@@ -205,8 +205,13 @@ static MagickBooleanType EnqueueWaveletDenoisePasses(
     goffset[0]=0;
     goffset[1]=x*gsize[1];
 
-    outputReady=EnqueueOpenCLKernel(pass->queue,pass->denoiseKernel,2,goffset,gsize,lsize,
-      pass->image,pass->filteredImage,MagickTrue,exception);
+    {
+      const OpenCLKernelLaunch
+        enqueue = { pass->queue, pass->denoiseKernel, 2, goffset, gsize, lsize,
+          pass->image, pass->filteredImage, MagickTrue };
+
+      outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+    }
     if (outputReady == MagickFalse)
       break;
   }

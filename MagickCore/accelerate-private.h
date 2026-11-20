@@ -33,15 +33,60 @@ extern "C" {
 
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
+typedef struct _AccelerateFunctionRequest
+{
+  const MagickFunction
+    function;
+
+  const size_t
+    number_parameters;
+
+  const double
+    *parameters;
+} AccelerateFunctionRequest;
+
+typedef struct _AccelerateModulateRequest
+{
+  const double
+    percent_brightness,
+    percent_hue,
+    percent_saturation;
+
+  const ColorspaceType
+    colorspace;
+} AccelerateModulateRequest;
+
+typedef struct _AccelerateMotionBlurRequest
+{
+  const double
+    *kernel;
+
+  const size_t
+    width;
+
+  const OffsetInfo
+    *offset;
+} AccelerateMotionBlurRequest;
+
+typedef struct _AccelerateResizeRequest
+{
+  const size_t
+    resizedColumns,
+    resizedRows;
+
+  const ResizeFilter
+    *resizeFilter;
+} AccelerateResizeRequest;
+
 extern MagickPrivate Image
   *AccelerateBlurImage(const Image *,const double,const double,ExceptionInfo *),
   *AccelerateDespeckleImage(const Image *,ExceptionInfo *),
   *AccelerateLocalContrastImage(const Image *,const double,const double,
     ExceptionInfo *),
-  *AccelerateMotionBlurImage(const Image*,const double*,const size_t,
-    const OffsetInfo*,ExceptionInfo*),
-  *AccelerateResizeImage(const Image *,const size_t,const size_t,
-    const ResizeFilter *,ExceptionInfo *),
+  *AccelerateMotionBlurImage(const Image*,const AccelerateMotionBlurRequest*,
+    ExceptionInfo*),
+  *AccelerateResizeImage(const Image *,const AccelerateResizeRequest *,
+    ExceptionInfo *),
   *AccelerateRotationalBlurImage(const Image *,const double,ExceptionInfo *),
   *AccelerateUnsharpMaskImage(const Image *,const double,const double,
     const double,const double,ExceptionInfo *),
@@ -52,12 +97,12 @@ extern MagickPrivate MagickBooleanType
   AccelerateContrastStretchImage(Image *,const double,const double,
     ExceptionInfo*),
   AccelerateEqualizeImage(Image *,ExceptionInfo *),
-  AccelerateFunctionImage(Image *,const MagickFunction,const size_t,
-    const double *,ExceptionInfo *),
+  AccelerateFunctionImage(Image *,const AccelerateFunctionRequest *,
+    ExceptionInfo *),
   AccelerateGrayscaleImage(Image *,const PixelIntensityMethod,
     ExceptionInfo *),
-  AccelerateModulateImage(Image *,const double,const double,const double,
-    const ColorspaceType, ExceptionInfo*);
+  AccelerateModulateImage(Image *,const AccelerateModulateRequest *,
+    ExceptionInfo*);
 
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
 

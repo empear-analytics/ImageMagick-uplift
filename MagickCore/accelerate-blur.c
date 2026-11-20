@@ -308,9 +308,13 @@ static MagickBooleanType EnqueueBlurColumnPass(const BlurColumnPass *pass,
   lsize[0]=1;
   lsize[1]=input->chunkSize;
 
-  *outputReady=EnqueueOpenCLKernel(input->queue,*blurColumnKernel,2,
-    (size_t *) NULL,gsize,lsize,input->image,input->filteredImage,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch
+      enqueue = { input->queue, *blurColumnKernel, 2, (size_t *) NULL, gsize,
+        lsize, input->image, input->filteredImage, MagickFalse };
+
+    *outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
   return(MagickTrue);
 }
 
@@ -362,9 +366,13 @@ static MagickBooleanType EnqueueBlurPasses(const BlurPassesInput *input,
   lsize[0]=input->chunkSize;
   lsize[1]=1;
 
-  *outputReady=EnqueueOpenCLKernel(input->queue,*blurRowKernel,2,
-    (size_t *) NULL,gsize,lsize,input->image,input->filteredImage,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch
+      enqueue = { input->queue, *blurRowKernel, 2, (size_t *) NULL, gsize,
+        lsize, input->image, input->filteredImage, MagickFalse };
+
+    *outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
   if (*outputReady == MagickFalse)
     return(MagickFalse);
 

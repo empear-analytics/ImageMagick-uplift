@@ -90,11 +90,18 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-recreate-buffer-private.h \
+  MagickCore/accelerate-recreate-release-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate.c \
   MagickCore/animate-window.c \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
+  MagickCore/animate-window-command-private.h \
+  MagickCore/animate-window-menu-private.h \
+  MagickCore/animate-window-scene-private.h \
+  MagickCore/animate-window-events-private.h \
+  MagickCore/animate-window-session-private.h \
   MagickCore/annotate.c \
   MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
@@ -219,6 +226,21 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image.c \
   MagickCore/display.h \
   MagickCore/display-private.h \
+  MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-annotate-chop-private.h \
+  MagickCore/display-image-crop-private.h \
+  MagickCore/display-image-composite-crop-private.h \
+  MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-draw-undo-private.h \
+  MagickCore/display-image-apply-private.h \
+  MagickCore/display-image-apply-effects-private.h \
+  MagickCore/display-image-apply-filters-private.h \
+  MagickCore/display-image-matte-private.h \
+  MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-window-private.h \
+  MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -384,6 +406,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
+  MagickCore/opencl-initialize-benchmark-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -700,8 +723,15 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-recreate-buffer-private.h \
+  MagickCore/accelerate-recreate-release-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
+  MagickCore/animate-window-command-private.h \
+  MagickCore/animate-window-menu-private.h \
+  MagickCore/animate-window-scene-private.h \
+  MagickCore/animate-window-events-private.h \
+  MagickCore/animate-window-session-private.h \
   MagickCore/annotate-private.h \
   MagickCore/blob-private.h \
   MagickCore/cache-private.h \
@@ -763,6 +793,21 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
+  MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-annotate-chop-private.h \
+  MagickCore/display-image-crop-private.h \
+  MagickCore/display-image-composite-crop-private.h \
+  MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-draw-undo-private.h \
+  MagickCore/display-image-apply-private.h \
+  MagickCore/display-image-apply-effects-private.h \
+  MagickCore/display-image-apply-filters-private.h \
+  MagickCore/display-image-matte-private.h \
+  MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-window-private.h \
+  MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
@@ -816,6 +861,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
+  MagickCore/opencl-initialize-benchmark-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \

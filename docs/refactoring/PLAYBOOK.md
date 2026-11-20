@@ -2054,6 +2054,34 @@ merges code, not parameters.
    call changes in the same commit (2026-11-19, `GetSimilarityForMetric` of
    `compare-similarity-private.h`, `964f4cd49`): it is still never used through a function
    pointer, and the build of each including file refuses a call left with the old arguments.
+   *MagickPrivate form* (owner 2026-11-20, "I answer yes to that"; written under the
+   mandate (2026-11-19), please confirm). A function declared `MagickPrivate` (internal,
+   hidden, never `MagickExport` or `WandExport`, whose signatures stay) in a private header
+   that is not installed (`MAGICKCORE_NOINST_HDRS`) may be bundled the same way, on five
+   conditions. (a) The typedef stands in that same private header, directly above the
+   prototype's `extern` block and inside every preprocessor conditional that holds the
+   prototype, so each file that sees the prototype sees the type; its name carries the
+   function's family (`AccelerateFunctionRequest`) so that no includer already uses it.
+   (b) Every caller changes in the same commit: `git grep -w <Function>` over the whole
+   tree (MagickCore, MagickWand, coders, utilities, Magick++, `tools/`) lists them, and
+   the message names each. A caller in code no build compiles (`coders/dps.c` without
+   the DPS delegate, `#if 0`, a commented-out call), or in a file of the other campaign,
+   holds the step: report it. (c) The function is never taken by address and is not
+   listed in `MagickCore/methods.h` with a different arity (that file only renames).
+   (d) Object identity per file: the defining file and every file with a changed call,
+   compiled with `-fno-inline` against `HEAD`'s and the working tree's headers (both
+   sides' own, since `obj_identical.sh` and `obj_modulo.sh` see only the working tree's),
+   have every function other than the bundled one and the callers holding a changed call
+   instruction-identical, none new or gone; every other includer of the header compiles
+   to an identical object. (e) The oracle on the bundled function and each reached caller
+   (`--function`, the wide catalogue for X11 or OpenCL code); a caller no case reaches
+   takes *Unreached functions: B and N* items 1 to 4; a call inside a per-pixel loop or an
+   OpenMP region is timed as any step there is (inclusive Ir of the region function, at
+   most +0.01 % under the owner's 2026-11-19 ruling). Every includer of the header keeps
+   its score and compiles in all `ci_linux_warnings` configurations; the header is scored
+   by hand before and after. A `static` function that the bundled one calls with exactly
+   the bound locals of its step 3 may then take the same `const Name *` under step 8's
+   *Existing input struct* form, the bindings standing for Recipe N's.
 2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
    top of the file, one member per parameter in the group, with the parameter's type and
    name.
@@ -2085,6 +2113,14 @@ merges code, not parameters.
    two lines and 8.42 with the block form, and stays 8.46 in one; precedent for the
    declaration: `compare-similarity-image.c`'s `const SimilarityRow row = {...}`). Only
    the layout of these lines changes; the tokens are those of the two-line form.
+   The same one-line declaration may stand as the one declaration of the block form
+   below, and in either form it is also allowed when the two-line form would carry the
+   file past CodeScene's *Lines of Code in a Single File* bar enough to lower it
+   (mandate (2026-11-19), please confirm; `display-image-annotate-private.h`, 9.09 ->
+   8.54 with the two-line block form of `XConfigureImageColormap`'s call in
+   `XColorEditRelease`, 9.09 with one line): the file-level count reads the same lines
+   the function-level one does, and the tokens, their order and the evaluation stay
+   those of the two-line form.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
    Form for a call in a loop (2026-11-05): when the calls stand in the body of a loop of
@@ -23615,6 +23651,61 @@ same order. Step 4's proof compiles the `.c` file against the headers of `HEAD` 
 working tree (`tools/obj_identical.sh` and `pp_identical.sh` compile both sides against the
 working tree's headers and cannot see a header-only change): the preprocessed unit and the
 object, wide candidate's flags, `__LINE__` and `__FILE__` pinned, both identical.
+Mid-file form, a run after a kept item (owner, 2026-11-20: private headers may be added to
+the X11 files and included mid-file, PR #126 Q2): in an X11 file whose statics sit between
+items that must stay in the `.c` file (`display-image.c`: about 600 statics around its two
+`MagickExport` functions and two non-`const` command tables), Form A's run may instead begin
+directly after such a kept item: a definition with external linkage, a non-`const`
+file-scope object, the opening `#if defined(MAGICKCORE_X11_DELEGATE)` (and the blank line
+after it) of the branch that holds the rest of the file, or the `#include` line of an
+earlier step of this form. It ends directly before the next kept item, or at any earlier
+top-level boundary outside every `#if` pair it holds, so one long stretch between two kept
+items may go into several headers, one per commit. Blank and form-feed lines at the run's
+edges stay in the `.c` file. The `.c` file names the new header on the run's own first
+line, inside the same `#if` branches as the run (a mid-file `#include`), so the translation
+unit has the same tokens in the same order. The run may name a kept file-scope object
+(it stays defined once, above or below, in the `.c` file, as it was). A `%` banner in the
+run that documents a function outside the run (a kept external definition, or a static
+of a later run) moves, unchanged, to directly above that function, as step 1 moves an
+external function's banner. Step 4's proof is `WIDE=1` `pp_identical.sh` and
+`obj_identical.sh` (the `.c` file changes, so both tools see the change), both `IDENTICAL`.
+In a stub-probed chain of several headers out of one file, a header's bar (step 1) is the
+file's score before the chain's first step, not the score an earlier header of the same
+chain already raised it to (the owner's 2026-11-17 reading: products "at or above the
+original's score"); the message names both numbers when they differ.
+A header of the mid-file form may be carved again, as the forms above carve a header they
+produced: its leading run (from the line after its include guard's `#define` and the blank
+line after it, to a top-level boundary outside every `#if` pair it holds) moves verbatim
+into a new header of the same kind, and the `.c` file names the new header on the line
+directly above its `#include` of the carved one, so the translation unit has the same
+tokens in the same order. A `%` banner in the run that documents a function left in the
+carved header moves to directly above that function. Step 4's proof compiles the `.c` file
+against the headers of `HEAD` and of the working tree (the carved and the new header placed
+ahead of every `-I` path), wide candidate's flags, `__LINE__` and `__FILE__` pinned:
+preprocessed unit and object both identical. Step 1's bar is the carved header's score
+before the step; both products must reach it and one must rise above it.
+Mid-file conditional form (mandate, 2026-11-19; campaign A round 36; owner 2026-11-20, "private
+headers may be ... included mid-file", read by the main session as covering mid-file includes
+in general, not only in X11 files, and flagged in the PR): Form A also applies to a `.c` file
+whose include block is followed by a whole-file conditional (`#if
+defined(MAGICKCORE_OPENCL_SUPPORT)` in `opencl-initialize.c`) that itself opens with a
+conditional `#include` (`#if defined(MAGICKCORE_LTDL_DELEGATE)` / `#include "ltdl.h"` /
+`#endif`), which some build compiles, so that naming the new header in the include block would
+put the run's items before that header's tokens. The run then begins with the blank line after
+that inner `#endif` (the blank line stays in the `.c` file, below the new include) and ends
+directly before the first item that stays; the `.c` file names the new header on the line
+directly after the inner `#endif`, inside the file's conditional, where the run stood. The
+header holds the items verbatim and in order inside its include guard and adds no wrapping
+conditional of its own (no `#if defined(MAGICKCORE_OPENCL_SUPPORT)` around the items: its one
+include already stands inside the file's conditional); the conditional blocks inside the run
+(`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and
+all, unedited. The translation unit has the same tokens in the same order in every
+configuration. Step 4's proof: `tools/pp_identical.sh` and
+`tools/obj_identical.sh` in every build that compiles the file (`WIDE=1`, and `BUILD=` each CI
+configuration that compiles it, such as `ci-gcc-x` and `ci-clang-x`), `IDENTICAL` (or
+`pp_identical` differing only in indentation, identical under `diff -b`), and `NOTHING
+COMPILED` in the narrow build before and after. Unbuilt branches inside the run (`#ifdef
+_WIN32` in the accelerate timer) move verbatim under the owner's 2026-11-20 ruling.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -23958,6 +24049,25 @@ which moves zeroing writes and keeps the variable.
    pixel or per row is timed against its parent as the timing rule asks; a function that
    runs once per call is timed on its cases with callgrind instruction counts and an A/A
    run beside the comparison.
+7. *Initialiser form* (2026-11-20). The copies may instead be the initialiser of a `const`
+   struct `s` declared in a block of its own whose only statement is the one call that
+   reads it, `{ const T s = { e1, ..., en }; F(&s); }` (Recipe FB's form), standing where
+   nothing follows it in the function but statements that name none of `s`'s elements
+   (`accelerate-histogram.c`'s `ComputeEqualizeImage`, whose cleanup copies seven values
+   into `EqualizeBuffers` for `ReleaseEqualizeBuffers`). Every element `ek` is a plain
+   identifier: a chosen local (steps 2 and 4: declared with the member's exact type and a
+   constant initialiser, named nowhere after the block), a parameter the function never
+   assigns and whose address it never takes, or a local that is not chosen. Then:
+   (a) `s` is declared, not `const`, among the function's declarations, after every
+   declaration its initialiser names, with the initialiser that lists, member by member,
+   the constant of the chosen local's declarator, the parameter itself, or the constant
+   `NULL`, `0` or `MagickFalse` of the member's type for a local that is not chosen;
+   (b) each chosen local's declarator goes and every other use of it is written `s.m`
+   (step 3); (c) the block is replaced by one statement `s.m=v;` per local not chosen, in
+   member order, followed by the call `F(&s);` unchanged. A local is left unchosen when
+   text no build compiles names it (a Recipe UB fragment, which is never edited), or when
+   step 2 does not hold for it. No statement names `s` between its declaration and the
+   call except through the renamed uses.
 
 **Before:**
 
@@ -24017,6 +24127,17 @@ which moves zeroing writes and keeps the variable.
   addresses were; the struct already lived in memory (the call takes `&s`). The step
   removes copies, it adds none.
 
+- Under step 7 the struct is initialised when execution reaches the declarations, so each
+  chosen member holds its local's constant from the point the local did, and a parameter
+  read there has the value the block's initialiser read, since the function never assigns
+  it. Every later write of a chosen local lands in its member (step 3), so at the call each
+  member holds what the initialiser copied from the local; a local not chosen is copied
+  into its member at the point where the initialiser read it, by `s.m=v;`, and the
+  placeholder constant it replaces is never read. The callee receives the address of a
+  struct of the same type holding the same member values (a `T *` where the block passed
+  a `const T *`, converted implicitly). A path that leaves before the call leaves the
+  struct unread, as it left the locals.
+
 **Evidence level:** oracle on the function's cases, with `refactor_guard.py` and
 `--calls`, `ci_warnings.sh`, `ci_linux_warnings.sh --campaign-a` and `cxx_warnings.sh`,
 steps 1 and 2 checked by reading; callgrind instruction counts and A/A-bounded timing
@@ -24027,7 +24148,7 @@ round 31 third batch, lane c): a *Large Method* of 107 lines after rounds 30 and
 held by thirteen locals and their copies into `rows`, with its seven public arguments
 staying; a probe of this step takes it to 80 lines (9.11 to 9.25), and with a Recipe HN
 head and a Recipe E defaults block below the threshold (9.68). Added by Claude Code
-(Claude Opus 5.5) under the mandate of 2026-10-24.
+(Claude Opus 5.5) under the mandate of 2026-10-24. Step 7 (2026-11-20, campaign A, W50 round 37, lane c): `accelerate-histogram.c`'s `ComputeEqualizeImage` (77 lines after the round's Recipe I, JN and H steps), whose cleanup copies `clEnv`, `imageBuffer`, `map`, `equalizeMapBuffer`, `equalize_map`, `histogramBuffer` and `histogram` into a `const EqualizeBuffers` initialiser for `ReleaseEqualizeBuffers`; `imageBuffer` stays a local because the `RECREATEBUFFER` fragments name it. A probe: 69 lines, the file 8.98 to 9.38. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
@@ -25851,6 +25972,362 @@ for the owner's confirmation.
 
 ---
 
+## Recipe UB - Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Overall Code
+Complexity* on a function that holds a conditional block no Linux build compiles (an
+`#ifdef` of a macro nothing defines, such as `RECREATEBUFFER` in the OpenCL histogram
+methods, or an `#if 0` block), whose text CodeScene counts (its `if`s and lines) although no
+compiler ever sees it. The block names the function's locals (or names that no longer exist:
+`accelerate-histogram.c`'s block assigns `mem_flags`, `length` and `clStatus` and reads
+`context`, none of which `ComputeEqualizeImage` declares), so it cannot move into a helper
+without being edited, and every extraction around it is blocked by the rule that unbuilt code
+is never edited.
+
+**Not covered by:** the *Preprocessor branches* exception for `#if 0`, which moves a dead
+branch together with the code that holds it (an extraction); here the block moves alone and
+nothing around it changes. Recipe OH, which moves file-scope items to a header named in the
+include block; here the block stays inside its function and the header is named where the
+block stood. Recipe S (whole functions, a branch inside them).
+
+**How:**
+
+1. Probe first: replace the block by the `#include` line of step 3 in a copy of the file and
+   score the copy with `tools/ch.py`. Take the step when the file rises, or when the step is
+   the first of a chain whose next step is named and probed (rule 2).
+2. The block. It runs from its opening directive (`#ifdef X`, `#if 0`) through its matching
+   `#endif`, both lines included, and no build compiles any line of it: its condition is
+   false in every configuration (`grep -rn X` over the tree, `configure.ac`, `config/` and
+   the Windows project files finds no definition; `#if 0` needs no check). A block with an
+   `#else` that some build compiles is not taken.
+3. The header. Create `MagickCore/<stem>-<theme>-private.h` holding the short licence comment
+   of the private headers, saying which functions include it in place, and then the block
+   byte for byte. It has no include guard and no other code: it is a fragment, included where
+   the block stood, possibly in several places. List it under `MAGICKCORE_NOINST_HDRS` and
+   `MAGICKCORE_BASE_SRCS` in `MagickCore/Makefile.am`, mirrored in `Makefile.in`.
+4. The file. Replace the block's lines by one line, `#include
+   "MagickCore/<stem>-<theme>-private.h"`, at column 0 where the opening directive stood.
+   Nothing else changes; a comment above the block stays above the include. Another function
+   (in this file or another) that holds the same block byte for byte includes the same header
+   in a commit of its own; no copy of the header is made.
+5. Proof. A script checks that the header's text after its licence comment equals the lines
+   removed from the file, and that `git show HEAD:<file>` with the include line replaced by
+   that text is the working file. `tools/obj_identical.sh` prints `IDENTICAL` in every build
+   that compiles the function (`WIDE=1` for OpenCL and X11), and in the narrow build when it
+   compiles it. `tools/pp_identical.sh` prints `IDENTICAL`, or `DIFFERENT` only in the
+   indentation of the line after the include (`clang -E -P` rebuilds a line's leading blanks
+   from its column and loses one after a nested file returns); then the units compared with
+   `diff -b` are identical, which the commit quotes. With the macro defined, the unit gets
+   the same tokens in the same place, because `#include` is textual.
+6. Checks: `tools/ci_linux_warnings.sh --campaign-a`, `refactor_guard.py --combined` over the
+   file and the header (every literal's total unchanged), the scores of the file and of the
+   header, and the wide oracle when a case reaches the function.
+
+**Before:** (`accelerate-histogram.c`, `ComputeEqualizeImage`)
+
+```c
+  /* recreate input buffer later, in case image updated */
+#ifdef RECREATEBUFFER
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+#endif
+```
+
+**After:**
+
+```c
+  /* recreate input buffer later, in case image updated */
+#include "MagickCore/accelerate-recreate-release-private.h"
+```
+
+with `accelerate-recreate-release-private.h` holding the licence comment and the four lines
+from `#ifdef RECREATEBUFFER` to `#endif`.
+
+**Careful:**
+
+- The block is dead text: nothing in it is edited, not even names that no longer exist in its
+  function. Whoever defines the macro later finds it, unchanged, in the header the function
+  names in its place, and must adjust it there, as before.
+- No include guard: a guard would make a second inclusion in one translation unit (two
+  functions of one file holding the same block) silently empty, so the second place would
+  lose its text under the macro.
+- `__LINE__` of the code after the block changes (fewer lines in the file); the proof pins it
+  and the oracle normalises it.
+- CodeScene does not see the block any more, so the function's score rises without any code
+  changing: this is the point of the recipe, and the reason it is limited to text no build
+  compiles (owner 2026-11-20: such code "may move verbatim into a header; it is never edited
+  or deleted").
+
+**Evidence level:** guard, with step 5's identities (the block is not compiled; the rest of
+the unit is unchanged).
+
+**Provenance:** 2026-11-20, from `accelerate-histogram.c` (8.85) and
+`accelerate-contrast-stretch.c` (7.30) (campaign A, W49 round 36, lane c): both hold the same
+two `#ifdef RECREATEBUFFER` blocks, which CodeScene counts in `ComputeEqualizeImage` (cc 16 to
+12 and 103 to 84 lines in a probe, the file 8.85 to 8.95) and `ComputeContrastStretchImage`
+(cc 79 to 75, 7.30 to 7.38). Written under the owner's ruling of 2026-11-20 that code no Linux
+build compiles may move verbatim into a header. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
+## Recipe JN - Drop a Conditional Jump to the Label That Follows It
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose last
+statement before a label `L:` is `if (cond) goto L;` with no `else`: the jump lands where
+falling through lands, so the test decides nothing, yet CodeScene counts the `if` and the
+`goto` (`accelerate-histogram.c`'s `ComputeEqualizeImage`, whose last step before `cleanup:`
+is `if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse) goto cleanup;`).
+
+**Not covered by:** Recipe TC, which drops a trailing `if (cond) continue;` of a loop body
+and refuses a `cond` that makes a call; Recipes V, Y and I, which move a block that jumps to
+a cleanup label into a helper and keep the caller's jump; Recipe NG, which drops a test
+before a NULL-safe call.
+
+**How:**
+
+1. The statement `if (cond) goto L;` has no `else`, and on every path the next thing
+   control reaches after it is the label `L:`: the label directly follows it, or nothing
+   but closing braces of blocks that hold it stand between them (a block that ends there
+   adds no statement on any path), and none of them is the closing brace of a `for`,
+   `while` or `do` body (that brace returns to the loop head, so the test still decides
+   whether the next iteration runs). No `#if` line stands between them. The function holds
+   no other statement between the two, and nothing else of the function changes.
+2. `cond` is either free of side effects (no assignment, increment, decrement or call:
+   Recipe TC step 2), or one call `F(args)` compared with a constant (`F(args) ==
+   MagickFalse`, `F(args) != MagickTrue`, `F(args) < 0`), or the call alone (`if
+   (F(args))`), with no other side effect in the comparison.
+3. A side-effect-free `cond`: delete the two lines. A call: the statement becomes
+   `(void) F(args);`, the call's text unchanged; the comparison and the `goto` go.
+4. Proof: `tools/obj_identical.sh FILE` prints `IDENTICAL` (in the build that compiles the
+   function: `WIDE=1` for the OpenCL and X11 files), and the oracle on the function's cases
+   where some case reaches it. Any object difference refuses the step.
+
+**Before:**
+
+```c
+    if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse)
+      goto cleanup;
+  }
+
+cleanup:
+```
+
+**After:**
+
+```c
+    (void) RunEqualizePass(&run,exception,&runTargets);
+  }
+
+cleanup:
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Both outcomes of the test lead to `L:`: the `goto` jumps
+  there, and falling through reaches it as the next point of execution (step 1). So the
+  only effect the statement has is evaluating `cond`. Under step 3 the call is still made,
+  once, with the same arguments, at the same point; only its result is no longer compared,
+  and comparing a returned value with a constant has no effect. A side-effect-free `cond`
+  has no effect to keep (Recipe TC's argument).
+- Closing braces between the statement and the label end blocks; leaving a block runs no
+  code in C (no destructors), and the block-scope objects it ends are not named at `L`.
+- `(void)` keeps the convention for a discarded `MagickBooleanType` result, so no compiler
+  warns about an unused result (`warn_unused_result` is not set on these functions, but the
+  cast says that the discard is deliberate).
+- Not taken when anything other than closing braces stands before the label (a statement,
+  a declaration, a `#if` line): then the test decides whether that runs.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`; the oracle on
+the function's cases as well where some case reaches it.
+
+**Provenance:** 2026-11-20, from `accelerate-histogram.c`'s `ComputeEqualizeImage`
+(campaign A, W50 round 37, lane c): after the Recipe I step that merged its input and
+histogram blocks (cc 12 to 10), the last jump before `cleanup:` is one of the two tests that
+keep it at *Complex Method* (cc 10, threshold 9); a probe of this step takes it to cc 8 and
+the file 8.97 to 8.98, object code identical in the wide build. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
+## Recipe DC - Run Twin Dialog Commands Through One Runner Taking a Command Struct
+
+**Use when:** CodeScene reports *Code Duplication* (or *Lines of Code in a Single File*) in
+a file whose `static` command functions are copies of one dialog command: each keeps a
+`static char` reply buffer, asks the user for it with a dialog whose title and prompt are
+string literals, returns when the reply is empty, applies one function of the file to the
+reply, and ends with the same refresh tail. `display-image-apply-effects-private.h`'s
+`XApplySharpenCommand`, `XApplyBlurCommand`, `XApplySwirlCommand` and five more differ only
+in the dialog's two literals, the buffer they own (its name and initial text) and the
+`XApply*ToImage` function they call.
+
+**Not covered by:** Recipe CF, whose copies differ only in the function called (its step
+1 renames no literal, and these differ in two string literals and the buffer); Recipes SV
+and SC, whose differing values are constants passed to an extracted block, while here a
+function designator differs too and the buffer must stay owned by its command; Recipe D,
+which refuses differing literals and callees; Recipe KD and Recipe KF, which replace a
+dispatch by a table and leave the dispatched functions' bodies alone.
+
+**How:**
+
+1. Copies. Two or more `static void` functions of one file (or of one private header that
+   only one file includes) whose bodies are the same token sequence once each copy's
+   reply buffer is renamed to one name, the two literals of its dialog request are
+   replaced by two names and the callee at the apply role by `apply`; comments are
+   ignored. Each copy declares its buffer as a `static char` array of the function, with
+   its initialiser, among its first declarations, and every other local is one of the
+   copies' common `const` bindings from the context parameter. Checked by a script that
+   prints each copy's title, prompt, buffer and callee, and refuses any other difference.
+2. The method type. Every callee is a `static` function of the file (or of a header the
+   file includes before it) with the same parameter types; it is called only from its
+   copy (`git grep -w` over the tree). Write `typedef void (*NameMethod)(T1,T2,...);` with
+   exactly those types.
+3. The command struct, typed directly above the runner: the dialog's own request type as
+   its first member (`XDialogRequest request;`, title, prompt and buffer in the request's
+   member order) and `NameMethod apply;`. It holds pointers only: the buffer stays a
+   `static` of its command.
+4. The runner, a `static void` function directly above the first copy: its parameters are
+   the copies' common parameters with `const Name *command` after the first, at most four
+   in all. Its body is a copy's text with the request built by the copy replaced by
+   `&command->request`, the buffer by a `char *const` local bound from
+   `command->request.reply`, and the call at the apply role by `command->apply(...)` with
+   the copy's arguments; nothing else changes.
+5. Replace each copy's body by its buffer declaration (unchanged), one `const Name command
+   = { { title, prompt, buffer }, callee };` declaration (the copy's two literals, the
+   buffer's name, a function designator) and the call of the runner passing the copy's
+   parameters and `&command`. The copy's comments stay above the call. The function
+   keeps its name and parameters for its dispatcher.
+6. All copies change in one commit (rule 1); the message names each copy and its callee.
+7. Checks: the build in every configuration that compiles the file (`WIDE=1` for X11) and
+   `ci_linux_warnings.sh`, `cxx_warnings` (or the lane's C++ check), `refactor_guard.py`
+   (literals unchanged; `--calls` shows the copies' common callees down by one call per
+   copy but one, each callee down by one, the runner up by its definition and one call per
+   copy, `apply` up by one) and the oracle on every copy and every callee (each must be
+   reached: an unreached copy does not take this recipe).
+8. No timing: dialog commands run once per user command (owner 2026-11-18 evening).
+
+**Before:** (`display-image-apply-effects-private.h`, one of eight)
+
+```c
+static void XApplySharpenCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+  ...
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  /*
+    Query user for sharpen radius.
+  */
+  {
+    const XDialogRequest
+      dialog_request = { "Sharpen",
+        "Enter the sharpen radius and standard deviation:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
+  if (*radius == '\0')
+    return;
+  /*
+    Sharpen image scanlines.
+  */
+  XApplySharpenToImage(display,windows,flags,radius,image,exception);
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+```
+
+**After:**
+
+```c
+typedef void
+  (*XDialogApplyMethod)(Display *,XWindows *,MagickStatusType *,char *,
+    Image **,ExceptionInfo *);
+
+typedef struct _XDialogCommand
+{
+  XDialogRequest
+    request;
+
+  XDialogApplyMethod
+    apply;
+} XDialogCommand;
+
+static void XRunDialogCommand(const XMagickCommandContext *context,
+  const XDialogCommand *command,MagickStatusType *flags)
+{
+  ...
+  char
+    *const reply = command->request.reply;
+
+  (void) XDialogWidget(display,windows,&command->request);
+  if (*reply == '\0')
+    return;
+  command->apply(display,windows,flags,reply,image,exception);
+  CatchException(exception);
+  ...
+}
+...
+static void XApplySharpenCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  const XDialogCommand
+    command = { { "Sharpen", "Enter the sharpen radius and standard deviation:",
+      radius }, XApplySharpenToImage };
+
+  /*
+    Query user for sharpen radius.
+    Sharpen image scanlines.
+  */
+  XRunDialogCommand(context,&command,flags);
+}
+```
+
+**Careful:**
+
+- The buffer. It stays a `static` of its command, with its initialiser, so its storage,
+  its first value and the value it keeps from one command to the next are the same; the
+  runner only receives its address, as the dialog widget and the callee did. Two commands
+  never share a buffer.
+- The request. `XDialogWidget` receives a pointer to an `XDialogRequest` whose three
+  members hold the same title, prompt and buffer address as the copy's own request did;
+  the widget reads them and writes only through `reply`, into the same buffer.
+- The call through `apply` has the callee's exact type (step 2), so it calls that
+  function with the same arguments (C11 6.5.2.2, 6.3.2.3p8), and the build refuses a
+  designator of another type in the initialiser. Each command therefore runs its copy's
+  statements in the same order on the same values, with one more call level.
+- Speed: the copies run once per user command in the X11 display program, never per
+  pixel, so the indirect call costs nothing that matters (owner 2026-11-18 evening).
+- The step does not by itself clear *Code Duplication*: the commands become small
+  functions of one shape, which CodeScene may still group. It removes their tails from
+  the file (*Lines of Code in a Single File*) and gives the callees one type, so that
+  Recipe B can bundle their arguments in one commit through the method table (owner
+  2026-11-20: every entry of one function-pointer table in one commit).
+
+**Evidence level:** oracle (every copy and every callee reached; the wide catalogue for
+X11 code), with `refactor_guard.py --calls` and step 1's script.
+
+**Provenance:** 2026-11-20, from `display-image-apply-effects-private.h` (7.32; campaign A,
+W50 round 37, lane b): about twenty `XApply*Command` functions, carved out of
+`display.c`'s `XMagickCommand`, repeat the dialog, empty-reply test and refresh tail around
+one `XApply*ToImage` call; the round-37 brief asked for a table-driven runner in which
+each command keeps its own `static char` buffer. The first use takes the eight that pass
+`flags` and catch the exception (one callee type): 2249 to 2079 lines, score flat at 7.32
+(the file's *Code Duplication* and argument findings stay; a probe without the twenty
+callees' argument findings gives 7.55). Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26414,3 +26891,16 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | *X11 conditional form* of Form A: in a `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)` closing at the file's end (the `widget-*.c` split products), the run begins after the opener; the new header wraps the items, verbatim and in order, in the same conditional inside its guard, and the `.c` file names it as the last line of its include block, above the opener (no mid-file include); proof `pp_identical.sh` and `obj_identical.sh` with `WIDE=1` (`pp_identical.sh` gains `WIDE=1`) | `widget-color.c`, `widget-font.c`, `widget-file.c`, `widget-text.c` and `widget-list.c` (campaign A, W48 round 35, lane a), each one family carrying *Lines of Code in a Single File* (one public root each, so Recipe S has nothing to split); probes: color 9.38 to 10.0 with a 10.0 header, font 9.38 to 10.0 with a 10.0 header, file 8.81 to 10.0 with a 9.38 header | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | D | Form (b), *Unreached functions* and *Object code that differs only in the caller*: the block's single output that the helper returns may be a member `s.m` of a struct local of the caller, the call `s.m=Helper(...,s.m,...);`, when the member is reached with one `.` and no `->`, is set on every path before the block, and the block reads and writes no other member of `s`; `tools/reuse_check.py` accepts the shape and refuses `->` | `fourier-forward-private.h`'s `ForwardFourierTransformChannel` (campaign A, W48 round 35, lane b): its padding block is `PadFourierWidth`'s body with `fourier_info.width` as the padded width; the call clears the header's Overall Code Complexity, 9.38 -> 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *X11 conditional form* on a header it produced that one `.c` file includes: the run begins after the header's own X11 opener, the new header wraps it in the same conditional, the `.c` file names the new header directly above the carved one; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags), since `obj_identical.sh`/`pp_identical.sh` cannot see a header-only change | `widget-list-actions-private.h` (campaign A, W48 round 35, lane a): at 998 lines of code it blocks the Recipe B bundle of `XEditText` (`widget-core-private.h` 9.68 to 10.0), whose two block-form call sites would put it at 1005 (9.38); a carve of its leading run up to `MoveListBrowserSliderByPage` leaves both headers at 10.0 | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *Mid-file form*, a run after a kept item: in an X11 file whose statics sit between items that stay (external definitions, non-`const` file-scope objects, the X11 opener, an earlier step's `#include`), Form A's run may begin directly after such an item and end before the next one or at an earlier boundary outside its `#if` pairs, one header per commit; the `.c` file names the header on the run's first line, inside the same `#if` branches; a banner documenting a function outside the run moves to directly above it; proof `WIDE=1` `pp_identical.sh` and `obj_identical.sh` | `display-image.c` (6.49): `#if defined(MAGICKCORE_X11_DELEGATE)` holds the rest of the file, and its statics sit around `XDisplayBackgroundImage`, `XDisplayImage` and the two non-`const` command tables, so no run follows the include block; stub probe (cs-mcp 1.5.16) with eight headers 6.49 to 9.68, headers 6.89 to 9.09. Redone from campaign A W41 lane b2's held `565722583` on the owner's 2026-11-20 answer to PR #126 Q2 (private headers in X11 files, included mid-file); campaign A, W49 round 36, lane b | owner |
+| 2026-11-20 | AMEND | OH | Step 1's bar in a stub-probed chain of several headers out of one file is the file's score before the chain's first step, not the score an earlier header of the chain raised it to; the message names both numbers | `display-image.c`: the first two headers raise it 6.49 to 7.55, the next two (the draw and undo commands; the `XApply*` command appliers with their static argument counts and duplication) score 7.10 in the probe, above 6.49 and below the file's 7.32 to 7.55 at their steps; the chain ends at 9.68. Read from the owner's 2026-11-17 ruling (products "at or above the original's score"); redone from W41 lane b2's held `a71f4805d`; campaign A, W49 round 36, lane b | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | B | Step 1, *MagickPrivate form*: a `MagickPrivate` function of a private, not installed header may be bundled when the typedef stands in that header above the prototype (inside the same conditionals), every caller in the tree changes in the same commit (a caller in unbuilt code or in the other campaign's files holds the step), the function is never taken by address; proof object identity per file with `-fno-inline` against each side's own headers apart from the bundled function and the changed callers, identical objects for the other includers, the oracle on the function and reached callers, *Unreached functions: B and N* for unreached ones, the timing rule for calls in per-pixel loops or OpenMP regions; a `static` callee taking exactly the bound locals may take the same struct under step 8's *Existing input struct* form | The owner's 2026-11-20 answer ("I answer yes to that") allowing `MagickPrivate` signatures to change; about 51 campaign A files sit at 9.68 with *Excess Number of Function Arguments* alone, 13 of them held only by `MagickPrivate` or `static` functions (`AccelerateFunctionImage`, `AccelerateModulateImage`, `AccelerateResizeImage`, `AccelerateMotionBlurImage`, `EnqueueOpenCLKernel`, `MorphologyApply`, the widget and xwindow entry points; campaign A, W49 round 36, lane a) | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *Mid-file form*, carved again: a mid-file header's leading run (after its guard's `#define`) moves verbatim into a new header, and the `.c` file names it directly above its `#include` of the carved header; banners of functions left behind move to above them; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags); both products at or above the carved header's score, one above it | The `display-image-*` headers of round 36's first batch (6.89 to 9.09) carry *Number of Functions*, *Lines of Code* and, once smaller, *Overall Code Complexity* and the duplication the 27,000-line file hid; probes of one cut each: annotate 6.89 to 8.28 and 9.09, crop 6.89 to 8.54 and 8.28, draw 7.10 to 7.32 and 7.78, matte 7.55 to 8.54 and 9.09, apply 7.10 to 7.32 and 7.32, window 9.09 to 9.09 and 10.0; campaign A, W49 round 36, lane b | mandate (2026-11-19) |
+| 2026-11-20 | NEW | UB | Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place: a conditional block no Linux build compiles (`#ifdef RECREATEBUFFER`, `#if 0`) inside a function moves, byte for byte, into a guard-less private header that the function `#include`s at the block's place; files holding the same block include the same header; proof by script (the text moved unchanged) and `pp_identical.sh`/`obj_identical.sh` IDENTICAL | `accelerate-histogram.c`'s `ComputeEqualizeImage` and `accelerate-contrast-stretch.c`'s `ComputeContrastStretchImage` (campaign A, W49 round 36, lane c), each holding the same two `RECREATEBUFFER` blocks; probes 8.85 to 8.95 and 7.30 to 7.38; the owner's ruling of 2026-11-20 that code no Linux build compiles may move verbatim into a header | mandate (2026-11-19) |
+| 2026-11-20 | WORDING | UB | Step 5: `pp_identical.sh` may print DIFFERENT only in the indentation of the line after the include (clang `-E -P` loses a leading blank after a nested file returns); the units must then be identical under `diff -b`, and `obj_identical.sh` must print IDENTICAL | The first use, `accelerate-histogram.c` (wide build): one line, `  {` against ` {`, object IDENTICAL | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *Mid-file conditional form* of Form A: when the file's whole-file conditional opens with a conditional `#include` that some build compiles (`ltdl.h` in `opencl-initialize.c`), the run begins after that include's `#endif` and the new header is named on the next line, inside the conditional (a mid-file include); the header has no conditional of its own; proof `pp_identical`/`obj_identical` in every build that compiles the file | `opencl-initialize.c` (campaign A, W49 round 36, lane c): *Lines of Code in a Single File* (1307 lines); a probe of the run from its typedefs to `LoadOpenCLBenchmarks` leaves the file at 10.0 and the header at 9.38 (the file's score before); naming the header in the include block would move `ltdl.h`'s tokens after the items in the wide build, which defines `MAGICKCORE_LTDL_DELEGATE`; owner 2026-11-20 on mid-file includes, as the main session reads it | mandate (2026-11-19) |
+| 2026-11-20 | WORDING | OH | *Mid-file conditional form*: the run begins with the blank line after the inner `#endif` (which stays in the `.c` file below the include); "no conditional of its own" means no wrapping conditional around the items; the conditional blocks inside the run (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and all, unedited | Review of `247c503b7` (campaign A, W49 round 36, lane c): the wording left the start of the run and the inner conditionals ambiguous; `02688eb72` did exactly this | mandate (2026-11-19) |
+| 2026-11-20 | NEW | JN | Drop a Conditional Jump to the Label That Follows It: an `if (cond) goto L;` whose next point of execution is `L:` (nothing but closing braces between) is deleted when `cond` has no side effect, or becomes `(void) F(args);` when `cond` is one call compared with a constant; proof `obj_identical.sh` IDENTICAL, oracle where reached | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the last jump before `cleanup:`; a probe after the round's Recipe I step: cc 10 to 8 (leaves *Complex Method*), 8.97 to 8.98, object IDENTICAL (wide) | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | LM | Step 7, initialiser form: the copies may be the initialiser of a `const` struct declared in a block of its own whose only statement is the call that reads it; the struct is then declared, not `const`, among the declarations, initialised with the chosen locals' constants and the parameters it copied, each other local copied by `s.m=v;` where the block stood, and the block becomes the call; a local that text no build compiles names (a Recipe UB fragment) is not chosen | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the cleanup's `EqualizeBuffers` initialiser; a probe 77 to 69 lines, 8.98 to 9.38 | mandate (2026-11-19) |
+| 2026-11-20 | WORDING | JN | Step 1: the closing braces between the statement and `L:` exclude the closing brace of a `for`, `while` or `do` body, which returns to the loop head, so the test still decides something | Review of W50 lane c batch 1 (main session): the first wording let a jump out of a loop body's last statement count as a jump to the next point of execution; `835880ade` (no loop around it) is unaffected | mandate (2026-11-19) |
+| 2026-11-20 | NEW | DC | Run Twin Dialog Commands Through One Runner Taking a Command Struct: `static` dialog commands that differ only in the dialog's title and prompt literals, the `static char` reply buffer each owns and the function applied to the reply keep their buffers and pass a `const` struct `{ { title, prompt, buffer }, callee }` to one runner, which calls the callee through a method of the callees' exact type | `display-image-apply-effects-private.h` (7.32; campaign A, W50 round 37, lane b): about twenty `XApply*Command` copies of one dialog-apply-refresh body; CF refuses the differing literals and buffers. First use, the eight `flags` commands: 2249 to 2079 lines, score flat, the callees left with one type for a one-commit Recipe B through the method table | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | B | Step 5, one-line form: the one-line `const` declaration may also be the one declaration of the block form, and in either form it is allowed when the two-line form would carry the file past *Lines of Code in a Single File* enough to lower it, not only when it would make a *Large Method*; tokens, order and evaluation those of the two-line form | `XConfigureImageColormap`'s call in `display-image-annotate-private.h`'s `XColorEditRelease` (campaign A, W50 round 37, lane a): 9.09 -> 8.54 in a probe with the two-line block form, 9.09 with one line | mandate (2026-11-19) |

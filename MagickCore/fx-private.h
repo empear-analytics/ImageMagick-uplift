@@ -29,9 +29,19 @@ extern MagickPrivate FxInfo
   *AcquireFxInfo(const Image *,const char *,ExceptionInfo *),
   *DestroyFxInfo(FxInfo *);
 
+typedef struct _FxChannelPosition
+{
+  const PixelChannel
+    channel;
+
+  const ssize_t
+    x,
+    y;
+} FxChannelPosition;
+
 extern MagickPrivate MagickBooleanType
-  FxEvaluateChannelExpression(FxInfo *,const PixelChannel,const ssize_t,
-   const ssize_t,double *,ExceptionInfo *);
+  FxEvaluateChannelExpression(FxInfo *,const FxChannelPosition *,double *,
+    ExceptionInfo *);
 
 #if defined(__cplusplus) || defined(c_plusplus)
 }

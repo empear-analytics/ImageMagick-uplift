@@ -1231,9 +1231,14 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     Modulate image.
   */
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
-  if (AccelerateModulateImage(image,percent_brightness,percent_hue,
-        percent_saturation,colorspace,exception) != MagickFalse)
-    return(MagickTrue);
+  {
+    const AccelerateModulateRequest
+      request = { percent_brightness, percent_hue, percent_saturation,
+        colorspace };
+
+    if (AccelerateModulateImage(image,&request,exception) != MagickFalse)
+      return(MagickTrue);
+  }
 #endif
   input.image=image;
   input.colorspace=colorspace;

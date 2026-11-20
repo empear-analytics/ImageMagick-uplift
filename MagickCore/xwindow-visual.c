@@ -658,18 +658,19 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 %
 %  The format of the XDisplayImageInfo method is:
 %
-%      void XDisplayImageInfo(Display *display,
-%        const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
-%        Image *image,ExceptionInfo *exception)
+%      void XDisplayImageInfo(const XDisplayImageInfoTarget *target,
+%        Image *undo_image,Image *image,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
+%    o target: where the information is displayed, in these members:
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o display: Specifies a connection to an X server;  returned from
+%        XOpenDisplay.
 %
-%    o windows: Specifies a pointer to a XWindows structure.
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%
+%      o windows: Specifies a pointer to a XWindows structure.
 %
 %    o undo_image: the undo image.
 %
@@ -774,10 +775,18 @@ static void DestroyXTextList(char **textlist)
   textlist=(char **) RelinquishMagickMemory(textlist);
 }
 
-MagickPrivate void XDisplayImageInfo(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
-  Image *image,ExceptionInfo *exception)
+MagickPrivate void XDisplayImageInfo(const XDisplayImageInfoTarget *target,
+  Image *undo_image,Image *image,ExceptionInfo *exception)
 {
+  Display
+    *const display = target->display;
+
+  const XResourceInfo
+    *const resource_info = target->resource_info;
+
+  XWindows
+    *const windows = target->windows;
+
   char
     filename[MagickPathExtent],
     *text,
@@ -836,14 +845,16 @@ MagickPrivate void XDisplayImageInfo(Display *display,
       char
         title[MagickPathExtent];
 
+      const XHelpView
+        view = { display, resource_info, windows, MagickTrue };
+
       /*
         Display information about the image in the Text View widget.
       */
       (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
       (void) FormatLocaleString(title,MagickPathExtent,"Image Info: %s",
         image->filename);
-      XTextViewWidget(display,resource_info,windows,MagickTrue,title,
-        (char const **) textlist);
+      XTextViewWidget(&view,title,(char const **) textlist);
       DestroyXTextList(textlist);
     }
   text=DestroyString(text);

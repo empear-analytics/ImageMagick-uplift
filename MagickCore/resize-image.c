@@ -1108,8 +1108,12 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   filter_type=SelectResizeFilterType(image,filter,x_factor,y_factor);
   resize_filter=AcquireResizeFilter(image,filter_type,MagickFalse,exception);
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
-  resize_image=AccelerateResizeImage(image,columns,rows,resize_filter,
-    exception);
+  {
+    const AccelerateResizeRequest
+      resize = { columns, rows, resize_filter };
+
+    resize_image=AccelerateResizeImage(image,&resize,exception);
+  }
   if (resize_image != (Image *) NULL)
     {
       resize_filter=DestroyResizeFilter(resize_filter);

@@ -402,9 +402,14 @@ static void RedrawColorBrowserAction(const ColorBrowserContext *context,
       color=windows->widget.pixel_info->matte_color;
       (void) XParseColor(display,windows->widget.map_info->colormap,
         (*reply_info).text,&windows->widget.pixel_info->matte_color);
-      XBestPixel(display,windows->widget.map_info->colormap,(XColor *) NULL,
-        (unsigned int) windows->widget.visual_info->colormap_size,
-        &windows->widget.pixel_info->matte_color);
+      {
+        const XBestPixelTarget
+          pixel_target = { display, windows->widget.map_info->colormap };
+
+        XBestPixel(&pixel_target,(XColor *) NULL,
+          (unsigned int) windows->widget.visual_info->colormap_size,
+          &windows->widget.pixel_info->matte_color);
+      }
       (*mode_info).text=colorname;
       (void) FormatLocaleString((*mode_info).text,MagickPathExtent,
         "#%02x%02x%02x",windows->widget.pixel_info->matte_color.red,
@@ -1034,10 +1039,12 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       colorlist=GetColorList(glob_pattern,&colors,exception);
       if (colorlist == (char **) NULL)
         {
+          const XDialogRequest
+            dialog_request = { action, "Enter color name:", reply };
+
           XNoticeWidget(display,windows,"Unable to obtain colors names:",
             glob_pattern);
-          (void) XDialogWidget(display,windows,action,"Enter color name:",
-            reply);
+          (void) XDialogWidget(display,windows,&dialog_request);
           return;
         }
     }

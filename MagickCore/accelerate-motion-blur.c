@@ -1174,9 +1174,17 @@ cleanup:
 }
 
 MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
-  const double* kernel,const size_t width,const OffsetInfo *offset,
-  ExceptionInfo *exception)
+  const AccelerateMotionBlurRequest *motion,ExceptionInfo *exception)
 {
+  const double
+    *const kernel = motion->kernel;
+
+  const size_t
+    width = motion->width;
+
+  const OffsetInfo
+    *const offset = motion->offset;
+
   const MotionBlurRequest
     request = { kernel, width, offset };
 

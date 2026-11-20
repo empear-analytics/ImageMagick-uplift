@@ -5012,29 +5012,35 @@ static void ScanBracedPattern(char *pattern,ssize_t *offset,ssize_t *depth,
 static MagickStatusType EvaluatePixelExpression(FxInfo *fx_info,
   const Image *image,PixelInfo *pixel,ExceptionInfo *exception)
 {
+  const FxChannelPosition
+    red = { RedPixelChannel, 0, 0 },
+    green = { GreenPixelChannel, 0, 0 },
+    blue = { BluePixelChannel, 0, 0 },
+    black = { BlackPixelChannel, 0, 0 },
+    alpha = { AlphaPixelChannel, 0, 0 };
+
   double
     value;
 
   MagickStatusType
     fx_status;
 
-  fx_status=FxEvaluateChannelExpression(fx_info,RedPixelChannel,0,0,
-    &value,exception);
+  fx_status=FxEvaluateChannelExpression(fx_info,&red,&value,exception);
   pixel->red=(double) QuantumRange*value;
-  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-    GreenPixelChannel,0,0,&value,exception);
+  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,&green,
+    &value,exception);
   pixel->green=(double) QuantumRange*value;
-  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-    BluePixelChannel,0,0,&value,exception);
+  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,&blue,
+    &value,exception);
   pixel->blue=(double) QuantumRange*value;
   if (image->colorspace == CMYKColorspace)
     {
       fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-        BlackPixelChannel,0,0,&value,exception);
+        &black,&value,exception);
       pixel->black=(double) QuantumRange*value;
     }
-  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-    AlphaPixelChannel,0,0,&value,exception);
+  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,&alpha,
+    &value,exception);
   pixel->alpha=(double) QuantumRange*value;
   return(fx_status);
 }
@@ -5184,6 +5190,9 @@ static MagickBooleanType InterpretCharacter(char **q,const char **p)
 static MagickBooleanType AppendFxValue(const InterpretText *text,
   Image *property_image,const char *pattern,ExceptionInfo *exception)
 {
+  const FxChannelPosition
+    composite = { CompositePixelChannel, 0, 0 };
+
   double
     value;
 
@@ -5199,8 +5208,7 @@ static MagickBooleanType AppendFxValue(const InterpretText *text,
   fx_info=AcquireFxInfo(property_image,pattern+3,exception);
   if (fx_info == (FxInfo *) NULL)
     return(MagickTrue);
-  fx_status=FxEvaluateChannelExpression(fx_info,CompositePixelChannel,
-    0,0,&value,exception);
+  fx_status=FxEvaluateChannelExpression(fx_info,&composite,&value,exception);
   fx_info=DestroyFxInfo(fx_info);
   if (fx_status != MagickFalse)
     {

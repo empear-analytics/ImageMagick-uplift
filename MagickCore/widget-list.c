@@ -441,8 +441,7 @@ static void RunListBrowser(const ListBrowserContext *context,
 %  The format of the XListBrowserWidget method is:
 %
 %      void XListBrowserWidget(Display *display,XWindows *windows,
-%        XWindowInfo *window_info,const char *const *list,const char *action,
-%        const char *query,char *reply)
+%        XWindowInfo *window_info,const XListBrowserRequest *request)
 %
 %  A description of each parameter follows:
 %
@@ -451,19 +450,20 @@ static void RunListBrowser(const ListBrowserContext *context,
 %
 %    o window: Specifies a pointer to a XWindows structure.
 %
-%    o list: Specifies a pointer to an array of strings.  The user can
-%      select from these strings as a possible reply value.
+%    o request: the list and the query, in these members:
 %
-%    o action: Specifies a pointer to the action of this widget.
+%      o list: Specifies a pointer to an array of strings.  The user can
+%        select from these strings as a possible reply value.
 %
-%    o query: Specifies a pointer to the query to present to the user.
+%      o action: Specifies a pointer to the action of this widget.
 %
-%    o reply: the response from the user is returned in this parameter.
+%      o query: Specifies a pointer to the query to present to the user.
+%
+%      o reply: the response from the user is returned in this parameter.
 %
 */
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
-  XWindowInfo *window_info,const char *const *list,const char *action,
-  const char *query,char *reply)
+  XWindowInfo *window_info,const XListBrowserRequest *request)
 {
   char
     primary_selection[MagickPathExtent];
@@ -489,27 +489,27 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
   assert(window_info != (XWindowInfo *) NULL);
-  assert(list != (const char **) NULL);
-  assert(action != (char *) NULL);
-  assert(query != (char *) NULL);
-  assert(reply != (char *) NULL);
+  assert(request->list != (const char **) NULL);
+  assert(request->action != (char *) NULL);
+  assert(request->query != (char *) NULL);
+  assert(request->reply != (char *) NULL);
   if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",action);
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",request->action);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  if (list == (const char **) NULL)
+  if (request->list == (const char **) NULL)
     {
       XNoticeWidget(display,windows,"No text to browse:",(char *) NULL);
       return;
     }
-  entries=CountListBrowserEntries(list);
+  entries=CountListBrowserEntries(request->list);
   /*
     Determine Font Browser widget attributes.
   */
   font_info=window_info->font_info;
-  text_width=WidgetTextWidth(font_info,(char *) query);
-  text_width=WidestListBrowserEntry(font_info,list,entries,text_width);
-  width=GetListBrowserWidth(font_info,action);
+  text_width=WidgetTextWidth(font_info,(char *) request->query);
+  text_width=WidestListBrowserEntry(font_info,request->list,entries,text_width);
+  width=GetListBrowserWidth(font_info,request->action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position List Browser widget.
@@ -529,12 +529,12 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.entries=entries;
   list_context.primary_selection=primary_selection;
   list_context.font_info=font_info;
-  list_context.list=list;
+  list_context.list=request->list;
   list_context.height=height;
-  list_context.action=action;
+  list_context.action=request->action;
   list_context.width=width;
-  list_context.reply=reply;
-  list_context.query=query;
+  list_context.reply=request->reply;
+  list_context.query=request->query;
   RunListBrowser(&list_context,&mask);
   WithdrawListBrowserWidget(display,windows,window_info);
 }

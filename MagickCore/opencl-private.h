@@ -438,10 +438,32 @@ extern MagickPrivate cl_kernel
 extern MagickPrivate cl_mem
   CreateOpenCLBuffer(MagickCLDevice,cl_mem_flags,size_t,void *);
 
+typedef struct _OpenCLKernelLaunch
+{
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    kernel;
+
+  cl_uint
+    work_dim;
+
+  const size_t
+    *offset,
+    *gsize,
+    *lsize;
+
+  const Image
+    *input_image,
+    *output_image;
+
+  MagickBooleanType
+    flush;
+} OpenCLKernelLaunch;
+
 extern MagickPrivate MagickBooleanType
-  EnqueueOpenCLKernel(cl_command_queue,cl_kernel,cl_uint,const size_t *,
-    const size_t *,const size_t *,const Image *,const Image *,
-    MagickBooleanType,ExceptionInfo *),
+  EnqueueOpenCLKernel(const OpenCLKernelLaunch *,ExceptionInfo *),
   InitializeOpenCL(MagickCLEnv,ExceptionInfo *),
   OpenCLThrowMagickException(MagickCLDevice,ExceptionInfo *,
     const char *,const char *,const size_t,const ExceptionType,const char *,
