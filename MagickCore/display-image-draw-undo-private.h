@@ -880,10 +880,24 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XShowImageCacheInfo(Display *display,XWindows *windows,
-  XResourceInfo *resource_info,Image *undo_image,Image **image,
-  ExceptionInfo *exception)
+static void XShowImageCacheInfo(const XImageCacheContext *cache_context,
+  Image *undo_image)
 {
+  Display
+    *const display = cache_context->display;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
   const XDisplayImageInfoTarget
     target = { display, resource_info, windows };
 
@@ -941,7 +955,7 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   /*
     Display image info.
   */
-  XShowImageCacheInfo(display,windows,resource_info,undo_image,image,exception);
+  XShowImageCacheInfo(cache_context,undo_image);
 }
 
 static void XImageCache(const XImageCacheContext *cache_context,
