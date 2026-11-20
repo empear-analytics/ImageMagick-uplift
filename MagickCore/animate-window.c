@@ -85,6 +85,7 @@
 #include "MagickCore/xwindow-private.h"
 #if defined(MAGICKCORE_X11_DELEGATE)
 
+#include "MagickCore/animate-window-menu-private.h"
 #include "MagickCore/animate-window-command-private.h"
 
 
