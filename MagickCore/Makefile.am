@@ -262,6 +262,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw-core-private.h \
   MagickCore/draw-primitive-path-private.h \
   MagickCore/draw-primitive-fill-private.h \
+  MagickCore/draw-primitive-render-private.h \
   MagickCore/effect.c \
   MagickCore/effect-filter.c \
   MagickCore/effect-despeckle.c \
@@ -818,6 +819,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/draw-core-private.h \
   MagickCore/draw-primitive-path-private.h \
   MagickCore/draw-primitive-fill-private.h \
+  MagickCore/draw-primitive-render-private.h \
   MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
   MagickCore/effect-common-private.h \
