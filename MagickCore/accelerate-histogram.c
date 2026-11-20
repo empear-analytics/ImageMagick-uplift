@@ -1223,10 +1223,10 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
       stage = { image, device, clEnv, buffers.histogram, queue };
 
     const EqualizeHistogramStageTargets
-      stageTargets = { &image_view, &inputPixels, &imageBuffer,
+      targets = { &image_view, &inputPixels, &imageBuffer,
         &buffers.histogramBuffer };
 
-    if (RunEqualizeHistogramStage(&stage,exception,&stageTargets) == MagickFalse)
+    if (RunEqualizeHistogramStage(&stage,exception,&targets) == MagickFalse)
       goto cleanup;
   }
 
