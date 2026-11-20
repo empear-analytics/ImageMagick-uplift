@@ -114,6 +114,7 @@
 #include "MagickCore/display-image-composite-crop-private.h"
 #include "MagickCore/display-image-crop-private.h"
 
+#include "MagickCore/display-image-draw-undo-private.h"
 #include "MagickCore/display-image-draw-private.h"
 
 #include "MagickCore/display-image-apply-private.h"

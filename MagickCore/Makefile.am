@@ -228,6 +228,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-crop-private.h \
   MagickCore/display-image-composite-crop-private.h \
   MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-draw-undo-private.h \
   MagickCore/display-image-apply-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-tile-private.h \
@@ -786,6 +787,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-crop-private.h \
   MagickCore/display-image-composite-crop-private.h \
   MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-draw-undo-private.h \
   MagickCore/display-image-apply-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-tile-private.h \
