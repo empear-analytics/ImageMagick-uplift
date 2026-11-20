@@ -24,9 +24,27 @@
 extern "C" {
 #endif
 
+typedef struct _MorphologyApplyRequest
+{
+  const MorphologyMethod
+    method;
+
+  const ssize_t
+    iterations;
+
+  const KernelInfo
+    *kernel;
+
+  const CompositeOperator
+    compose;
+
+  const double
+    bias;
+} MorphologyApplyRequest;
+
 extern MagickPrivate Image
-  *MorphologyApply(const Image *,const MorphologyMethod,const ssize_t,
-    const KernelInfo *,const CompositeOperator,const double,ExceptionInfo *);
+  *MorphologyApply(const Image *,const MorphologyApplyRequest *,
+    ExceptionInfo *);
 
 extern MagickPrivate void
   ShowKernelInfo(const KernelInfo *),

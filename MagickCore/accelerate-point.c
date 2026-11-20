@@ -278,9 +278,17 @@ static MagickBooleanType EnqueueFunctionKernel(cl_command_queue queue,
 }
 
 static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception)
+  const AccelerateFunctionRequest *request,ExceptionInfo *exception)
 {
+  const MagickFunction
+    function = request->function;
+
+  const size_t
+    number_parameters = request->number_parameters;
+
+  const double
+    *const parameters = request->parameters;
+
   cl_command_queue
     queue;
 
@@ -360,8 +368,7 @@ static void TraceAccelerateCall(Image *image,ExceptionInfo *exception)
 }
 
 MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception)
+  const AccelerateFunctionRequest *request,ExceptionInfo *exception)
 {
   MagickBooleanType
     status;
@@ -378,8 +385,7 @@ MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
-  status=ComputeFunctionImage(image,clEnv,function,number_parameters,
-    parameters,exception);
+  status=ComputeFunctionImage(image,clEnv,request,exception);
   return(status);
 }
 
@@ -712,10 +718,16 @@ static void ReleaseModulateResources(const ModulateReleaseInputs *inputs)
 }
 
 static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
-  const double percent_brightness,const double percent_hue,
-  const double percent_saturation,const ColorspaceType colorspace,
-  ExceptionInfo *exception)
+  const AccelerateModulateRequest *request,ExceptionInfo *exception)
 {
+  const double
+    percent_brightness = request->percent_brightness,
+    percent_hue = request->percent_hue,
+    percent_saturation = request->percent_saturation;
+
+  const ColorspaceType
+    colorspace = request->colorspace;
+
   CacheView
     *image_view;
 
@@ -790,10 +802,11 @@ cleanup:
 }
 
 MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
-  const double percent_brightness,const double percent_hue,
-  const double percent_saturation,const ColorspaceType colorspace,
-  ExceptionInfo *exception)
+  const AccelerateModulateRequest *request,ExceptionInfo *exception)
 {
+  const ColorspaceType
+    colorspace = request->colorspace;
+
   MagickBooleanType
     status;
 
@@ -812,8 +825,7 @@ MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
-  status=ComputeModulateImage(image,clEnv,percent_brightness,percent_hue,
-    percent_saturation,colorspace,exception);
+  status=ComputeModulateImage(image,clEnv,request,exception);
   return(status);
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */

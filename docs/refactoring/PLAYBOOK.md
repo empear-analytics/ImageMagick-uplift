@@ -2054,6 +2054,34 @@ merges code, not parameters.
    call changes in the same commit (2026-11-19, `GetSimilarityForMetric` of
    `compare-similarity-private.h`, `964f4cd49`): it is still never used through a function
    pointer, and the build of each including file refuses a call left with the old arguments.
+   *MagickPrivate form* (owner 2026-11-20, "I answer yes to that"; written under the
+   mandate (2026-11-19), please confirm). A function declared `MagickPrivate` (internal,
+   hidden, never `MagickExport` or `WandExport`, whose signatures stay) in a private header
+   that is not installed (`MAGICKCORE_NOINST_HDRS`) may be bundled the same way, on five
+   conditions. (a) The typedef stands in that same private header, directly above the
+   prototype's `extern` block and inside every preprocessor conditional that holds the
+   prototype, so each file that sees the prototype sees the type; its name carries the
+   function's family (`AccelerateFunctionRequest`) so that no includer already uses it.
+   (b) Every caller changes in the same commit: `git grep -w <Function>` over the whole
+   tree (MagickCore, MagickWand, coders, utilities, Magick++, `tools/`) lists them, and
+   the message names each. A caller in code no build compiles (`coders/dps.c` without
+   the DPS delegate, `#if 0`, a commented-out call), or in a file of the other campaign,
+   holds the step: report it. (c) The function is never taken by address and is not
+   listed in `MagickCore/methods.h` with a different arity (that file only renames).
+   (d) Object identity per file: the defining file and every file with a changed call,
+   compiled with `-fno-inline` against `HEAD`'s and the working tree's headers (both
+   sides' own, since `obj_identical.sh` and `obj_modulo.sh` see only the working tree's),
+   have every function other than the bundled one and the callers holding a changed call
+   instruction-identical, none new or gone; every other includer of the header compiles
+   to an identical object. (e) The oracle on the bundled function and each reached caller
+   (`--function`, the wide catalogue for X11 or OpenCL code); a caller no case reaches
+   takes *Unreached functions: B and N* items 1 to 4; a call inside a per-pixel loop or an
+   OpenMP region is timed as any step there is (inclusive Ir of the region function, at
+   most +0.01 % under the owner's 2026-11-19 ruling). Every includer of the header keeps
+   its score and compiles in all `ci_linux_warnings` configurations; the header is scored
+   by hand before and after. A `static` function that the bundled one calls with exactly
+   the bound locals of its step 3 may then take the same `const Name *` under step 8's
+   *Existing input struct* form, the bindings standing for Recipe N's.
 2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
    top of the file, one member per parameter in the group, with the parameter's type and
    name.
@@ -26438,3 +26466,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | *X11 conditional form* on a header it produced that one `.c` file includes: the run begins after the header's own X11 opener, the new header wraps it in the same conditional, the `.c` file names the new header directly above the carved one; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags), since `obj_identical.sh`/`pp_identical.sh` cannot see a header-only change | `widget-list-actions-private.h` (campaign A, W48 round 35, lane a): at 998 lines of code it blocks the Recipe B bundle of `XEditText` (`widget-core-private.h` 9.68 to 10.0), whose two block-form call sites would put it at 1005 (9.38); a carve of its leading run up to `MoveListBrowserSliderByPage` leaves both headers at 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *Mid-file form*, a run after a kept item: in an X11 file whose statics sit between items that stay (external definitions, non-`const` file-scope objects, the X11 opener, an earlier step's `#include`), Form A's run may begin directly after such an item and end before the next one or at an earlier boundary outside its `#if` pairs, one header per commit; the `.c` file names the header on the run's first line, inside the same `#if` branches; a banner documenting a function outside the run moves to directly above it; proof `WIDE=1` `pp_identical.sh` and `obj_identical.sh` | `display-image.c` (6.49): `#if defined(MAGICKCORE_X11_DELEGATE)` holds the rest of the file, and its statics sit around `XDisplayBackgroundImage`, `XDisplayImage` and the two non-`const` command tables, so no run follows the include block; stub probe (cs-mcp 1.5.16) with eight headers 6.49 to 9.68, headers 6.89 to 9.09. Redone from campaign A W41 lane b2's held `565722583` on the owner's 2026-11-20 answer to PR #126 Q2 (private headers in X11 files, included mid-file); campaign A, W49 round 36, lane b | owner |
 | 2026-11-20 | AMEND | OH | Step 1's bar in a stub-probed chain of several headers out of one file is the file's score before the chain's first step, not the score an earlier header of the chain raised it to; the message names both numbers | `display-image.c`: the first two headers raise it 6.49 to 7.55, the next two (the draw and undo commands; the `XApply*` command appliers with their static argument counts and duplication) score 7.10 in the probe, above 6.49 and below the file's 7.32 to 7.55 at their steps; the chain ends at 9.68. Read from the owner's 2026-11-17 ruling (products "at or above the original's score"); redone from W41 lane b2's held `a71f4805d`; campaign A, W49 round 36, lane b | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | B | Step 1, *MagickPrivate form*: a `MagickPrivate` function of a private, not installed header may be bundled when the typedef stands in that header above the prototype (inside the same conditionals), every caller in the tree changes in the same commit (a caller in unbuilt code or in the other campaign's files holds the step), the function is never taken by address; proof object identity per file with `-fno-inline` against each side's own headers apart from the bundled function and the changed callers, identical objects for the other includers, the oracle on the function and reached callers, *Unreached functions: B and N* for unreached ones, the timing rule for calls in per-pixel loops or OpenMP regions; a `static` callee taking exactly the bound locals may take the same struct under step 8's *Existing input struct* form | The owner's 2026-11-20 answer ("I answer yes to that") allowing `MagickPrivate` signatures to change; about 51 campaign A files sit at 9.68 with *Excess Number of Function Arguments* alone, 13 of them held only by `MagickPrivate` or `static` functions (`AccelerateFunctionImage`, `AccelerateModulateImage`, `AccelerateResizeImage`, `AccelerateMotionBlurImage`, `EnqueueOpenCLKernel`, `MorphologyApply`, the widget and xwindow entry points; campaign A, W49 round 36, lane a) | mandate (2026-11-19) |

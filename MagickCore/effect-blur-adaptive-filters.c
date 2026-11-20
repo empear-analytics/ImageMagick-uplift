@@ -772,7 +772,12 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
     Motion blur image.
   */
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
-  blur_image=AccelerateMotionBlurImage(image,kernel,width,offset,exception);
+  {
+    const AccelerateMotionBlurRequest
+      motion = { kernel, width, offset };
+
+    blur_image=AccelerateMotionBlurImage(image,&motion,exception);
+  }
   if (blur_image != (Image *) NULL)
     {
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);

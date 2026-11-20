@@ -987,9 +987,15 @@ static MagickBooleanType ResizeVerticalThenHorizontal(
 }
 
 static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
-  const size_t resizedColumns,const size_t resizedRows,
-  const ResizeFilter *resizeFilter,ExceptionInfo *exception)
+  const AccelerateResizeRequest *resize,ExceptionInfo *exception)
 {
+  const size_t
+    resizedColumns = resize->resizedColumns,
+    resizedRows = resize->resizedRows;
+
+  const ResizeFilter
+    *const resizeFilter = resize->resizeFilter;
+
   cl_command_queue
     queue=NULL;
 
@@ -1083,9 +1089,11 @@ static MagickBooleanType gpuSupportedResizeWeighting(
 }
 
 MagickPrivate Image *AccelerateResizeImage(const Image *image,
-  const size_t resizedColumns,const size_t resizedRows,
-  const ResizeFilter *resizeFilter,ExceptionInfo *exception)
+  const AccelerateResizeRequest *resize,ExceptionInfo *exception)
 {
+  const ResizeFilter
+    *const resizeFilter = resize->resizeFilter;
+
   Image
     *filteredImage;
 
@@ -1108,8 +1116,7 @@ MagickPrivate Image *AccelerateResizeImage(const Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return((Image *) NULL);
 
-  filteredImage=ComputeResizeImage(image,clEnv,resizedColumns,resizedRows,
-    resizeFilter,exception);
+  filteredImage=ComputeResizeImage(image,clEnv,resize,exception);
   return(filteredImage);
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */

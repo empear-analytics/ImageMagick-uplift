@@ -1354,9 +1354,7 @@ static void InitializeMorphologyLimits(const MorphologyMethod method,
 }
 
 MagickPrivate Image *MorphologyApply(const Image *image,
-  const MorphologyMethod method, const ssize_t iterations,
-  const KernelInfo *kernel, const CompositeOperator compose,const double bias,
-  ExceptionInfo *exception)
+  const MorphologyApplyRequest *request,ExceptionInfo *exception)
 {
   CompositeOperator
     curr_compose;
@@ -1397,16 +1395,16 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
-  assert(kernel != (KernelInfo *) NULL);
-  assert(kernel->signature == MagickCoreSignature);
+  assert(request->kernel != (KernelInfo *) NULL);
+  assert(request->kernel->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
 
   count = 0;      /* number of low-level morphology primitives performed */
-  if ( iterations == 0 )
+  if ( request->iterations == 0 )
     return((Image *) NULL);   /* null operation - nothing to do! */
 
-  kernel_limit=GetMorphologyKernelLimit(image,iterations);
+  kernel_limit=GetMorphologyKernelLimit(image,request->iterations);
 
   verbose = IsStringTrue(GetImageArtifact(image,"debug"));
 
@@ -1422,12 +1420,14 @@ MagickPrivate Image *MorphologyApply(const Image *image,
    * + how many primitives make up the compound morphology
    * + multi-kernel compose method to use (by default)
    */
-  InitializeMorphologyLimits(method,compose,limits,&stage_limit);
+  InitializeMorphologyLimits(request->method,request->compose,limits,
+    &stage_limit);
 
   {
     const MorphologyApplyStages
-      stages = { image, method, kernel, compose, bias, special, verbose,
-        method_limit, stage_limit, kernel_limit, v_info, exception, targets };
+      stages = { image, request->method, request->kernel, request->compose,
+        request->bias, special, verbose, method_limit, stage_limit,
+        kernel_limit, v_info, exception, targets };
 
     if (ApplyMorphologyMethodPrimitives(&stages,rslt_compose,&stage_targets) ==
         MagickFalse)

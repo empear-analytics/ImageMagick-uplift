@@ -845,8 +845,14 @@ static void XRefreshExposedWindows(Display *display,XWindows *windows)
 }
 
 MagickPrivate void XProgressMonitorWidget(Display *display,XWindows *windows,
-  const char *task,const MagickOffsetType offset,const MagickSizeType span)
+  const char *task,const XProgressMonitorSpan *progress)
 {
+  const MagickOffsetType
+    offset = progress->offset;
+
+  const MagickSizeType
+    span = progress->span;
+
   unsigned int
     width;
 
