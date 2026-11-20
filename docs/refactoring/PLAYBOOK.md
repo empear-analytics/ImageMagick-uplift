@@ -25428,6 +25428,154 @@ functions; a stub probe gave 9.38 without the four arrow helpers and `widget-cor
 
 ---
 
+## Recipe MS - Merge Twins Differing in One Statement Run Through a Selector in a Struct
+
+**Use when:** CodeScene reports *Code Duplication* between two `static` (or `static inline`)
+functions of one file or private header with the same return type and parameter types, whose
+bodies are the same text once each twin's variables are renamed to one name per role, except
+for one run of whole statements at one place, a different run in each twin:
+`widget-browser-private.h`'s `ReleaseListBrowserAction` and `ReleaseListBrowserCancel`, whose
+button-release handlers differ only in the statements run when the button was hit,
+`(*state)=ConfirmListBrowserReply(display,reply_info,(*state));` against `*reply_info.text='\0';
+(*state)|=ExitState;`.
+
+**Not covered by:** Recipe MT, whose differing runs are whole expressions (or one statement
+standing in one copy only, between two statements both hold), not two different statement
+runs; Recipe CF, whose copies differ only in the function called; Recipe MV, whose copies
+differ in values; Recipe TI, which inlines the merged function into single callers and takes
+the copies away; Recipes SC and SV, whose copies differ in constants. These would also give
+the merged function a fifth parameter here (a selector beside four parameters).
+
+**How:**
+
+1. The twins `A` and `B` stand in one file or private header, outside every OpenMP region,
+   with no `#` line inside, neither used through a function pointer, with the same return
+   type and parameter types. Check by script: after renaming each twin's variables to one
+   name per role (`action_info`, `cancel_info` to `button_info`), the token sequences of the
+   bodies are equal except for one run in each, `RA` in `A` and `RB` in `B`; each run is a
+   sequence of whole statements with no declaration and no `return`, `break`, `continue` or
+   `goto`, so control leaves each run at its end, as it did.
+2. The selector. Write `typedef enum { NameA, NameB } NameSide;` and a struct `Name` whose
+   members are the twins' first parameter (a pointer, under its own name and type) and
+   `NameSide side`, directly above the merged function.
+3. Write the merged function `M`, `static inline` when the twins are, directly above `A`: its
+   parameters are `const Name *name` in place of the twins' first parameter, then the twins'
+   other parameters under their role names, at most four in all; its body binds `const`
+   locals of the first parameter's name and of `side` from the struct (Recipe N step 4), then
+   the twins' common text, with the run's place written `if (side == NameA)` `RA` `else`
+   `{ RB }` (braces as the runs need them), `RA` and `RB` verbatim.
+4. Each twin keeps its name, parameters and callers; its body becomes `const Name name =
+   { p1, NameX };`, with its own first parameter and its own constant, and the call of `M`
+   with `&name` and its other parameters in order (`return` of it when `M` returns a value).
+5. Check by script that `M`'s body, with the bindings dropped and the selection folded for
+   each constant, equals that twin's body token for token (role names renamed back).
+6. One merge per commit. Proof: the object code of every file that includes the twins'
+   header (or of the twins' file), compiled with the build's flags against `HEAD` and against
+   the working tree: `IDENTICAL` is the proof (a compiler that inlines `M` into each twin
+   folds the constant selector); where it is not, the oracle on the cases that execute each
+   twin (`casemap.py`), both twins reached.
+7. Checks: `refactor_guard.py --combined` (`WARN` for the literals now written once) and
+   `--calls` (the twins' callees drop by one copy; `M` gains its definition and two calls),
+   `tools/ci_linux_warnings.sh` on every including file, `tools/ch.py`.
+
+**Before:** (`widget-browser-private.h`)
+
+```c
+static inline void ReleaseListBrowserAction(const ListBrowserRelease *release,
+  const XWidgetInfo reply_info,XWidgetInfo *action_info,size_t *state)
+{
+  ...
+      if ((event.xbutton.window == window_info->id) &&
+          (MatteIsActive((*action_info),event.xbutton)))
+        {
+          (*state)=ConfirmListBrowserReply(display,reply_info,(*state));
+        }
+  ...
+}
+
+static inline void ReleaseListBrowserCancel(const ListBrowserRelease *release,
+  const XWidgetInfo reply_info,XWidgetInfo *cancel_info,size_t *state)
+{
+  ...
+        {
+          *reply_info.text='\0';
+          (*state)|=ExitState;
+        }
+  ...
+}
+```
+
+**After:**
+
+```c
+typedef enum
+{
+  ActionListBrowserButton,
+  CancelListBrowserButton
+} ListBrowserButtonSide;
+
+typedef struct _ListBrowserButton
+{
+  const ListBrowserRelease
+    *release;
+
+  ListBrowserButtonSide
+    side;
+} ListBrowserButton;
+
+static inline void ReleaseListBrowserButton(const ListBrowserButton *button,
+  const XWidgetInfo reply_info,XWidgetInfo *button_info,size_t *state)
+{
+  const ListBrowserRelease
+    *const release = button->release;
+
+  const ListBrowserButtonSide
+    side = button->side;
+  ...
+        {
+          if (side == ActionListBrowserButton)
+            (*state)=ConfirmListBrowserReply(display,reply_info,(*state));
+          else
+            {
+              *reply_info.text='\0';
+              (*state)|=ExitState;
+            }
+        }
+  ...
+}
+
+static inline void ReleaseListBrowserAction(const ListBrowserRelease *release,
+  const XWidgetInfo reply_info,XWidgetInfo *action_info,size_t *state)
+{
+  const ListBrowserButton
+    button = { release, ActionListBrowserButton };
+
+  ReleaseListBrowserButton(&button,reply_info,action_info,state);
+}
+```
+
+**Careful:**
+
+- The selection tests a constant that each twin fixes: twin `A` runs `RA` and nothing of `RB`,
+  at the place `RA` stood, between the same statements, so every side effect happens in the
+  order it did; the bound local reads the same pointer the twin's parameter held. The only new
+  work per call is filling a two-member struct and one test.
+- A run that leaves early (a `return`) would need a result code; step 1 refuses it.
+- Step 3's limit of four parameters is why the selector travels in the struct with the first
+  parameter: a fifth parameter would trade *Code Duplication* for *Excess Number of Function
+  Arguments*.
+
+**Evidence level:** guard when every including object is `IDENTICAL` (step 6), else oracle with
+both twins reached.
+
+**Provenance:** 2026-11-20, from `widget-browser-private.h` (campaign A, W47 round 34, lane
+b6): after `27a800815` its one finding was *Code Duplication* in `ReleaseListBrowserAction` and
+`ReleaseListBrowserCancel` (9.38); a stub probe of this merge gave 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-11-19, at the main session's request (round 34),
+for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25982,3 +26130,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | S | Step 2: a function-level `static` that a helper moving into the private header writes leaves the function for the original's file scope, renamed with a prefix from the function's name, storage, type, extent and initialiser unchanged, and is shared through one accessor; an array's accessor returns a pointer to the array (`T (*NameReference(void))[N]`), so `sizeof` keeps its value. One object as before, never a copy per including file; object comparison identical but the helper's accessor calls and the renamed `.bss` symbol | `widget.c`'s `ReleaseWidgetKey` (campaign A, W47 round 34, lane b6): its `command[MagickPathExtent]` and `key_symbol` serve the Color, File and Font browsers, which the chain stub-probed at widget.c 8.28 to 9.09 puts in three files; the main session refused per-file copies of writable state | mandate (2026-11-19) |
 | 2026-11-20 | NEW | HM | Move a family header's helpers into the private header it includes: `static inline` helpers of a Recipe S family header that every includer also sees through the first header move, unchanged, to the end of the first header when that clears *Code Duplication* in the family header and the first header keeps its score; proof: every including file's object byte-identical against HEAD's headers | `widget-browser-private.h` (campaign A, W47 round 34, lane b6): 8.81 with *Code Duplication* in seven functions, three of them the arrow helpers `XDrawTriangleEast`/`North`/`South`; a probe 9.38 without the four arrow helpers, `widget-core-private.h` 9.68 with them (unchanged) | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | FG | Step 6, *wrapper form*: for *Code Duplication* between the twins, when a caller of `F` is unreached or in another file (both `static inline` in one private header), `F` keeps its name, parameters and callers and its body becomes `return(G(...,E(t)));`; evidence the oracle on the cases that execute `F` | `widget-browser-private.h`'s `TrackListBrowserSlider` and `TrackFontBrowserSlider` (campaign A, W47 round 34, lane b6): two of the header's four duplicated functions after `a1492c8ff`; `TrackListBrowserSlider`'s callers are `widget-list.c`'s `MoveListBrowserPointer` (1 case) and `widget.c`'s `MoveTextViewPointer` (0 cases), so step 4 could not rewrite every call under the oracle | mandate (2026-11-19) |
+| 2026-11-20 | NEW | MS | Merge twins differing in one statement run through a selector in a struct: the bodies are equal under role renaming except one run of whole statements (no declaration, no jump); a merged function takes a `{ first parameter, side }` struct in place of the first parameter (at most four parameters) and selects `RA` or `RB` at the run's place; the twins keep names and callers and call it with a constant; proof object identity per includer, else the oracle with both twins reached | `widget-browser-private.h`'s `ReleaseListBrowserAction` and `ReleaseListBrowserCancel` (campaign A, W47 round 34, lane b6): the header's one finding after `27a800815` (9.38); a probe of the merge 10.0 | mandate (2026-11-19) |
