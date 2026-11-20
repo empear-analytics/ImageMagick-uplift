@@ -117,6 +117,7 @@
 #include "MagickCore/display-image-draw-undo-private.h"
 #include "MagickCore/display-image-draw-private.h"
 
+#include "MagickCore/display-image-apply-effects-private.h"
 #include "MagickCore/display-image-apply-private.h"
 
 #include "MagickCore/display-image-matte-roi-private.h"
