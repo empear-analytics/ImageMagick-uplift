@@ -552,9 +552,21 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplySepiaToneToImage(Display *display,XWindows *windows,
-  char *factor,Image **image,ExceptionInfo *exception)
+static void XApplySepiaToneToImage(const XMagickCommandContext *context,
+  char *factor)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   double
     threshold;
 
@@ -607,7 +619,7 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   /*
     Sepia tone image pixels.
   */
-  XApplySepiaToneToImage(display,windows,factor,image,exception);
+  XApplySepiaToneToImage(context,factor);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
