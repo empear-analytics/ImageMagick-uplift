@@ -1391,6 +1391,28 @@ static void SkipDashOffset(const DashOffsetInput *dash,double *length,
   }
 }
 
+static MagickBooleanType AcquireDashPolygon(
+  const PrimitiveInfo *primitive_info,size_t *number_vertices,
+  PrimitiveInfo **dash_polygon,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++) ;
+  (*number_vertices)=(size_t) i;
+  (*dash_polygon)=(PrimitiveInfo *) AcquireQuantumMemory((size_t)
+    (2UL*(*number_vertices)+32UL),sizeof(*(*dash_polygon)));
+  if ((*dash_polygon) == (PrimitiveInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+      return(MagickFalse);
+    }
+  (void) memset((*dash_polygon),0,(2UL*(*number_vertices)+32UL)*
+    sizeof(*(*dash_polygon)));
+  return(MagickTrue);
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1431,18 +1453,9 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   assert(draw_info != (const DrawInfo *) NULL);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),"    begin draw-dash");
-  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++) ;
-  number_vertices=(size_t) i;
-  dash_polygon=(PrimitiveInfo *) AcquireQuantumMemory((size_t)
-    (2UL*number_vertices+32UL),sizeof(*dash_polygon));
-  if (dash_polygon == (PrimitiveInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(MagickFalse);
-    }
-  (void) memset(dash_polygon,0,(2UL*number_vertices+32UL)*
-    sizeof(*dash_polygon));
+  if (AcquireDashPolygon(primitive_info,&number_vertices,&dash_polygon,
+      exception) == MagickFalse)
+    return(MagickFalse);
   clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
   clone_info->miterlimit=0;
   dash_polygon[0]=primitive_info[0];
