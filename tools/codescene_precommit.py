@@ -16,12 +16,12 @@ Two exceptions, because both move code that was gated before rather than add any
 
 Only library code is gated: .c and .cpp files in the subsystems that
 tools/codehealth_sweep.py scores, and the private headers there (`*-private.h`),
-which hold static and static inline functions (owner, 2026-11-20). A header with no
-function gets no score from CodeScene ("Could not determine Code Health score."):
-it counts as 10.0, nothing in it to fault, when its text (comments and preprocessor
-lines stripped) has no ')' followed by '{' outside an if/for/while/switch head; the
-same message for a header that has function text means CodeScene could not parse it,
-and the header is refused. Public headers are declarations and are not gated. Adapted from the 3SX campaign.
+which hold static and static inline functions (owner, 2026-11-20). CodeScene gives
+no score ("Could not determine Code Health score.") both for a header with no function
+and for one it cannot parse, so such a header counts as 10.0 only when it is listed in
+tools/noscore_headers.txt (as staged), a reviewed list of headers read and found to
+hold no function definition; every other header without a score is refused. Public
+headers are declarations and are not gated. Adapted from the 3SX campaign.
 """
 
 from __future__ import annotations
@@ -48,10 +48,7 @@ SUBSYSTEMS = ("MagickCore/", "MagickWand/", "coders/", "Magick++/lib/", "filters
 EXCLUDED = ()
 SCORE_RE = re.compile(r"Code Health score:\s*([0-9.]+)")
 NO_SCORE = "Could not determine Code Health score."
-NOISE_RE = re.compile(r"/\*.*?\*/|//[^\n]*|^[ \t]*#[^\n]*(?:\\\n[^\n]*)*", re.S | re.M)
-FUNCTION_LIKE_RE = re.compile(r"\)\s*\{")
-WORD_BEFORE_RE = re.compile(r"(\w+)\s*\Z")
-CONTROL_WORDS = {"if", "for", "while", "switch"}
+NOSCORE_LIST = "tools/noscore_headers.txt"
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -172,36 +169,23 @@ def parse_score(stdout: str, path: str) -> float:
     return float(match.group(1))
 
 
-def opener_word(text: str, close: int) -> str:
-    """The word before the '(' that the ')' at text[close] closes ('' if none)."""
-    depth = 0
-    for k in range(close, -1, -1):
-        depth += (text[k] == ")") - (text[k] == "(")
-        if depth == 0:
-            match = WORD_BEFORE_RE.search(text, 0, k)
-            return match.group(1) if match else ""
-    return ""
+def noscore_headers() -> set[str]:
+    """The paths of tools/noscore_headers.txt as staged (else as in the working tree)."""
+    staged_exists, text = show_staged(NOSCORE_LIST)
+    if not staged_exists:
+        listed = REPO / NOSCORE_LIST
+        text = listed.read_text(encoding="utf-8") if listed.is_file() else ""
+    return {line.split("#")[0].strip() for line in text.splitlines()} - {""}
 
 
-def has_function_text(path: str) -> bool:
-    """True when the file, comments and preprocessor lines stripped, has a ')' followed by
-    '{' that does not close an if, for, while or switch head: a function definition."""
-    text = NOISE_RE.sub(" ", Path(path).read_text(encoding="utf-8", errors="replace"))
-    return any(opener_word(text, m.start()) not in CONTROL_WORDS
-               for m in FUNCTION_LIKE_RE.finditer(text))
-
-
-def scoreless_header(path: str, stdout: str) -> bool:
-    return path.endswith(".h") and NO_SCORE in stdout
-
-
-def score(path: str, exe: str) -> float:
+def score(path: str, exe: str, name: str) -> float:
+    """The score of the file at PATH, which holds a version of NAME. cs-mcp gives NO_SCORE both
+    for a header with no function and for one it cannot parse: only a header listed in
+    tools/noscore_headers.txt, read and found to hold no function, counts as 10.0."""
     stdout = run_score_request(exe, path)
-    # cs-mcp says NO_SCORE both for a header with no function and for one it cannot parse:
-    # only the first counts as 10.0, nothing to fault; the second is refused below.
-    if scoreless_header(path, stdout) and not has_function_text(path):
+    if NO_SCORE in stdout and name in noscore_headers():
         return 10.0
-    return parse_score(stdout, path)
+    return parse_score(stdout, f"{name} (not in {NOSCORE_LIST})")
 
 
 def temp_file(content: str, suffix: str) -> str:
@@ -226,8 +210,8 @@ def check_revised_file(path: str, exe: str, previous: str, staged: str) -> str |
     old_file = temp_file(previous, suffix)
     new_file = temp_file(staged, suffix)
     try:
-        old_score = score(old_file, exe)
-        new_score = score(new_file, exe)
+        old_score = score(old_file, exe, path)
+        new_score = score(new_file, exe, path)
     finally:
         cleanup_temp_files((old_file, new_file))
 
@@ -239,7 +223,7 @@ def check_revised_file(path: str, exe: str, previous: str, staged: str) -> str |
 def check_new_file(path: str, exe: str, staged: str, bar: float | None) -> str | None:
     new_file = temp_file(staged, Path(path).suffix)
     try:
-        new_score = score(new_file, exe)
+        new_score = score(new_file, exe, path)
     finally:
         cleanup_temp_files((new_file,))
 
@@ -291,7 +275,7 @@ def shrunk_scores(paths: list[tuple[str, str | None]], exe: str) -> list[tuple[s
             continue
         old_file = temp_file(previous, Path(path).suffix)
         try:
-            scores.append((path, score(old_file, exe)))
+            scores.append((path, score(old_file, exe, previous_path or path)))
         finally:
             cleanup_temp_files((old_file,))
     return scores

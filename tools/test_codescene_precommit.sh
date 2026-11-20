@@ -72,8 +72,13 @@ printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/x-private.h"; git -C "$repo" 
 expect "private header degrades" 1 "x-private.h: Code Health degraded from 10.00"
 printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/x.h"; git -C "$repo" add -A
 expect "public header degrades (not gated: nothing staged to score)" 0 ""
+# A header cs-mcp cannot score passes only when tools/noscore_headers.txt (as staged) lists it.
 printf '#ifdef NEVER\n  r=1;\n#endif\n' > "$repo/MagickCore/frag-private.h"; git -C "$repo" add -A
-expect "new header with no function" 0 "gate passed"
+expect "new header with no score, not listed" 1 "frag-private.h (not in tools/noscore_headers.txt)"
+printf '#ifdef NEVER\n  r=1;\n#endif\n' > "$repo/MagickCore/frag-private.h"
+printf 'MagickCore/frag-private.h  # a fragment, no function\n' > "$repo/tools/noscore_headers.txt"
+git -C "$repo" add -A
+expect "new header with no score, listed in the same commit" 0 "gate passed"
 printf '%s' "$bad" > "$repo/MagickCore/n-private.h"; git -C "$repo" add -A
 expect "new private header below 10.0" 1 "n-private.h: new code must score 10.0"
 printf '%s' "$good" > "$repo/MagickCore/y.c"
@@ -87,8 +92,16 @@ expect "new .c beside a shrinking low header" 1 "w.c: new code must score 10.0"
 # with function text and no score is refused, not counted as 10.0 (review of 4e40bdec0).
 printf '}}} @@ static ((( \n%s\n' "$bad" > "$repo/MagickCore/x-private.h"; git -C "$repo" add -A
 expect "private header made unparseable" 1 "x-private.h: No Code Health score returned"
-printf '#ifdef NEVER\n  if (r != 0)\n  {\n    r=1;\n  }\n#endif\n' > "$repo/MagickCore/frag2-private.h"
+# Bypasses of 3a760b93d's "no function text" heuristic (review of 3a760b93d): a K&R definition
+# and a macro between ')' and '{'. Neither header is listed, so neither may pass on NO_SCORE.
+printf '%s' "$bad" | sed '1s/(.*)$/(a,b,c,d,e,f)\n  int a,b,c,d,e,f;/' > "$repo/MagickCore/x-private.h"
 git -C "$repo" add -A
-expect "new fragment with an if block, no function" 0 "gate passed"
+expect "a K&R definition" 1 "x-private.h"
+printf '%s' "$bad" | sed '1s/)$/) MAGICK_ATTRIBUTE/' > "$repo/MagickCore/x-private.h"; git -C "$repo" add -A
+expect "a macro between ) and {" 1 "x-private.h"
+printf '#ifdef NEVER\n  if (r != 0)\n  {\n    r=1;\n  }\n#endif\n' > "$repo/MagickCore/frag2-private.h"
+printf 'MagickCore/frag2-private.h  # a fragment, no function\n' > "$repo/tools/noscore_headers.txt"
+git -C "$repo" add -A
+expect "new fragment with an if block, listed" 0 "gate passed"
 [ $fail -eq 0 ] && echo "test_codescene_precommit: all passed"
 exit $fail

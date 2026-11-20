@@ -1,0 +1,50 @@
+# Private headers that cs-mcp cannot score ("Could not determine Code Health score.") and that
+# hold no function definition, so tools/codescene_precommit.py lets a commit that stages them
+# pass as 10.0. Any other private header without a score is refused: cs-mcp says the same for a
+# header it cannot parse, and a heuristic for "no function here" was bypassed by a K&R
+# definition and by a macro between ')' and '{' (review of 4e40bdec0/3a760b93d, round 36).
+# One path per line, then '#' and the reason, checked by reading: no function definition (no
+# static or inline function, no ')' followed by '{' outside a macro body). A new entry is part of
+# the reviewed commit that adds it. Seeded 2026-11-20 (campaign A round 36, lane c) from a scan
+# of all 172 gated *-private.h files on campaign/W49-c: these 41 gave no score.
+MagickCore/accelerate-private.h  # MagickPrivate declarations only
+MagickCore/accelerate-recreate-buffer-private.h  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
+MagickCore/accelerate-recreate-release-private.h  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
+MagickCore/animate-private.h  # declarations only
+MagickCore/annotate-private.h  # declarations only
+MagickCore/blob-private.h  # enums, macros and declarations
+MagickCore/coder-private.h  # declarations only
+MagickCore/configure-private.h  # declarations only
+MagickCore/display-private.h  # declarations only
+MagickCore/distribute-cache-private.h  # a struct and declarations
+MagickCore/exception-private.h  # Throw*Exception statement macros and declarations
+MagickCore/fx-private.h  # declarations only
+MagickCore/gem-private.h  # declarations only
+MagickCore/geometry-private.h  # declarations only
+MagickCore/linked-list-private.h  # a struct and declarations
+MagickCore/log-private.h  # declarations only
+MagickCore/magic-private.h  # declarations only
+MagickCore/matrix-private.h  # declarations only
+MagickCore/mime-private.h  # an enum and declarations
+MagickCore/module-private.h  # declarations only
+MagickCore/monitor-private.h  # declarations only
+MagickCore/morphology-private.h  # declarations only
+MagickCore/opencl-private.h  # structs, typedefs of OpenCL entry points, macros and declarations
+MagickCore/option-private.h  # declarations only
+MagickCore/pixel-private.h  # declarations only
+MagickCore/profile-private.h  # declarations only
+MagickCore/registry-private.h  # declarations only
+MagickCore/resize-private.h  # an enum and declarations
+MagickCore/resource-private.h  # declarations only
+MagickCore/semaphore-private.h  # declarations only
+MagickCore/signature-private.h  # macros and declarations
+MagickCore/stream-private.h  # declarations only
+MagickCore/transform-private.h  # declarations only
+MagickCore/type-private.h  # declarations only
+MagickCore/version-private.h  # declarations only
+MagickCore/xwindow-image-private.h  # declarations only
+MagickWand/mogrify-private.h  # image-stack statement macros and a struct
+MagickWand/operation-private.h  # declarations only
+MagickWand/pixel-wand-private.h  # declarations only
+MagickWand/wandcli-private.h  # CLIWandException* statement macros, an enum and structs
+coders/psd-private.h  # a struct and declarations
