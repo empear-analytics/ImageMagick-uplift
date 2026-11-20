@@ -403,6 +403,34 @@ typedef struct _RotateCommandInput
     targets;
 } RotateCommandInput;
 
+static void XSelectRotateDirection(const RotateCommandInput *input,int id,
+  ModeType *direction)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const RotateMenu = input->RotateMenu;
+
+  const char
+    *Directions[] =
+    {
+      "horizontal",
+      "vertical",
+      (char *) NULL,
+    };
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  id=XMenuWidget(display,windows,RotateMenu[id],
+    Directions,input->command);
+  *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
+}
+
 static void XRotateCommand(const RotateCommandInput *input,
   ModeType *direction,size_t *state)
 {
@@ -450,20 +478,7 @@ static void XRotateCommand(const RotateCommandInput *input,
     }
     case RotateDirectionCommand:
     {
-      const char
-        *Directions[] =
-        {
-          "horizontal",
-          "vertical",
-          (char *) NULL,
-        };
-
-      /*
-        Select a command from the pop-up menu.
-      */
-      id=XMenuWidget(display,windows,RotateMenu[id],
-        Directions,input->command);
-      *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
+      XSelectRotateDirection(input,id,direction);
       break;
     }
     case RotateHelpCommand:
