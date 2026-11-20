@@ -718,10 +718,16 @@ static void ReleaseModulateResources(const ModulateReleaseInputs *inputs)
 }
 
 static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
-  const double percent_brightness,const double percent_hue,
-  const double percent_saturation,const ColorspaceType colorspace,
-  ExceptionInfo *exception)
+  const AccelerateModulateRequest *request,ExceptionInfo *exception)
 {
+  const double
+    percent_brightness = request->percent_brightness,
+    percent_hue = request->percent_hue,
+    percent_saturation = request->percent_saturation;
+
+  const ColorspaceType
+    colorspace = request->colorspace;
+
   CacheView
     *image_view;
 
@@ -798,11 +804,6 @@ cleanup:
 MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
   const AccelerateModulateRequest *request,ExceptionInfo *exception)
 {
-  const double
-    percent_brightness = request->percent_brightness,
-    percent_hue = request->percent_hue,
-    percent_saturation = request->percent_saturation;
-
   const ColorspaceType
     colorspace = request->colorspace;
 
@@ -824,8 +825,7 @@ MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
-  status=ComputeModulateImage(image,clEnv,percent_brightness,percent_hue,
-    percent_saturation,colorspace,exception);
+  status=ComputeModulateImage(image,clEnv,request,exception);
   return(status);
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
