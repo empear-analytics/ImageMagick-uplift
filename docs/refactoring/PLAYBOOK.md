@@ -23615,6 +23615,28 @@ same order. Step 4's proof compiles the `.c` file against the headers of `HEAD` 
 working tree (`tools/obj_identical.sh` and `pp_identical.sh` compile both sides against the
 working tree's headers and cannot see a header-only change): the preprocessed unit and the
 object, wide candidate's flags, `__LINE__` and `__FILE__` pinned, both identical.
+Mid-file form, a run after a kept item (owner, 2026-11-20: private headers may be added to
+the X11 files and included mid-file, PR #126 Q2): in an X11 file whose statics sit between
+items that must stay in the `.c` file (`display-image.c`: about 600 statics around its two
+`MagickExport` functions and two non-`const` command tables), Form A's run may instead begin
+directly after such a kept item: a definition with external linkage, a non-`const`
+file-scope object, the opening `#if defined(MAGICKCORE_X11_DELEGATE)` (and the blank line
+after it) of the branch that holds the rest of the file, or the `#include` line of an
+earlier step of this form. It ends directly before the next kept item, or at any earlier
+top-level boundary outside every `#if` pair it holds, so one long stretch between two kept
+items may go into several headers, one per commit. Blank and form-feed lines at the run's
+edges stay in the `.c` file. The `.c` file names the new header on the run's own first
+line, inside the same `#if` branches as the run (a mid-file `#include`), so the translation
+unit has the same tokens in the same order. The run may name a kept file-scope object
+(it stays defined once, above or below, in the `.c` file, as it was). A `%` banner in the
+run that documents a function outside the run (a kept external definition, or a static
+of a later run) moves, unchanged, to directly above that function, as step 1 moves an
+external function's banner. Step 4's proof is `WIDE=1` `pp_identical.sh` and
+`obj_identical.sh` (the `.c` file changes, so both tools see the change), both `IDENTICAL`.
+In a stub-probed chain of several headers out of one file, a header's bar (step 1) is the
+file's score before the chain's first step, not the score an earlier header of the same
+chain already raised it to (the owner's 2026-11-17 reading: products "at or above the
+original's score"); the message names both numbers when they differ.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -26414,3 +26436,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | *X11 conditional form* of Form A: in a `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)` closing at the file's end (the `widget-*.c` split products), the run begins after the opener; the new header wraps the items, verbatim and in order, in the same conditional inside its guard, and the `.c` file names it as the last line of its include block, above the opener (no mid-file include); proof `pp_identical.sh` and `obj_identical.sh` with `WIDE=1` (`pp_identical.sh` gains `WIDE=1`) | `widget-color.c`, `widget-font.c`, `widget-file.c`, `widget-text.c` and `widget-list.c` (campaign A, W48 round 35, lane a), each one family carrying *Lines of Code in a Single File* (one public root each, so Recipe S has nothing to split); probes: color 9.38 to 10.0 with a 10.0 header, font 9.38 to 10.0 with a 10.0 header, file 8.81 to 10.0 with a 9.38 header | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | D | Form (b), *Unreached functions* and *Object code that differs only in the caller*: the block's single output that the helper returns may be a member `s.m` of a struct local of the caller, the call `s.m=Helper(...,s.m,...);`, when the member is reached with one `.` and no `->`, is set on every path before the block, and the block reads and writes no other member of `s`; `tools/reuse_check.py` accepts the shape and refuses `->` | `fourier-forward-private.h`'s `ForwardFourierTransformChannel` (campaign A, W48 round 35, lane b): its padding block is `PadFourierWidth`'s body with `fourier_info.width` as the padded width; the call clears the header's Overall Code Complexity, 9.38 -> 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *X11 conditional form* on a header it produced that one `.c` file includes: the run begins after the header's own X11 opener, the new header wraps it in the same conditional, the `.c` file names the new header directly above the carved one; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags), since `obj_identical.sh`/`pp_identical.sh` cannot see a header-only change | `widget-list-actions-private.h` (campaign A, W48 round 35, lane a): at 998 lines of code it blocks the Recipe B bundle of `XEditText` (`widget-core-private.h` 9.68 to 10.0), whose two block-form call sites would put it at 1005 (9.38); a carve of its leading run up to `MoveListBrowserSliderByPage` leaves both headers at 10.0 | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *Mid-file form*, a run after a kept item: in an X11 file whose statics sit between items that stay (external definitions, non-`const` file-scope objects, the X11 opener, an earlier step's `#include`), Form A's run may begin directly after such an item and end before the next one or at an earlier boundary outside its `#if` pairs, one header per commit; the `.c` file names the header on the run's first line, inside the same `#if` branches; a banner documenting a function outside the run moves to directly above it; proof `WIDE=1` `pp_identical.sh` and `obj_identical.sh` | `display-image.c` (6.49): `#if defined(MAGICKCORE_X11_DELEGATE)` holds the rest of the file, and its statics sit around `XDisplayBackgroundImage`, `XDisplayImage` and the two non-`const` command tables, so no run follows the include block; stub probe (cs-mcp 1.5.16) with eight headers 6.49 to 9.68, headers 6.89 to 9.09. Redone from campaign A W41 lane b2's held `565722583` on the owner's 2026-11-20 answer to PR #126 Q2 (private headers in X11 files, included mid-file); campaign A, W49 round 36, lane b | owner |
+| 2026-11-20 | AMEND | OH | Step 1's bar in a stub-probed chain of several headers out of one file is the file's score before the chain's first step, not the score an earlier header of the chain raised it to; the message names both numbers | `display-image.c`: the first two headers raise it 6.49 to 7.55, the next two (the draw and undo commands; the `XApply*` command appliers with their static argument counts and duplication) score 7.10 in the probe, above 6.49 and below the file's 7.32 to 7.55 at their steps; the chain ends at 9.68. Read from the owner's 2026-11-17 ruling (products "at or above the original's score"); redone from W41 lane b2's held `a71f4805d`; campaign A, W49 round 36, lane b | mandate (2026-11-19) |
