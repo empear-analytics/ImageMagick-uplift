@@ -22,114 +22,37 @@
 #include "MagickCore/image-private.h"
 #include "MagickCore/pixel.h"
 #include "MagickCore/pixel-accessor.h"
+#include "MagickCore/colorspace-illuminant-xyz-private.h"
 #include "MagickCore/colorspace-xyz-to-rgb-private.h"
+#include "MagickCore/colorspace-hcl-plain-to-rgb-private.h"
+#include "MagickCore/colorspace-hcl-to-rgb-private.h"
+#include "MagickCore/colorspace-hsb-hsi-to-rgb-private.h"
 #include "MagickCore/colorspace-to-rgb-private.h"
 #include "MagickCore/colorspace-lab-to-rgb-private.h"
+#include "MagickCore/colorspace-luv-lms-to-rgb-private.h"
 #include "MagickCore/colorspace-cie-to-rgb-private.h"
+#include "MagickCore/colorspace-rgb-to-xyz-cmy-private.h"
+#include "MagickCore/colorspace-rgb-to-hcl-hsb-private.h"
 #include "MagickCore/colorspace-rgb-to-xyz-private.h"
 #include "MagickCore/colorspace-rgb-to-hue-private.h"
 #include "MagickCore/colorspace-rgb-to-lab-private.h"
+#include "MagickCore/colorspace-rgb-to-lchuv-private.h"
 #include "MagickCore/colorspace-rgb-to-cie-private.h"
+#include "MagickCore/colorspace-xyz-to-jzazbz-private.h"
+#include "MagickCore/colorspace-rgb-to-jzazbz-private.h"
+#include "MagickCore/colorspace-jzazbz-to-xyz-private.h"
 #include "MagickCore/colorspace-jzazbz-private.h"
 #include "MagickCore/colorspace-jzazbz-oklab-private.h"
+#include "MagickCore/colorspace-rgb-to-ycc-private.h"
+#include "MagickCore/colorspace-rgb-to-luma-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
+#include "MagickCore/colorspace-predicates-private.h"
+#include "MagickCore/colorspace-lab-compatible-private.h"
+#include "MagickCore/colorspace-rgb-predicates-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
-
-static inline MagickBooleanType IsCMYKColorspace(
-  const ColorspaceType colorspace)
-{
-  if (colorspace == CMYKColorspace)
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsGrayColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == LinearGRAYColorspace) || (colorspace == GRAYColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsGrayImageType(const ImageType type)
-{
-  switch (type)
-  {
-    case GrayscaleType:
-    case GrayscaleAlphaType:
-    case BilevelType:
-      return(MagickTrue);
-    default:
-      break;
-  }
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsHueCompatibleColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == HCLColorspace) || (colorspace == HCLpColorspace) ||
-      (colorspace == HSBColorspace) || (colorspace == HSIColorspace) ||
-      (colorspace == HSLColorspace) || (colorspace == HSVColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsLabCompatibleColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == LabColorspace) || (colorspace == LCHColorspace) ||
-      (colorspace == LCHabColorspace) || (colorspace == LCHuvColorspace) ||
-      (colorspace == OklabColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsRGBColorspace(const ColorspaceType colorspace)
-{
-  switch (colorspace)
-  {
-    case RGBColorspace:
-    case scRGBColorspace:
-    case LinearGRAYColorspace:
-      return(MagickTrue);
-    default:
-      break;
-  }
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IssRGBColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == sRGBColorspace) || (colorspace == TransparentColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IssRGBCompatibleColorspace(
-  const ColorspaceType colorspace)
-{
-  switch (colorspace)
-  {
-    case sRGBColorspace:
-    case RGBColorspace:
-    case Adobe98Colorspace:
-    case ProPhotoColorspace:
-    case DisplayP3Colorspace:
-    case scRGBColorspace:
-    case TransparentColorspace:
-    case GRAYColorspace:
-    case LinearGRAYColorspace:
-      return(MagickTrue);
-    default:
-      break;
-  }
-  return(MagickFalse);
-}
 
 static inline MagickBooleanType IsYCbCrCompatibleColorspace(
   const ColorspaceType colorspace)

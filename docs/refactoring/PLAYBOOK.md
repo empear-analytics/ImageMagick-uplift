@@ -1038,6 +1038,22 @@ place in it; every other condition of the form stands. The replacement removes t
 block's branches from the function and adds no function, so it lowers the file's mean
 cyclomatic complexity as removing a function finding does.
 
+**A struct member as the returned output** (mandate (2026-11-19), added 2026-11-20 for
+`fourier-forward-private.h`'s `ForwardFourierTransformChannel`, please confirm). In form
+(b), *Unreached functions* and *Object code that differs only in the caller*, the block's
+single output that the helper returns (Recipe E step 3, `v=Helper(...,v);`) may be a
+member `s.m` of a struct local `s` of the caller instead of a plain variable: the call is
+`s.m=Helper(...,s.m,...);`, `s.m` passed to the by-value parameter that the helper's
+closing `return(p);` returns. Conditions: one `.` and no `->` (the caller's own object,
+not one reached through a pointer, so no other name of the caller can alias it); `s.m` is
+set on every path before the block (checked by reading: the call reads it, as the
+block's untaken path left it); the block writes no other member of `s` and reads no
+other member of `s` (the helper sees only the one value). `tools/reuse_check.py` accepts
+this shape (2026-11-20, `tools/test_reuse_check.py`'s `ReturnedMemberOutput`) and
+refuses a member through `->`, another member assigned, and another member passed. The
+member is an lvalue of the same type as a variable, read once at the call and assigned
+once at the return, so the caller's object ends with the value the block left in it.
+
 **A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
 *Unreached functions* and *Object code that differs only in the caller* may call a
 helper that the file defines below the caller, and one whose block reads its inputs
@@ -26386,3 +26402,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | S | Step 2: a file-scope `static` variable of struct type that both parts name is shared through one pointer accessor `T *NameReference(void)`, on four conditions: one object per variable (`nm`), declaration, storage and initialiser unchanged; every use through `(*NameReference())`, no new copy of the struct; object identity per function with `-fno-inline` apart from the accessor calls and loads; the oracle on each rewritten function | `widget.c`'s `submenu_info` and `toggle_info` (campaign A, W47 round 34, lane b6), named by the Command and Menu families and declared in one group with `monitor_info` and `selection_info`; the main session's extension of the accessor form of the owner's round-23 ruling. A probe of the Command/Menu split with it left widget.c flat at 9.09 (Lines of Code remains), so the split was not taken | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | S | Step 2's struct-typed accessor: a pointer declarator of the same declaration group is shared on the same four conditions through `T **NameReference(void)`, every use written `(*NameReference())` | `widget.c`'s `*selection_info` (campaign A, W47 round 34, lane b6): the heap array of selection buttons that the Command family allocates and indexes and `DestroyXWidget` releases; found when the Command split of the probed chain did not compile without it | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *X11 conditional form* of Form A: in a `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)` closing at the file's end (the `widget-*.c` split products), the run begins after the opener; the new header wraps the items, verbatim and in order, in the same conditional inside its guard, and the `.c` file names it as the last line of its include block, above the opener (no mid-file include); proof `pp_identical.sh` and `obj_identical.sh` with `WIDE=1` (`pp_identical.sh` gains `WIDE=1`) | `widget-color.c`, `widget-font.c`, `widget-file.c`, `widget-text.c` and `widget-list.c` (campaign A, W48 round 35, lane a), each one family carrying *Lines of Code in a Single File* (one public root each, so Recipe S has nothing to split); probes: color 9.38 to 10.0 with a 10.0 header, font 9.38 to 10.0 with a 10.0 header, file 8.81 to 10.0 with a 9.38 header | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | D | Form (b), *Unreached functions* and *Object code that differs only in the caller*: the block's single output that the helper returns may be a member `s.m` of a struct local of the caller, the call `s.m=Helper(...,s.m,...);`, when the member is reached with one `.` and no `->`, is set on every path before the block, and the block reads and writes no other member of `s`; `tools/reuse_check.py` accepts the shape and refuses `->` | `fourier-forward-private.h`'s `ForwardFourierTransformChannel` (campaign A, W48 round 35, lane b): its padding block is `PadFourierWidth`'s body with `fourier_info.width` as the padded width; the call clears the header's Overall Code Complexity, 9.38 -> 10.0 | mandate (2026-11-19) |

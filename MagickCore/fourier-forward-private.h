@@ -736,6 +736,9 @@ static inline MagickBooleanType IsFourierPaddingNeeded(const Image *image)
     ((image->rows % 2) != 0)) ? MagickTrue : MagickFalse);
 }
 
+static size_t
+  PadFourierWidth(const Image *,size_t);
+
 static MagickBooleanType ForwardFourierTransformChannel(
   const ForwardChannelSource *source,const PixelChannel channel,
   Image *fourier_image,ExceptionInfo *exception)
@@ -759,12 +762,7 @@ static MagickBooleanType ForwardFourierTransformChannel(
 
   fourier_info.width=source->image->columns;
   fourier_info.height=source->image->rows;
-  if (IsFourierPaddingNeeded(source->image) != MagickFalse)
-    {
-      size_t extent=source->image->columns < source->image->rows ?
-        source->image->rows : source->image->columns;
-      fourier_info.width=(extent & 0x01) == 1 ? extent+1UL : extent;
-    }
+  fourier_info.width=PadFourierWidth(source->image,fourier_info.width);
   fourier_info.height=fourier_info.width;
   fourier_info.center=fourier_info.width/2+1;
   fourier_info.channel=channel;
