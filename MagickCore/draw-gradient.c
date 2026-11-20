@@ -637,16 +637,13 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
     width=(size_t) (bounding_box.x+(ssize_t) bounding_box.width);
     for (x=bounding_box.x; x < (ssize_t) width; x++)
     {
-      GradientSpreadInput
-        spread;
-
       GetPixelInfoPixel(image,q,&pixel);
-      spread.gradient=gradient;
-      spread.gradient_vector=gradient_vector;
-      spread.length=length;
-      spread.x=x;
-      spread.y=y;
-      GetSpreadGradientColor(&spread,&offset,&composite);
+      {
+        const GradientSpreadInput
+          spread = { gradient, gradient_vector, length, x, y };
+
+        GetSpreadGradientColor(&spread,&offset,&composite);
+      }
       CompositePixelInfoOver(&composite,composite.alpha,&pixel,pixel.alpha,
         &pixel);
       SetPixelViaPixelInfo(image,&pixel,q);
