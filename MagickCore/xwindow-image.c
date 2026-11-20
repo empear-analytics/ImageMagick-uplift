@@ -6987,14 +6987,9 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   if ((visual_info->klass != DirectColor) &&
       (visual_info->klass != TrueColor))
     {
-      XBestPixelSource
-        best_source;
+      const XBestPixelSource
+        best_source = { display, colormap, colors, number_colors, image };
 
-      best_source.display=display;
-      best_source.colormap=colormap;
-      best_source.colors=colors;
-      best_source.number_colors=number_colors;
-      best_source.image=image;
       XSetVisualPixels(&best_source,pixel);
     }
   colors=(XColor *) RelinquishMagickMemory(colors);
