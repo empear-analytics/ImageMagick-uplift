@@ -559,12 +559,12 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
     status;
 
   cl_kernel
-    unsharpMaskKernel;
+    unsharpMaskKernel=NULL;
 
   cl_mem
     filteredImageBuffer,
     imageBuffer,
-    imageKernelBuffer;
+    imageKernelBuffer=NULL;
 
   cl_uint
     imageColumns,
@@ -580,7 +580,7 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
     *filteredImage;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
@@ -599,9 +599,6 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   filteredImage=NULL;
   imageBuffer=NULL;
   filteredImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  unsharpMaskKernel=NULL;
-  outputReady=MagickFalse;
 
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
