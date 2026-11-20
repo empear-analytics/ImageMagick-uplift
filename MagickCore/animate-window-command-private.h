@@ -229,6 +229,17 @@ static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
     }
 }
 
+static void XUseWindowAttributesSize(const int flags,
+  XWindowAttributes *window_attributes,unsigned int *width,
+  unsigned int *height)
+{
+  if (((flags & (XValue | YValue))) != 0)
+    {
+      (*width)=(unsigned int) (*window_attributes).width;
+      (*height)=(unsigned int) (*window_attributes).height;
+    }
+}
+
 static void XAdjustBackgroundSize(const AnimateBackgroundSetup *setup,
   const AnimateBackgroundTargets *targets)
 {
@@ -285,11 +296,7 @@ static void XAdjustBackgroundSize(const AnimateBackgroundSetup *setup,
         (*resources).image_geometry,default_geometry,
         (*window_info).border_width,size_hints,&(*window_info).x,
         &(*window_info).y,(int *) width,(int *) height,&gravity);
-      if (((flags & (XValue | YValue))) != 0)
-        {
-          (*width)=(unsigned int) (*window_attributes).width;
-          (*height)=(unsigned int) (*window_attributes).height;
-        }
+      XUseWindowAttributesSize(flags,window_attributes,width,height);
       (void) XFree((void *) size_hints);
     }
 }
