@@ -439,8 +439,12 @@ static void XSelectPenColor(const EditMenuInput *menu,
   */
   (void) XParseColor(display,windows->map_info->colormap,
     resource_info->pen_colors[pen_number],color);
-  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-    (unsigned int) MaxColors,color);
+  {
+    const XBestPixelTarget
+      pixel_target = { display, windows->map_info->colormap };
+
+    XBestPixel(&pixel_target,(XColor *) NULL,(unsigned int) MaxColors,color);
+  }
   windows->pixel_info->pen_colors[pen_number]=(*color);
   (*pen_id)=(unsigned int) pen_number;
 }

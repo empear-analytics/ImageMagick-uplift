@@ -580,6 +580,15 @@ typedef struct _XMakeWindowHints
     *manager_hints;
 } XMakeWindowHints;
 
+typedef struct _XBestPixelTarget
+{
+  Display
+    *display;
+
+  Colormap
+    colormap;
+} XBestPixelTarget;
+
 typedef struct _XStandardColormapRequest
 {
   XVisualInfo
@@ -600,7 +609,7 @@ typedef struct _XStandardColormapRequest
 
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
-  XBestPixel(Display *,const Colormap,XColor *,unsigned int,XColor *),
+  XBestPixel(const XBestPixelTarget *,XColor *,unsigned int,XColor *),
   XCheckRefreshWindows(Display *,XWindows *),
   XClientMessage(Display *,const Window,const Atom,const Atom,const Time),
   XComponentTerminus(void),
