@@ -28,6 +28,7 @@
 #include "MagickCore/colorspace-cie-to-rgb-private.h"
 #include "MagickCore/colorspace-rgb-to-xyz-private.h"
 #include "MagickCore/colorspace-rgb-to-hue-private.h"
+#include "MagickCore/colorspace-rgb-to-lab-private.h"
 #include "MagickCore/colorspace-rgb-to-cie-private.h"
 #include "MagickCore/colorspace-jzazbz-oklab-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
