@@ -511,6 +511,20 @@ static MagickBooleanType GrowEdgePoints(PointInfo **points,const ssize_t n,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireEdgePoints(PointInfo **points,
+  size_t *number_points)
+{
+  if ((*points) == (PointInfo *) NULL)
+    {
+      (*number_points)=16;
+      (*points)=(PointInfo *) AcquireQuantumMemory((size_t) (*number_points),
+        sizeof(*(*points)));
+    }
+  if ((*points) == (PointInfo *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -596,13 +610,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
             points=(PointInfo *) RelinquishMagickMemory(points);
             return(DestroyPolygonInfo(polygon_info));
           }
-        if (points == (PointInfo *) NULL)
-          {
-            number_points=16;
-            points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
-              sizeof(*points));
-          }
-        if (points == (PointInfo *) NULL)
+        if (AcquireEdgePoints(&points,&number_points) == MagickFalse)
           return(ThrowPolygonAllocationFailure(polygon_info,exception));
         ghostline=path_info[i].code == GhostlineCode ? MagickTrue : MagickFalse;
         point=path_info[i].point;
