@@ -28,6 +28,20 @@
 extern "C" {
 #endif
 
+static inline MagickBooleanType ExtendXMLContent(char **canonical_content,
+  const ssize_t i,size_t *extent)
+{
+  if ((i+MagickPathExtent) > (ssize_t) (*extent))
+    {
+      (*extent)+=MagickPathExtent;
+      (*canonical_content)=(char *) ResizeQuantumMemory((*canonical_content),
+        (*extent),sizeof(*(*canonical_content)));
+      if ((*canonical_content) == (char *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static inline char *SubstituteXMLEntities(const char *content,
   const MagickBooleanType pedantic)
 {
@@ -51,14 +65,8 @@ static inline char *SubstituteXMLEntities(const char *content,
   extent=MagickPathExtent;
   for (p=content; *p != '\0'; p++)
   {
-    if ((i+MagickPathExtent) > (ssize_t) extent)
-      {
-        extent+=MagickPathExtent;
-        canonical_content=(char *) ResizeQuantumMemory(canonical_content,extent,
-          sizeof(*canonical_content));
-        if (canonical_content == (char *) NULL)
-          return(canonical_content);
-      }
+    if (ExtendXMLContent(&canonical_content,i,&extent) == MagickFalse)
+      return(canonical_content);
     switch (*p)
     {
       case '&':
