@@ -521,18 +521,11 @@ static void HandleCommandEvent(const CommandWidgetEvent *tile,int *id,
 #define tile_width 112
 #define tile_height 70
 
-static void RedrawCommandButtons(Display *display,XWindows *windows,
-  const unsigned int number_selections)
+static void DrawCommandTile(Display *display,XWindows *windows)
 {
-  int
-    i;
-
   Pixmap
     tile_pixmap;
 
-  /*
-    Draw command buttons.
-  */
   tile_pixmap=XCreatePixmapFromBitmapData(display,windows->command.id,
     (char *) tile_bits,tile_width,tile_height,1L,0L,1);
   if (tile_pixmap != (Pixmap) NULL)
@@ -542,6 +535,18 @@ static void RedrawCommandButtons(Display *display,XWindows *windows,
         (int) ((windows->command.width-tile_width) >> 1),10,1L);
       (void) XFreePixmap(display,tile_pixmap);
     }
+}
+
+static void RedrawCommandButtons(Display *display,XWindows *windows,
+  const unsigned int number_selections)
+{
+  int
+    i;
+
+  /*
+    Draw command buttons.
+  */
+  DrawCommandTile(display,windows);
   for (i=0; i < (int) number_selections; i++)
   {
     XDrawBeveledButton(display,&windows->command,&(*SelectionInfoReference())[i]);
