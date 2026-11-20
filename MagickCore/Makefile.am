@@ -90,6 +90,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-recreate-buffer-private.h \
+  MagickCore/accelerate-recreate-release-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate.c \
   MagickCore/animate-window.c \
@@ -700,6 +702,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-recreate-buffer-private.h \
+  MagickCore/accelerate-recreate-release-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
   MagickCore/annotate-private.h \
