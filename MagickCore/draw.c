@@ -5601,6 +5601,32 @@ static PointInfo ScaleArcRadii(PointInfo radii,const double delta)
   return(radii);
 }
 
+static MagickStatusType TraceArcSegments(MVGInfo *mvg_info,
+  const ArcSegmentInput *segment,PointInfo *points,PrimitiveInfo **p)
+{
+  const size_t
+    arc_segments = segment->arc_segments;
+
+  MagickStatusType
+    status;
+
+  ssize_t
+    i;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) arc_segments; i++)
+  {
+    TraceArcSegmentPoints(segment,i,(*p),points);
+    status&=(MagickStatusType) TraceBezier(mvg_info,4);
+    if (status == 0)
+      break;
+    (*p)=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
+    mvg_info->offset+=(ssize_t) (*p)->coordinates;
+    (*p)+=(ptrdiff_t) (*p)->coordinates;
+  }
+  return(status);
+}
+
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   const PointInfo end,const ArcPathShape *shape)
 {
@@ -5638,9 +5664,6 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
 
   PrimitiveInfo
     *p;
-
-  ssize_t
-    i;
 
   size_t
     arc_segments;
@@ -5683,21 +5706,13 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   theta=GetArcSweepTheta(theta,sweep);
   arc_segments=(size_t) CastDoubleToSsizeT(ceil(fabs((double) (theta/(0.5*
     MagickPI+MagickEpsilon)))));
-  status=MagickTrue;
   p=primitive_info;
-  for (i=0; i < (ssize_t) arc_segments; i++)
   {
     const ArcSegmentInput
       segment = { alpha, theta, arc_segments, center, cosine, sine, radii,
         start, end, primitive_info };
 
-    TraceArcSegmentPoints(&segment,i,p,points);
-    status&=(MagickStatusType) TraceBezier(mvg_info,4);
-    if (status == 0)
-      break;
-    p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
-    mvg_info->offset+=(ssize_t) p->coordinates;
-    p+=(ptrdiff_t) p->coordinates;
+    status=TraceArcSegments(mvg_info,&segment,points,&p);
   }
   return(FinishArcPath(mvg_info,status,offset,p));
 }
