@@ -450,9 +450,7 @@ static MagickBooleanType XDrawEditStep(const DrawEditContext *context,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XDrawEditImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception)
+static MagickBooleanType XDrawEditImage(const XImageCacheContext *edit)
 {
   static ElementType
     element = PointElement;
@@ -516,23 +514,25 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Allocate polygon info.
   */
-  if (XAcquireDrawCoordinates(exception,&shape_targets) == MagickFalse)
+  if (XAcquireDrawCoordinates(edit->exception,&shape_targets) ==
+      MagickFalse)
     return(MagickFalse);
   /*
     Map Command widget.
   */
-  XMapDrawCommandWidget(display,windows,DrawEditMenu);
+  XMapDrawCommandWidget(edit->display,edit->windows,DrawEditMenu);
   /*
     Wait for first button press.
   */
-  root_window=XRootWindow(display,XDefaultScreen(display));
+  root_window=XRootWindow(edit->display,XDefaultScreen(edit->display));
   draw_info.stencil=OpaqueStencil;
   status=MagickTrue;
-  cursor=XCreateFontCursor(display,XC_tcross);
+  cursor=XCreateFontCursor(edit->display,XC_tcross);
   {
     const DrawEditContext
-      draw_context = { display, resource_info, windows, DrawEditMenu, command,
-        root_window, exception, image, cursor, DrawEditCommands };
+      draw_context = { edit->display, edit->resource_info, edit->windows,
+        DrawEditMenu, command, root_window, edit->exception, edit->image,
+        cursor, DrawEditCommands };
 
     for ( ; ; )
     {
@@ -541,7 +541,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         break;
     }
   }
-  XSetCursorState(display,windows,MagickFalse);
+  XSetCursorState(edit->display,edit->windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
   return((MagickBooleanType) (status != 0));
 }
@@ -880,10 +880,24 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XShowImageCacheInfo(Display *display,XWindows *windows,
-  XResourceInfo *resource_info,Image *undo_image,Image **image,
-  ExceptionInfo *exception)
+static void XShowImageCacheInfo(const XImageCacheContext *cache_context,
+  Image *undo_image)
 {
+  Display
+    *const display = cache_context->display;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
   const XDisplayImageInfoTarget
     target = { display, resource_info, windows };
 
@@ -941,7 +955,7 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   /*
     Display image info.
   */
-  XShowImageCacheInfo(display,windows,resource_info,undo_image,image,exception);
+  XShowImageCacheInfo(cache_context,undo_image);
 }
 
 static void XImageCache(const XImageCacheContext *cache_context,
