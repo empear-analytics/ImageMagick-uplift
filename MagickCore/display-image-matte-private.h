@@ -13,9 +13,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of display-image.c: the magnify window, matte-
-  edit, pan, paste, print, region-of-interest and rotate commands, from
-  XMoveMagnifyPosition to XRotateImage; included by that file only.
+  MagickCore private methods of display-image.c: the end of the region-of-
+  interest command and the rotate command, from XROIWaitCorner to
+  XRotateImage; included by that file only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_MATTE_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_MATTE_PRIVATE_H

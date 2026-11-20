@@ -13,10 +13,10 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of display-image.c: the remaining command
-  appliers, the magick command dispatch and the magnify handlers, from
-  XApplyReduceNoiseCommand to XMoveMagnifyRightDown; included by that file
-  only.
+  MagickCore private methods of display-image.c: the save, new, shear, crop-
+  and-scale and region-of-interest appliers, the command dispatch, the magick
+  command and the magnify handlers, from XApplySaveCommand to
+  XMoveMagnifyRightDown; included by that file only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_APPLY_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_APPLY_PRIVATE_H

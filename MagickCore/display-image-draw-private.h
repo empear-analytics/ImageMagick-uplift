@@ -13,10 +13,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of display-image.c: the draw-edit command, the
-  undo cache, the image-window key commands and the first command appliers,
-  from XErasePreviewElement to XApplyReduceNoiseToImage; included by that file
-  only.
+  MagickCore private methods of display-image.c: the transform, enhance,
+  effect and quit command appliers, from XApplyFlopCommand to
+  XApplyReduceNoiseToImage; included by that file only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_DRAW_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_DRAW_PRIVATE_H
