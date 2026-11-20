@@ -161,6 +161,7 @@ static char
 
 static void TraceXMLTree(XMLTreeInfo *xml_info)
 {
+  magick_unreferenced(xml_info);
   assert(xml_info != (XMLTreeInfo *) NULL);
   assert((xml_info->signature == MagickCoreSignature) ||
          (((XMLTreeRoot *) xml_info)->signature == MagickCoreSignature));

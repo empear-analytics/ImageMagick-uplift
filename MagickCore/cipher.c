@@ -800,6 +800,7 @@ static SignatureInfo *CopyNonceDigest(SignatureInfo *signature_info,
 static void OpenCipherImage(const Image *image,
   const ExceptionInfo *exception)
 {
+  magick_unreferenced(exception);
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -1131,6 +1132,8 @@ static ssize_t SetAESRounds(AESInfo *aes_info,const StringInfo *key)
 
 static void OpenSetAESKey(const AESInfo *aes_info,const StringInfo *key)
 {
+  magick_unreferenced(aes_info);
+  magick_unreferenced(key);
   assert(aes_info != (AESInfo *) NULL);
   assert(aes_info->signature == MagickCoreSignature);
   assert(key != (StringInfo *) NULL);

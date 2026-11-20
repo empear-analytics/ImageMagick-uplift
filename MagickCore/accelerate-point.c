@@ -352,6 +352,7 @@ cleanup:
 
 static void TraceAccelerateCall(Image *image,ExceptionInfo *exception)
 {
+  magick_unreferenced(exception);
   assert(image != NULL);
   assert(exception != (ExceptionInfo *) NULL);
   if (IsEventLogging() != MagickFalse)

@@ -166,6 +166,8 @@ static void AddLZWString(TableType *table,const size_t last_code,
 static void CheckLZWEncodeArguments(const Image *image,
   const unsigned char *magick_restrict pixels,const ExceptionInfo *exception)
 {
+  magick_unreferenced(pixels);
+  magick_unreferenced(exception);
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(pixels != (unsigned char *) NULL);

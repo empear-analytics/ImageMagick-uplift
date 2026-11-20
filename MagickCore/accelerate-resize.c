@@ -1024,10 +1024,10 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
       source = { clEnv, image, resizedColumns, resizedRows };
 
     const ResizeImageTargets
-      targets = { &device, &queue, &filteredImage, &imageBuffer,
+      imageTargets = { &device, &queue, &filteredImage, &imageBuffer,
         &filteredImageBuffer };
 
-    if (AcquireResizeBuffers(&source,exception,&targets) == MagickFalse)
+    if (AcquireResizeBuffers(&source,exception,&imageTargets) == MagickFalse)
       goto cleanup;
   }
 

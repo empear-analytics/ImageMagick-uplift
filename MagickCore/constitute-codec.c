@@ -873,6 +873,7 @@ static void FindFallbackDecoder(const DecodeFallbackInfo *info,
 static void CheckReadImageArguments(const ImageInfo *image_info,
   const ExceptionInfo *exception)
 {
+  magick_unreferenced(exception);
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
   assert(image_info->filename != (char *) NULL);
