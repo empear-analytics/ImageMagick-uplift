@@ -20,8 +20,21 @@
 #ifndef MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 
-static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
-  MagickStatusType *flags)
+typedef void
+  (*XDialogApplyMethod)(Display *,XWindows *,MagickStatusType *,char *,
+    Image **,ExceptionInfo *);
+
+typedef struct _XDialogCommand
+{
+  XDialogRequest
+    request;
+
+  XDialogApplyMethod
+    apply;
+} XDialogCommand;
+
+static void XRunDialogCommand(const XMagickCommandContext *context,
+  const XDialogCommand *command,MagickStatusType *flags)
 {
   Display
     *const display = context->display;
@@ -38,30 +51,39 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  static char
-    radius[MagickPathExtent] = "0";
+  char
+    *const reply = command->request.reply;
 
   /*
-    Query user for noise radius.
+    Query user for the command's argument, then apply the command.
   */
-  {
-    const XDialogRequest
-      dialog_request = { "Reduce Noise", "Enter the noise radius:", radius };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*radius == '\0')
+  (void) XDialogWidget(display,windows,&command->request);
+  if (*reply == '\0')
     return;
-  /*
-    Reduce noise in the image.
-  */
-  XApplyReduceNoiseToImage(display,windows,flags,radius,image,exception);
+  command->apply(display,windows,flags,reply,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  static char
+    radius[MagickPathExtent] = "0";
+
+  const XDialogCommand
+    command = { { "Reduce Noise", "Enter the noise radius:", radius },
+      XApplyReduceNoiseToImage };
+
+  /*
+    Query user for noise radius.
+    Reduce noise in the image.
+  */
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplySharpenToImage(Display *display,XWindows *windows,
@@ -88,46 +110,18 @@ static void XApplySharpenToImage(Display *display,XWindows *windows,
 static void XApplySharpenCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
+  const XDialogCommand
+    command = { { "Sharpen", "Enter the sharpen radius and standard deviation:",
+      radius }, XApplySharpenToImage };
+
   /*
     Query user for sharpen radius.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Sharpen",
-        "Enter the sharpen radius and standard deviation:", radius };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*radius == '\0')
-    return;
-  /*
     Sharpen image scanlines.
   */
-  XApplySharpenToImage(display,windows,flags,radius,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplyBlurToImage(Display *display,XWindows *windows,
@@ -154,46 +148,18 @@ static void XApplyBlurToImage(Display *display,XWindows *windows,
 static void XApplyBlurCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
+  const XDialogCommand
+    command = { { "Blur", "Enter the blur radius and standard deviation:",
+      radius }, XApplyBlurToImage };
+
   /*
     Query user for blur radius.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Blur",
-        "Enter the blur radius and standard deviation:", radius };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*radius == '\0')
-    return;
-  /*
     Blur an image.
   */
-  XApplyBlurToImage(display,windows,flags,radius,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplyThresholdToImage(Display *display,XWindows *windows,
@@ -273,46 +239,18 @@ static void XApplyEdgeDetectToImage(Display *display,XWindows *windows,
 static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     radius[MagickPathExtent] = "0";
 
+  const XDialogCommand
+    command = { { "Detect Edges", "Enter the edge detect radius:", radius },
+      XApplyEdgeDetectToImage };
+
   /*
     Query user for edge factor.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Detect Edges", "Enter the edge detect radius:",
-        radius };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*radius == '\0')
-    return;
-  /*
     Detect edge in image.
   */
-  XApplyEdgeDetectToImage(display,windows,flags,radius,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplySpreadToImage(Display *display,XWindows *windows,
@@ -338,45 +276,18 @@ static void XApplySpreadToImage(Display *display,XWindows *windows,
 static void XApplySpreadCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     amount[MagickPathExtent] = "2";
 
+  const XDialogCommand
+    command = { { "Spread", "Enter the displacement amount:", amount },
+      XApplySpreadToImage };
+
   /*
     Query user for spread amount.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Spread", "Enter the displacement amount:", amount };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*amount == '\0')
-    return;
-  /*
     Displace image pixels by a random amount.
   */
-  XApplySpreadToImage(display,windows,flags,amount,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplyShadeToImage(Display *display,XWindows *windows,
@@ -712,45 +623,18 @@ static void XApplySwirlToImage(Display *display,XWindows *windows,
 static void XApplySwirlCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     degrees[MagickPathExtent] = "60";
 
+  const XDialogCommand
+    command = { { "Swirl", "Enter the swirl angle:", degrees },
+      XApplySwirlToImage };
+
   /*
     Query user for swirl angle.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Swirl", "Enter the swirl angle:", degrees };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*degrees == '\0')
-    return;
-  /*
     Swirl image pixels about the center.
   */
-  XApplySwirlToImage(display,windows,flags,degrees,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplyImplodeToImage(Display *display,XWindows *windows,
@@ -777,46 +661,19 @@ static void XApplyImplodeToImage(Display *display,XWindows *windows,
 static void XApplyImplodeCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     factor[MagickPathExtent] = "0.3";
 
+  const XDialogCommand
+    command = { { "Implode",
+      "Enter the implosion/explosion factor (-1.0 - 1.0):", factor },
+      XApplyImplodeToImage };
+
   /*
     Query user for implode factor.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Implode",
-        "Enter the implosion/explosion factor (-1.0 - 1.0):", factor };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*factor == '\0')
-    return;
-  /*
     Implode image pixels about the center.
   */
-  XApplyImplodeToImage(display,windows,flags,factor,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplyVignetteToImage(Display *display,XWindows *windows,
@@ -1186,45 +1043,18 @@ static void XApplyOilPaintToImage(Display *display,XWindows *windows,
 static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   static char
     radius[MagickPathExtent] = "0";
 
+  const XDialogCommand
+    command = { { "Oil Paint", "Enter the mask radius:", radius },
+      XApplyOilPaintToImage };
+
   /*
     Query user for circular neighborhood radius.
-  */
-  {
-    const XDialogRequest
-      dialog_request = { "Oil Paint", "Enter the mask radius:", radius };
-
-    (void) XDialogWidget(display,windows,&dialog_request);
-  }
-  if (*radius == '\0')
-    return;
-  /*
     OilPaint image scanlines.
   */
-  XApplyOilPaintToImage(display,windows,flags,radius,image,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XRunDialogCommand(context,&command,flags);
 }
 
 static void XApplyCharcoalDrawToImage(Display *display,XWindows *windows,
