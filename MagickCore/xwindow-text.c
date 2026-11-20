@@ -646,9 +646,17 @@ static MagickBooleanType XOpenRenderResources(const DrawInfo *draw_info,
 }
 
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+  const XRenderText *text,ExceptionInfo *exception)
 {
+  const DrawInfo
+    *const draw_info = text->draw_info;
+
+  const PointInfo
+    *const offset = text->offset;
+
+  TypeMetric
+    *const metrics = text->metrics;
+
   XRenderRequest
     request;
 
@@ -753,9 +761,17 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
 %
 */
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+  const XRenderText *text,ExceptionInfo *exception)
 {
+  const DrawInfo
+    *const draw_info = text->draw_info;
+
+  const PointInfo
+    *const offset = text->offset;
+
+  TypeMetric
+    *const metrics = text->metrics;
+
   (void) draw_info;
   (void) offset;
   (void) metrics;
