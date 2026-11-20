@@ -2499,6 +2499,27 @@ static MagickBooleanType ParseMVGBorderColor(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static char *InjectMVGClassElements(char *primitive,const char *p,
+  const char *mvg_class,const char **q)
+{
+  char
+    *elements;
+
+  ssize_t
+    offset;
+
+  offset=(ssize_t) (p-primitive);
+  elements=AcquireString(primitive);
+  elements[offset]='\0';
+  (void) ConcatenateString(&elements,mvg_class);
+  (void) ConcatenateString(&elements,"\n");
+  (void) ConcatenateString(&elements,(*q));
+  primitive=DestroyString(primitive);
+  primitive=elements;
+  (*q)=primitive+offset;
+  return(primitive);
+}
+
 static MagickBooleanType IsNewGraphicContextId(DrawInfo **graphic_context,
   const ssize_t n,const char *token)
 {
@@ -2570,25 +2591,11 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
 
       if (IsRenderableClass(&renderable) != MagickFalse)
         {
-          char
-            *elements;
-
-          ssize_t
-            offset;
-
           /*
             Inject class elements in stream.
           */
           (void) CloneString(&graphic_context[n]->id,token);
-          offset=(ssize_t) (p-primitive);
-          elements=AcquireString(primitive);
-          elements[offset]='\0';
-          (void) ConcatenateString(&elements,mvg_class);
-          (void) ConcatenateString(&elements,"\n");
-          (void) ConcatenateString(&elements,q);
-          primitive=DestroyString(primitive);
-          primitive=elements;
-          q=primitive+offset;
+          primitive=InjectMVGClassElements(primitive,p,mvg_class,&q);
         }
     }
     break;
