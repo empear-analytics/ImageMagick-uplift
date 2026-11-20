@@ -21,8 +21,8 @@
 #define MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 
 typedef void
-  (*XDialogApplyMethod)(Display *,XWindows *,MagickStatusType *,char *,
-    Image **,ExceptionInfo *);
+  (*XDialogApplyMethod)(const XMagickCommandContext *,MagickStatusType *,
+    char *);
 
 typedef struct _XDialogCommand
 {
@@ -60,7 +60,7 @@ static void XRunDialogCommand(const XMagickCommandContext *context,
   (void) XDialogWidget(display,windows,&command->request);
   if (*reply == '\0')
     return;
-  command->apply(display,windows,flags,reply,image,exception);
+  command->apply(context,flags,reply);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
@@ -86,9 +86,21 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplySharpenToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+static void XApplySharpenToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -124,9 +136,21 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplyBlurToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+static void XApplyBlurToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -216,9 +240,21 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyEdgeDetectToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+static void XApplyEdgeDetectToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -253,9 +289,21 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplySpreadToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *amount,Image **image,ExceptionInfo *exception)
+static void XApplySpreadToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *amount)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -599,9 +647,21 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplySwirlToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *degrees,Image **image,ExceptionInfo *exception)
+static void XApplySwirlToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *degrees)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -637,9 +697,21 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplyImplodeToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *factor,Image **image,ExceptionInfo *exception)
+static void XApplyImplodeToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *factor)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -1019,9 +1091,21 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyOilPaintToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+static void XApplyOilPaintToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 

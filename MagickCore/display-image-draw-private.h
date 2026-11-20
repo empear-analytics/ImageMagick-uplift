@@ -1032,9 +1032,21 @@ static void XApplyQuantizeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyReduceNoiseToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+static void XApplyReduceNoiseToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
