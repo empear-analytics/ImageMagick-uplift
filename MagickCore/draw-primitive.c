@@ -851,9 +851,6 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   start=0;
   for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
   {
-    NewSubpathPointInput
-      subpath;
-
     code=LineToCode;
     if (coordinates <= 0)
       {
@@ -867,21 +864,21 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
         closed_subpath=primitive_info[i].closed_subpath;
       }
     coordinates--;
-    subpath.code=code;
-    subpath.coordinates=coordinates;
-    subpath.q=q;
-    subpath.primitive_info=primitive_info;
-    subpath.i=i;
-    if (IsNewSubpathPoint(&subpath) != MagickFalse)
-      {
-        /*
-          Eliminate duplicate points.
-        */
-        path_info[n].code=code;
-        path_info[n].point=primitive_info[i].point;
-        q=primitive_info[i].point;
-        n++;
-      }
+    {
+      const NewSubpathPointInput
+        subpath = { code, coordinates, q, primitive_info, i };
+
+      if (IsNewSubpathPoint(&subpath) != MagickFalse)
+        {
+          /*
+            Eliminate duplicate points.
+          */
+          path_info[n].code=code;
+          path_info[n].point=primitive_info[i].point;
+          q=primitive_info[i].point;
+          n++;
+        }
+    }
     if (coordinates > 0)
       continue;  /* next point in current subpath */
     if (closed_subpath != MagickFalse)
