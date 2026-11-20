@@ -186,9 +186,21 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplyThresholdToImage(Display *display,XWindows *windows,
-  char *factor,Image **image,ExceptionInfo *exception)
+static void XApplyThresholdToImage(const XMagickCommandContext *context,
+  char *factor)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   double
     threshold;
 
@@ -232,7 +244,7 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   /*
     Gamma correct image.
   */
-  XApplyThresholdToImage(display,windows,factor,image,exception);
+  XApplyThresholdToImage(context,factor);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
