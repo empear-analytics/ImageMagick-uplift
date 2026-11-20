@@ -441,22 +441,22 @@ static MagickBooleanType XDrawEditStep(const DrawEditContext *context,
 %
 %  The format of the XDrawEditImage method is:
 %
-%      MagickBooleanType XDrawEditImage(Display *display,
-%        XResourceInfo *resource_info,XWindows *windows,Image **image,
-%        ExceptionInfo *exception)
+%      MagickBooleanType XDrawEditImage(const XImageCacheContext *edit)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
+%    o edit: the X server and image context, in these members:
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o display: Specifies a connection to an X server; returned from
+%        XOpenDisplay.
 %
-%    o windows: Specifies a pointer to a XWindows structure.
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
-%    o image: the image.
+%      o windows: Specifies a pointer to a XWindows structure.
 %
-%    o exception: return any errors or warnings in this structure.
+%      o image: the image.
+%
+%      o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType XDrawEditImage(const XImageCacheContext *edit)

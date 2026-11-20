@@ -208,7 +208,7 @@ static void
 %
 %  The format of the XBestPixel method is:
 %
-%      void XBestPixel(Display *display,const Colormap colormap,XColor *colors,
+%      void XBestPixel(const XBestPixelTarget *target,XColor *colors,
 %        unsigned int number_colors,XColor *color)
 %
 %  A description of each parameter follows:
@@ -216,10 +216,12 @@ static void
 %    o pixel: XBestPixel returns the pixel value closest to the requested
 %      color.
 %
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
+%    o target: the X server connection and colormap, in these members:
 %
-%    o colormap: Specifies the ID of the X server colormap.
+%      o display: Specifies a connection to an X server;  returned from
+%        XOpenDisplay.
+%
+%      o colormap: Specifies the ID of the X server colormap.
 %
 %    o colors: Specifies an array of XColor structures.
 %
@@ -439,7 +441,7 @@ MagickPrivate void XCheckRefreshWindows(Display *display,XWindows *windows)
 %
 %  The format of the XClientMessage function is:
 %
-%      XClientMessage(display,window,protocol,reason,timestamp)
+%      XClientMessage(display,window,protocol,message)
 %
 %  A description of each parameter follows:
 %
@@ -450,9 +452,11 @@ MagickPrivate void XCheckRefreshWindows(Display *display,XWindows *windows)
 %
 %    o protocol: Specifies an atom value.
 %
-%    o reason: Specifies an atom value which is the reason to send.
+%    o message: the reason and its time, in these members:
 %
-%    o timestamp: Specifies a value of type Time.
+%      o reason: Specifies an atom value which is the reason to send.
+%
+%      o timestamp: Specifies a value of type Time.
 %
 */
 MagickPrivate void XClientMessage(Display *display,const Window window,
@@ -494,18 +498,19 @@ MagickPrivate void XClientMessage(Display *display,const Window window,
 %
 %  The format of the XConfigureImageColormap method is:
 %
-%      void XConfigureImageColormap(Display *display,
-%        XResourceInfo *resource_info,XWindows *windows,Image *image,
-%        ExceptionInfo *exception)
+%      void XConfigureImageColormap(const XImageColormapTarget *target,
+%        Image *image,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
+%    o target: the X connection, resources and windows, in these members:
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o display: Specifies a connection to an X server; returned from
+%        XOpenDisplay.
 %
-%    o windows: Specifies a pointer to a XWindows structure.
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%
+%      o windows: Specifies a pointer to a XWindows structure.
 %
 %    o image: the image.
 %
@@ -1276,7 +1281,7 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
 %  The format of the XMakeCursor method is:
 %
 %      Cursor XMakeCursor(Display *display,Window window,Colormap colormap,
-%        char *background_color,char *foreground_color)
+%        const XCursorColors *colors)
 %
 %  A description of each parameter follows:
 %
@@ -1289,9 +1294,13 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
 %    o colormap: Specifies the ID of the colormap from which the background
 %      and foreground color will be retrieved.
 %
-%    o background_color: Specifies the color to use for the cursor background.
+%    o colors: the cursor colors, in these members:
 %
-%    o foreground_color: Specifies the color to use for the cursor foreground.
+%      o background_color: Specifies the color to use for the cursor
+%        background.
+%
+%      o foreground_color: Specifies the color to use for the cursor
+%        foreground.
 %
 */
 MagickPrivate Cursor XMakeCursor(Display *display,Window window,
@@ -1377,8 +1386,8 @@ MagickPrivate Cursor XMakeCursor(Display *display,Window window,
 %  The format of the XMakeImage method is:
 %
 %      MagickBooleanType XMakeImage(Display *display,
-%        const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
-%        unsigned int width,unsigned int height,ExceptionInfo *exception)
+%        const XResourceInfo *resource_info,const XMakeImageRequest *request,
+%        ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
@@ -1387,15 +1396,17 @@ MagickPrivate Cursor XMakeCursor(Display *display,Window window,
 %
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
-%    o window: Specifies a pointer to a XWindowInfo structure.
+%    o request: the window, image and area, in these members:
 %
-%    o image: the image.
+%      o window: Specifies a pointer to a XWindowInfo structure.
 %
-%    o width: Specifies the width in pixels of the rectangular area to
-%      display.
+%      o image: the image.
 %
-%    o height: Specifies the height in pixels of the rectangular area to
-%      display.
+%      o width: Specifies the width in pixels of the rectangular area to
+%        display.
+%
+%      o height: Specifies the height in pixels of the rectangular area to
+%        display.
 %
 %    o exception: return any errors or warnings in this structure.
 %
@@ -5772,26 +5783,27 @@ static MagickBooleanType XMakePixmap(Display *display,
 %
 %  The format of the XMakeStandardColormap method is:
 %
-%      void XMakeStandardColormap(Display *display,XVisualInfo *visual_info,
-%        XResourceInfo *resource_info,Image *image,XStandardColormap *map_info,
-%        XPixelInfo *pixel,ExceptionInfo *exception)
+%      void XMakeStandardColormap(Display *display,
+%        const XStandardColormapRequest *request,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
 %    o display: Specifies a connection to an X server; returned from
 %      XOpenDisplay.
 %
-%    o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
-%      returned from XGetVisualInfo.
+%    o request: the visual, resources, image and colormap, in these members:
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
+%        returned from XGetVisualInfo.
 %
-%    o image: the image.
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
-%    o map_info: If a Standard Colormap type is specified, this structure is
-%      initialized with info from the Standard Colormap.
+%      o image: the image.
 %
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
+%      o map_info: If a Standard Colormap type is specified, this structure is
+%        initialized with info from the Standard Colormap.
+%
+%      o pixel: Specifies a pointer to a XPixelInfo structure.
 %
 %    o exception: return any errors or warnings in this structure.
 %
@@ -7055,9 +7067,8 @@ MagickPrivate void XMakeStandardColormap(Display *display,
 %
 %  The format of the XMakeWindow method is:
 %
-%      void XMakeWindow(Display *display,Window parent,char **argv,int argc,
-%        XClassHint *class_hint,XWMHints *manager_hints,
-%        XWindowInfo *window_info)
+%      void XMakeWindow(Display *display,Window parent,
+%        const XMakeWindowHints *hints,XWindowInfo *window_info)
 %
 %  A description of each parameter follows:
 %
@@ -7066,13 +7077,15 @@ MagickPrivate void XMakeStandardColormap(Display *display,
 %
 %    o parent: Specifies the parent window_info.
 %
-%    o argv: Specifies the application's argument list.
+%    o hints: the arguments and window manager hints, in these members:
 %
-%    o argc: Specifies the number of arguments.
+%      o argv: Specifies the application's argument list.
 %
-%    o class_hint: Specifies a pointer to a X11 XClassHint structure.
+%      o argc: Specifies the number of arguments.
 %
-%    o manager_hints: Specifies a pointer to a X11 XWMHints structure.
+%      o class_hint: Specifies a pointer to a X11 XClassHint structure.
+%
+%      o manager_hints: Specifies a pointer to a X11 XWMHints structure.
 %
 %    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
 %
