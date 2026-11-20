@@ -844,14 +844,16 @@ MagickPrivate void XDisplayImageInfo(const XDisplayImageInfoTarget *target,
       char
         title[MagickPathExtent];
 
+      const XHelpView
+        view = { display, resource_info, windows, MagickTrue };
+
       /*
         Display information about the image in the Text View widget.
       */
       (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
       (void) FormatLocaleString(title,MagickPathExtent,"Image Info: %s",
         image->filename);
-      XTextViewWidget(display,resource_info,windows,MagickTrue,title,
-        (char const **) textlist);
+      XTextViewWidget(&view,title,(char const **) textlist);
       DestroyXTextList(textlist);
     }
   text=DestroyString(text);

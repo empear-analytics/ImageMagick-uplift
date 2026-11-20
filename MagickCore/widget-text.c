@@ -435,10 +435,15 @@ static void RunTextView(const TextViewContext *context,
 %    o textlist: This string list is displayed within the Text View widget.
 %
 */
-MagickPrivate void XTextViewWidget(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,
-  const MagickBooleanType mono,const char *title,const char **textlist)
+MagickPrivate void XTextViewWidget(const XHelpView *view,const char *title,
+  const char **textlist)
 {
+  Display
+    *const display = view->display;
+
+  XWindows
+    *const windows = view->windows;
+
   char
     primary_selection[MagickPathExtent];
 
@@ -462,7 +467,7 @@ MagickPrivate void XTextViewWidget(Display *display,
     Convert text string to a text list.
   */
   assert(display != (Display *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
+  assert(view->resource_info != (XResourceInfo *) NULL);
   assert(windows != (XWindows *) NULL);
   assert(title != (const char *) NULL);
   assert(textlist != (const char **) NULL);
@@ -479,7 +484,7 @@ MagickPrivate void XTextViewWidget(Display *display,
     Determine Text View widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_info=SelectTextViewFont(display,resource_info,windows,mono);
+  text_info=SelectTextViewFont(display,view->resource_info,windows,view->mono);
   text_width=0;
   for (i=0; textlist[i] != (char *) NULL; i++)
     if (WidgetTextWidth(text_info,(char *) textlist[i]) > text_width)

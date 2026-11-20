@@ -1745,9 +1745,13 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
   previews=GetCommandOptions(MagickPreviewOptions);
   if (previews == (char **) NULL)
     return;
-  XListBrowserWidget(display,windows,&windows->widget,
-    (const char **) previews,"Preview",
-    "Select an enhancement, effect, or F/X:",preview_type);
+  {
+    const XListBrowserRequest
+      browse_request = { (const char **) previews, "Preview",
+        "Select an enhancement, effect, or F/X:", preview_type };
+
+    XListBrowserWidget(display,windows,&windows->widget,&browse_request);
+  }
   previews=DestroyStringList(previews);
   if (*preview_type == '\0')
     return;
@@ -2078,9 +2082,13 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   noises=GetCommandOptions(MagickNoiseOptions);
   if (noises == (char **) NULL)
     return;
-  XListBrowserWidget(display,windows,&windows->widget,
-    (const char **) noises,"Add Noise",
-    "Select a type of noise to add to your image:",noise_type);
+  {
+    const XListBrowserRequest
+      browse_request = { (const char **) noises, "Add Noise",
+        "Select a type of noise to add to your image:", noise_type };
+
+    XListBrowserWidget(display,windows,&windows->widget,&browse_request);
+  }
   noises=DestroyStringList(noises);
   if (*noise_type == '\0')
     return;
