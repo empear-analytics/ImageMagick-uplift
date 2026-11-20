@@ -278,9 +278,17 @@ static MagickBooleanType EnqueueFunctionKernel(cl_command_queue queue,
 }
 
 static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception)
+  const AccelerateFunctionRequest *request,ExceptionInfo *exception)
 {
+  const MagickFunction
+    function = request->function;
+
+  const size_t
+    number_parameters = request->number_parameters;
+
+  const double
+    *const parameters = request->parameters;
+
   cl_command_queue
     queue;
 
@@ -362,15 +370,6 @@ static void TraceAccelerateCall(Image *image,ExceptionInfo *exception)
 MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
   const AccelerateFunctionRequest *request,ExceptionInfo *exception)
 {
-  const MagickFunction
-    function = request->function;
-
-  const size_t
-    number_parameters = request->number_parameters;
-
-  const double
-    *const parameters = request->parameters;
-
   MagickBooleanType
     status;
 
@@ -386,8 +385,7 @@ MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
-  status=ComputeFunctionImage(image,clEnv,function,number_parameters,
-    parameters,exception);
+  status=ComputeFunctionImage(image,clEnv,request,exception);
   return(status);
 }
 
