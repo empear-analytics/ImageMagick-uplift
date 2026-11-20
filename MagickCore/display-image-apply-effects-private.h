@@ -1081,9 +1081,21 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyWaveToImage(Display *display,XWindows *windows,char *geometry,
-  Image **image,ExceptionInfo *exception)
+static void XApplyWaveToImage(const XMagickCommandContext *context,
+  char *geometry)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -1142,7 +1154,7 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   /*
     Alter an image along a sine wave.
   */
-  XApplyWaveToImage(display,windows,geometry,image,exception);
+  XApplyWaveToImage(context,geometry);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
