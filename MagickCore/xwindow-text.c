@@ -370,18 +370,20 @@ MagickPrivate void XGetAnnotateInfo(XAnnotateInfo *annotate_info)
 %
 %  The format of the XRenderImage method is:
 %
-%      MagickBooleanType XRenderImage(Image *image,DrawInfo *draw_info,
-%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+%      MagickBooleanType XRenderImage(Image *image,const XRenderText *text,
+%        ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
 %    o image: the image.
 %
-%    o draw_info: the draw info.
+%    o text: the text to render, in these members:
 %
-%    o offset: (x,y) location of text relative to image.
+%      o draw_info: the draw info.
 %
-%    o metrics: bounding box of text.
+%      o offset: (x,y) location of text relative to image.
+%
+%      o metrics: bounding box of text.
 %
 %    o exception: return any errors or warnings in this structure.
 %
@@ -769,18 +771,20 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
 %
 %  The format of the XRenderImage method is:
 %
-%      MagickBooleanType XRenderImage(Image *image,DrawInfo *draw_info,
-%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+%      MagickBooleanType XRenderImage(Image *image,const XRenderText *text,
+%        ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
 %    o image: the image.
 %
-%    o draw_info: the draw info.
+%    o text: the text to render, in these members:
 %
-%    o offset: (x,y) location of text relative to image.
+%      o draw_info: the draw info.
 %
-%    o metrics: bounding box of text.
+%      o offset: (x,y) location of text relative to image.
+%
+%      o metrics: bounding box of text.
 %
 %    o exception: return any errors or warnings in this structure.
 %

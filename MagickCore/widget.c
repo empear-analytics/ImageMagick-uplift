@@ -812,8 +812,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
 %  The format of the XProgressMonitorWidget method is:
 %
 %      void XProgressMonitorWidget(Display *display,XWindows *windows,
-%        const char *task,const MagickOffsetType offset,
-%        const MagickSizeType span)
+%        const char *task,const XProgressMonitorSpan *progress)
 %
 %  A description of each parameter follows:
 %
@@ -824,10 +823,12 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
 %
 %    o task: Identifies the task in progress.
 %
-%    o offset: Specifies the offset position within the span which represents
-%      how much progress has been made in completing a task.
+%    o progress: the progress made, in these members:
 %
-%    o span: Specifies the span relative to completing a task.
+%      o offset: Specifies the offset position within the span which represents
+%        how much progress has been made in completing a task.
+%
+%      o span: Specifies the span relative to completing a task.
 %
 */
 static void XRefreshExposedWindows(Display *display,XWindows *windows)

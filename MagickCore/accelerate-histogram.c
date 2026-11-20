@@ -1078,13 +1078,97 @@ static MagickBooleanType AcquireEqualizeHistogram(cl_uint4 **histogram)
   return(MagickTrue);
 }
 
+typedef struct _EqualizeHistogramStageInput
+{
+  Image
+    *image;
+
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+
+  cl_uint4
+    *histogram;
+
+  cl_command_queue
+    queue;
+} EqualizeHistogramStageInput;
+
+typedef struct _EqualizeHistogramStageTargets
+{
+  CacheView
+    **image_view;
+
+  void
+    **inputPixels;
+
+  cl_mem
+    *imageBuffer,
+    *histogramBuffer;
+} EqualizeHistogramStageTargets;
+
+static MagickBooleanType RunEqualizeHistogramStage(
+  const EqualizeHistogramStageInput *stage,ExceptionInfo *exception,
+  const EqualizeHistogramStageTargets *targets)
+{
+  Image
+    *const image = stage->image;
+
+  const MagickCLDevice
+    device = stage->device;
+
+  const MagickCLEnv
+    clEnv = stage->clEnv;
+
+  cl_uint4
+    *const histogram = stage->histogram;
+
+  const cl_command_queue
+    queue = stage->queue;
+
+  CacheView
+    **const image_view = targets->image_view;
+
+  void
+    **const inputPixels = targets->inputPixels;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer,
+    *const histogramBuffer = targets->histogramBuffer;
+
+  {
+    const EqualizeInputSource
+      source = { image, device, clEnv };
+
+    const EqualizeInputTargets
+      inputTargets = { image_view, inputPixels, imageBuffer };
+
+    if (AcquireEqualizeInput(&source,exception,&inputTargets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const HistogramPassInput
+      pass = { clEnv, device, histogram, queue, *imageBuffer, image };
+
+    if (RunHistogramPass(&pass,histogramBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+#define EqualizeImageTag  "Equalize/Image"
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
-#define EqualizeImageTag  "Equalize/Image"
-
   CacheView
     *image_view=NULL;
+
+  EqualizeBuffers
+    buffers = { clEnv, NULL, NULL, NULL, NULL, NULL, NULL };
 
   cl_command_queue
     queue=NULL;
@@ -1093,30 +1177,21 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     channel_mask=get32BitChannelValue(image->channel_mask);
 
   cl_mem
-    equalizeMapBuffer=NULL,
-    histogramBuffer=NULL,
     imageBuffer=NULL;
 
   cl_kernel
     equalizeKernel=NULL,
     histogramKernel=NULL;
 
-  cl_uint4
-    *histogram=NULL;
-
   cl_float4
     white,
-    black,
-    *map=NULL;
+    black;
 
   MagickBooleanType
     outputReady=MagickFalse;
 
   MagickCLDevice
     device;
-
-  PixelPacket
-    *equalize_map=NULL;
 
   void
     *inputPixels=NULL;
@@ -1140,25 +1215,18 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /*
     Allocate and initialize histogram arrays.
   */
-  if (AcquireEqualizeHistogram(&histogram) == MagickFalse)
+  if (AcquireEqualizeHistogram(&buffers.histogram) == MagickFalse)
       ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
 
   {
-    const EqualizeInputSource
-      source = { image, device, clEnv };
+    const EqualizeHistogramStageInput
+      stage = { image, device, clEnv, buffers.histogram, queue };
 
-    const EqualizeInputTargets
-      inputTargets = { &image_view, &inputPixels, &imageBuffer };
+    const EqualizeHistogramStageTargets
+      targets = { &image_view, &inputPixels, &imageBuffer,
+        &buffers.histogramBuffer };
 
-    if (AcquireEqualizeInput(&source,exception,&inputTargets) == MagickFalse)
-      goto cleanup;
-  }
-
-  {
-    const HistogramPassInput
-      pass = { clEnv, device, histogram, queue, imageBuffer, image };
-
-    if (RunHistogramPass(&pass,&histogramBuffer,exception) == MagickFalse)
+    if (RunEqualizeHistogramStage(&stage,exception,&targets) == MagickFalse)
       goto cleanup;
   }
 
@@ -1168,9 +1236,9 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /* CPU stuff */
   {
     const EqualizeMapTargets
-      mapTargets = { &equalize_map, &map, &black, &white };
+      mapTargets = { &buffers.equalize_map, &buffers.map, &black, &white };
 
-    if (AcquireEqualizeMaps(image,histogram,&mapTargets) == MagickFalse)
+    if (AcquireEqualizeMaps(image,buffers.histogram,&mapTargets) == MagickFalse)
       ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
   }
 
@@ -1187,27 +1255,22 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
 
   {
     const EqualizePassInput
-      run = { clEnv, device, equalize_map, imageBuffer, channel_mask, white,
-        black, image, queue, inputPixels, image_view };
+      run = { clEnv, device, buffers.equalize_map, imageBuffer, channel_mask,
+        white, black, image, queue, inputPixels, image_view };
 
     const EqualizePassTargets
-      runTargets = { &equalizeMapBuffer, &equalizeKernel, &outputReady };
+      runTargets = { &buffers.equalizeMapBuffer, &equalizeKernel,
+        &outputReady };
 
-    if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse)
-      goto cleanup;
+    (void) RunEqualizePass(&run,exception,&runTargets);
   }
 
 cleanup:
 
   image_view=DestroyCacheView(image_view);
 
-  {
-    const EqualizeBuffers
-      buffers = { clEnv, imageBuffer, map, equalizeMapBuffer, equalize_map,
-        histogramBuffer, histogram };
-
-    ReleaseEqualizeBuffers(&buffers);
-  }
+  buffers.imageBuffer=imageBuffer;
+  ReleaseEqualizeBuffers(&buffers);
   ReleaseEqualizeKernels(device,queue,histogramKernel,equalizeKernel);
 
   return(outputReady);

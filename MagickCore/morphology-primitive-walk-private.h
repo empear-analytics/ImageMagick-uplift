@@ -65,32 +65,32 @@ typedef struct _MorphologyPass
 %
 %  The format of the MorphologyApply method is:
 %
-%      Image *MorphologyApply(const Image *image,MorphologyMethod method,
-%        const ssize_t iterations,const KernelInfo *kernel,
-%        const CompositeMethod compose,const double bias,
-%        ExceptionInfo *exception)
+%      Image *MorphologyApply(const Image *image,
+%        const MorphologyApplyRequest *request,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
 %    o image: the source image
 %
-%    o method: the morphology method to be applied.
+%    o request: the morphology to apply, in these members:
 %
-%    o iterations: apply the operation this many times (or no change).
-%                  A value of -1 means loop until no change found.
-%                  How this is applied may depend on the morphology method.
-%                  Typically this is a value of 1.
+%      o method: the morphology method to be applied.
+%
+%      o iterations: apply the operation this many times (or no change).
+%                    A value of -1 means loop until no change found.
+%                    How this is applied may depend on the morphology method.
+%                    Typically this is a value of 1.
+%
+%      o kernel: An array of double representing the morphology kernel.
+%
+%      o compose: How to handle or merge multi-kernel results.
+%            If 'UndefinedCompositeOp' use default for the Morphology method.
+%            If 'NoCompositeOp' force image to be re-iterated by each kernel.
+%            Otherwise merge the results using the compose method given.
+%
+%      o bias: Convolution Output Bias.
 %
 %    o channel: the channel type.
-%
-%    o kernel: An array of double representing the morphology kernel.
-%
-%    o compose: How to handle or merge multi-kernel results.
-%          If 'UndefinedCompositeOp' use default for the Morphology method.
-%          If 'NoCompositeOp' force image to be re-iterated by each kernel.
-%          Otherwise merge the results using the compose method given.
-%
-%    o bias: Convolution Output Bias.
 %
 %    o exception: return any errors or warnings in this structure.
 %

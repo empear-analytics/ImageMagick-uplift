@@ -216,33 +216,38 @@ MagickPrivate MagickCLCacheInfo CopyMagickCLCacheInfo(MagickCLCacheInfo info)
 %
 %  The format of the EnqueueOpenCLKernel method is:
 %
-%      MagickBooleanType EnqueueOpenCLKernel(cl_kernel kernel,cl_uint work_dim,
-%        const size_t *global_work_offset,const size_t *global_work_size,
-%        const size_t *local_work_size,const Image *input_image,
-%        const Image *output_image,ExceptionInfo *exception)
+%      MagickBooleanType EnqueueOpenCLKernel(
+%        const OpenCLKernelLaunch *enqueue,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o kernel: the OpenCL kernel.
+%    o enqueue: the kernel launch, in these members:
 %
-%    o work_dim: the number of dimensions used to specify the global work-items
-%                and work-items in the work-group.
+%      o queue: the command queue the kernel is enqueued on.
 %
-%    o offset: can be used to specify an array of work_dim unsigned values
-%              that describe the offset used to calculate the global ID of a
-%              work-item.
+%      o kernel: the OpenCL kernel.
 %
-%    o gsize: points to an array of work_dim unsigned values that describe the
-%             number of global work-items in work_dim dimensions that will
-%             execute the kernel function.
+%      o work_dim: the number of dimensions used to specify the global
+%        work-items and work-items in the work-group.
 %
-%    o lsize: points to an array of work_dim unsigned values that describe the
-%             number of work-items that make up a work-group that will execute
-%             the kernel specified by kernel.
+%      o offset: can be used to specify an array of work_dim unsigned values
+%                that describe the offset used to calculate the global ID of a
+%                work-item.
 %
-%    o input_image: the input image of the operation.
+%      o gsize: points to an array of work_dim unsigned values that describe
+%        the number of global work-items in work_dim dimensions that will
+%        execute the kernel function.
 %
-%    o output_image: the output or secondary image of the operation.
+%      o lsize: points to an array of work_dim unsigned values that describe
+%        the number of work-items that make up a work-group that will execute
+%        the kernel specified by kernel.
+%
+%      o input_image: the input image of the operation.
+%
+%      o output_image: the output or secondary image of the operation.
+%
+%      o flush: if not MagickFalse, the queue is flushed once the
+%        kernel is enqueued.
 %
 %    o exception: return any errors or warnings in this structure.
 %
