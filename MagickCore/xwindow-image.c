@@ -512,10 +512,18 @@ MagickPrivate void XClientMessage(Display *display,const Window window,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickPrivate void XConfigureImageColormap(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+MagickPrivate void XConfigureImageColormap(
+  const XImageColormapTarget *target,Image *image,ExceptionInfo *exception)
 {
+  Display
+    *const display = target->display;
+
+  XResourceInfo
+    *const resource_info = target->resource_info;
+
+  XWindows
+    *const windows = target->windows;
+
   Colormap
     colormap;
 

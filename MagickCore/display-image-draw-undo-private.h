@@ -191,6 +191,9 @@ static MagickStatusType XDrawElementImage(const DrawEditContext *context,
   XWindows
     *const windows = context->windows;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   {
@@ -203,7 +206,7 @@ static MagickStatusType XDrawElementImage(const DrawEditContext *context,
   /*
     Update image colormap and return to image drawing.
   */
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
   return(status);
 }
@@ -853,6 +856,9 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   Image
     *cache_image;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Undo the last image transformation.
   */
@@ -882,7 +888,7 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   cache_image=DestroyImage(cache_image);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -931,6 +937,9 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   ExceptionInfo
     *const exception = cache_context->exception;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (command == RedoCommand)
     {
       /*
@@ -952,7 +961,7 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
       (*redo_image)=NewImageList();
       if (windows->image.orphan != MagickFalse)
         return;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+      XConfigureImageColormap(&cmap_target,*image,exception);
       (void) XConfigureImage(display,resource_info,windows,*image,exception);
       return;
     }

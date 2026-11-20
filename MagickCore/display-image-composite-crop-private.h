@@ -219,6 +219,9 @@ static MagickBooleanType XCompositeIntoImage(
   XWindows
     *const windows = input->windows;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Image compositing is relative to image configuration.
   */
@@ -259,7 +262,7 @@ static MagickBooleanType XCompositeIntoImage(
   /*
     Update image configuration.
   */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  XConfigureImageColormap(&cmap_target,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
 }
@@ -1942,8 +1945,13 @@ static MagickBooleanType XCropCopyImage(const CropContext *context,Image *image,
   /*
     Update image configuration.
   */
-  XConfigureImageColormap(context->display,context->resource_info,
-    context->windows,image,context->exception);
+  {
+    const XImageColormapTarget
+      cmap_target = { context->display, context->resource_info,
+        context->windows };
+
+    XConfigureImageColormap(&cmap_target,image,context->exception);
+  }
   (void) XConfigureImage(context->display,context->resource_info,
     context->windows,image,context->exception);
   return(MagickTrue);

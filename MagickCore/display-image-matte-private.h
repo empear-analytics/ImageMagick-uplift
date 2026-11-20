@@ -1195,6 +1195,9 @@ static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
     x,
     y;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (windows->image.orphan != MagickFalse)
     return(MagickTrue);
   if (normalized_degrees != 0.0)
@@ -1214,7 +1217,7 @@ static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
           windows->image.window_changes.width=(int) (*width);
           windows->image.window_changes.height=(int) (*height);
         }
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+      XConfigureImageColormap(&cmap_target,*image,exception);
     }
   else
     if (((rotations % 4) == 1) || ((rotations % 4) == 3))

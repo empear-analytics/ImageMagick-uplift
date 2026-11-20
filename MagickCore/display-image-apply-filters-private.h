@@ -54,6 +54,9 @@ static void XRunDialogCommand(const XMagickCommandContext *context,
   char
     *const reply = command->request.reply;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for the command's argument, then apply the command.
   */
@@ -65,7 +68,7 @@ static void XRunDialogCommand(const XMagickCommandContext *context,
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -230,6 +233,9 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   static char
     factor[MagickPathExtent] = "128";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for threshold value.
   */
@@ -248,7 +254,7 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -411,6 +417,9 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   static char
     geometry[MagickPathExtent] = "30x30";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for the shade geometry.
   */
@@ -431,7 +440,7 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -483,6 +492,9 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for bevel width.
   */
@@ -502,7 +514,7 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -556,6 +568,9 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   static char
     threshold[MagickPathExtent] = "1.0x1.5";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for smoothing threshold.
   */
@@ -574,7 +589,7 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -630,6 +645,9 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   static char
     factor[MagickPathExtent] = "80%";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for sepia-tone factor.
   */
@@ -650,7 +668,7 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -698,6 +716,9 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   static char
     factor[MagickPathExtent] = "60%";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for solarize factor.
   */
@@ -717,7 +738,7 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -885,6 +906,9 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   static char
     geometry[MagickPathExtent] = "0x20";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for the vignette geometry.
   */
@@ -905,7 +929,7 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -966,6 +990,9 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for the roll geometry.
   */
@@ -988,7 +1015,7 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
     return;
   windows->image.window_changes.width=(int) (*image)->columns;
   windows->image.window_changes.height=(int) (*image)->rows;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -1038,6 +1065,9 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   static char
     hue_percent[MagickPathExtent] = "110";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for percent hue change.
   */
@@ -1057,7 +1087,7 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -1119,6 +1149,9 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for emboss radius.
   */
@@ -1139,7 +1172,7 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -1201,6 +1234,9 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   static char
     geometry[MagickPathExtent] = "25x150";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for the wave geometry.
   */
@@ -1221,7 +1257,7 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -1336,6 +1372,9 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for charcoal radius.
   */
@@ -1357,7 +1396,7 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 

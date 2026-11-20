@@ -746,8 +746,12 @@ static void XColorEditRelease(const ColorEditContext *context,
   */
   (*x)=(*event).xbutton.x;
   (*y)=(*event).xbutton.y;
-  XConfigureImageColormap(context->display,context->resource_info,
-    context->windows,*context->image,context->exception);
+  {
+    const XImageColormapTarget cmap_target = { context->display,
+      context->resource_info, context->windows };
+
+    XConfigureImageColormap(&cmap_target,*context->image,context->exception);
+  }
   (void) XConfigureImage(context->display,context->resource_info,
     context->windows,*context->image,context->exception);
   XInfoWidget(context->display,context->windows,context->text);

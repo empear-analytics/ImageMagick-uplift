@@ -1189,6 +1189,9 @@ static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
   size_t
     *const state = targets->state;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if ((*event).xbutton.button != Button1)
     return;
   if (((*event).xbutton.window != windows->image.id) &&
@@ -1199,7 +1202,7 @@ static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
   */
   (*x)=(*event).xbutton.x;
   (*y)=(*event).xbutton.y;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
   XInfoWidget(display,windows,input->text);
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
@@ -2114,6 +2117,9 @@ static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
     height,
     width;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -2150,7 +2156,7 @@ static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
   /*
     Update image colormap.
   */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  XConfigureImageColormap(&cmap_target,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
 }
@@ -3127,6 +3133,9 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (((*state) & UpdateRegionState) != 0)
     {
       (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -3147,8 +3156,7 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
       }
       if (display_command != InfoCommand)
         {
-          XConfigureImageColormap(display,resource_info,windows,*image,
-            exception);
+          XConfigureImageColormap(&cmap_target,*image,exception);
           (void) XConfigureImage(display,resource_info,windows,*image,
             exception);
         }

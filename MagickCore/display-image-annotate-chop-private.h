@@ -3205,6 +3205,9 @@ static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
   XAnnotateInfo
     *previous_info;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Annotation is relative to image configuration.
   */
@@ -3258,7 +3261,7 @@ static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
   /*
     Update image configuration.
   */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  XConfigureImageColormap(&cmap_target,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
 }
@@ -4127,6 +4130,9 @@ static MagickBooleanType XChopApply(const ChopEventInput *input,Image **image,
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Image chopping is relative to image configuration.
   */
@@ -4150,7 +4156,7 @@ static MagickBooleanType XChopApply(const ChopEventInput *input,Image **image,
   /*
     Update image configuration.
   */
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
   return(MagickTrue);
 }

@@ -165,9 +165,11 @@ static void XReleaseIconColormap(const AnimateIconColormaps *icon_colormaps)
   XPixelInfo
     *const icon_pixel = icon_colormaps->icon_pixel;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (map_info->colormap == icon_map->colormap)
-    XConfigureImageColormap(display,resource_info,windows,
-      display_image,exception);
+    XConfigureImageColormap(&cmap_target,display_image,exception);
   (void) XFreeStandardColormap(display,icon_visual,icon_map,
     icon_pixel);
   windows->icon.mapped=MagickFalse;

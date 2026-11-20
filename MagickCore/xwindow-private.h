@@ -580,6 +580,18 @@ typedef struct _XMakeWindowHints
     *manager_hints;
 } XMakeWindowHints;
 
+typedef struct _XImageColormapTarget
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} XImageColormapTarget;
+
 typedef struct _XClientReason
 {
   Atom
@@ -623,7 +635,7 @@ extern MagickPrivate void
   XClientMessage(Display *,const Window,const Atom,
     const XClientReason *),
   XComponentTerminus(void),
-  XConfigureImageColormap(Display *,XResourceInfo *,XWindows *,Image *,
+  XConfigureImageColormap(const XImageColormapTarget *,Image *,
     ExceptionInfo *),
   XConstrainWindowPosition(Display *,XWindowInfo *),
   XDelay(Display *,const size_t),

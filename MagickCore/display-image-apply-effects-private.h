@@ -214,6 +214,9 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Query user for border color and geometry.
   */
@@ -251,7 +254,7 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
     return;
   windows->image.window_changes.width=(int) (*image)->columns;
   windows->image.window_changes.height=(int) (*image)->rows;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -287,6 +290,9 @@ static void XApplyAddFrameCommand(const XMagickCommandContext *context,
 
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
+
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
 
   /*
     Query user for frame color and geometry.
@@ -332,7 +338,7 @@ static void XApplyAddFrameCommand(const XMagickCommandContext *context,
     return;
   windows->image.window_changes.width=(int) (*image)->columns;
   windows->image.window_changes.height=(int) (*image)->rows;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -942,6 +948,9 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   static char
     noise_type[MagickPathExtent] = "Gaussian";
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Add noise to the image.
   */
@@ -963,7 +972,7 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -984,6 +993,9 @@ static void XApplyRestoreCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Restore Image window to its original size.
   */
@@ -1002,7 +1014,7 @@ static void XApplyRestoreCommand(const XMagickCommandContext *context)
       windows->image.x=0;
       windows->image.y=0;
     }
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 

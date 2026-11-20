@@ -871,6 +871,9 @@ static void XTileUpdateImage(const XTileInput *input)
   PixelInfo
     pixel;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Ensure all the images exist.
   */
@@ -913,7 +916,7 @@ static void XTileUpdateImage(const XTileInput *input)
   }
   windows->image.window_changes.width=(int) image->columns;
   windows->image.window_changes.height=(int) image->rows;
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  XConfigureImageColormap(&cmap_target,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
 }
 
