@@ -480,9 +480,21 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplySegmentToImage(Display *display,XWindows *windows,
-  char *threshold,Image **image,ExceptionInfo *exception)
+static void XApplySegmentToImage(const XMagickCommandContext *context,
+  char *threshold)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -532,7 +544,7 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   /*
     Segment an image.
   */
-  XApplySegmentToImage(display,windows,threshold,image,exception);
+  XApplySegmentToImage(context,threshold);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
