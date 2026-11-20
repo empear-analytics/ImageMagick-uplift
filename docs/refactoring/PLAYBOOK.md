@@ -23622,12 +23622,16 @@ whose include block is followed by a whole-file conditional (`#if
 defined(MAGICKCORE_OPENCL_SUPPORT)` in `opencl-initialize.c`) that itself opens with a
 conditional `#include` (`#if defined(MAGICKCORE_LTDL_DELEGATE)` / `#include "ltdl.h"` /
 `#endif`), which some build compiles, so that naming the new header in the include block would
-put the run's items before that header's tokens. The run then begins after that inner
-`#endif` and the blank line after it; the `.c` file names the new header on the line directly
-after the inner `#endif`, inside the file's conditional, where the run stood; the header holds
-the items verbatim and in order inside its include guard, with no conditional of its own (its
-one include stands inside the file's conditional). The translation unit has the same tokens in
-the same order in every configuration. Step 4's proof: `tools/pp_identical.sh` and
+put the run's items before that header's tokens. The run then begins with the blank line after
+that inner `#endif` (the blank line stays in the `.c` file, below the new include) and ends
+directly before the first item that stays; the `.c` file names the new header on the line
+directly after the inner `#endif`, inside the file's conditional, where the run stood. The
+header holds the items verbatim and in order inside its include guard and adds no wrapping
+conditional of its own (no `#if defined(MAGICKCORE_OPENCL_SUPPORT)` around the items: its one
+include already stands inside the file's conditional); the conditional blocks inside the run
+(`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and
+all, unedited. The translation unit has the same tokens in the same order in every
+configuration. Step 4's proof: `tools/pp_identical.sh` and
 `tools/obj_identical.sh` in every build that compiles the file (`WIDE=1`, and `BUILD=` each CI
 configuration that compiles it, such as `ci-gcc-x` and `ci-clang-x`), `IDENTICAL` (or
 `pp_identical` differing only in indentation, identical under `diff -b`), and `NOTHING
@@ -26534,3 +26538,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | UB | Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place: a conditional block no Linux build compiles (`#ifdef RECREATEBUFFER`, `#if 0`) inside a function moves, byte for byte, into a guard-less private header that the function `#include`s at the block's place; files holding the same block include the same header; proof by script (the text moved unchanged) and `pp_identical.sh`/`obj_identical.sh` IDENTICAL | `accelerate-histogram.c`'s `ComputeEqualizeImage` and `accelerate-contrast-stretch.c`'s `ComputeContrastStretchImage` (campaign A, W49 round 36, lane c), each holding the same two `RECREATEBUFFER` blocks; probes 8.85 to 8.95 and 7.30 to 7.38; the owner's ruling of 2026-11-20 that code no Linux build compiles may move verbatim into a header | mandate (2026-11-19) |
 | 2026-11-20 | WORDING | UB | Step 5: `pp_identical.sh` may print DIFFERENT only in the indentation of the line after the include (clang `-E -P` loses a leading blank after a nested file returns); the units must then be identical under `diff -b`, and `obj_identical.sh` must print IDENTICAL | The first use, `accelerate-histogram.c` (wide build): one line, `  {` against ` {`, object IDENTICAL | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *Mid-file conditional form* of Form A: when the file's whole-file conditional opens with a conditional `#include` that some build compiles (`ltdl.h` in `opencl-initialize.c`), the run begins after that include's `#endif` and the new header is named on the next line, inside the conditional (a mid-file include); the header has no conditional of its own; proof `pp_identical`/`obj_identical` in every build that compiles the file | `opencl-initialize.c` (campaign A, W49 round 36, lane c): *Lines of Code in a Single File* (1307 lines); a probe of the run from its typedefs to `LoadOpenCLBenchmarks` leaves the file at 10.0 and the header at 9.38 (the file's score before); naming the header in the include block would move `ltdl.h`'s tokens after the items in the wide build, which defines `MAGICKCORE_LTDL_DELEGATE`; owner 2026-11-20 on mid-file includes, as the main session reads it | mandate (2026-11-19) |
+| 2026-11-20 | WORDING | OH | *Mid-file conditional form*: the run begins with the blank line after the inner `#endif` (which stays in the `.c` file below the include); "no conditional of its own" means no wrapping conditional around the items; the conditional blocks inside the run (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and all, unedited | Review of `247c503b7` (campaign A, W49 round 36, lane c): the wording left the start of the run and the inner conditionals ambiguous; `02688eb72` did exactly this | mandate (2026-11-19) |
