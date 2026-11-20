@@ -224,6 +224,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-annotate-chop-private.h \
   MagickCore/display-image-crop-private.h \
   MagickCore/display-image-draw-private.h \
   MagickCore/display-image-apply-private.h \
@@ -780,6 +781,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-annotate-chop-private.h \
   MagickCore/display-image-crop-private.h \
   MagickCore/display-image-draw-private.h \
   MagickCore/display-image-apply-private.h \
