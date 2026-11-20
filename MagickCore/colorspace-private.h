@@ -36,6 +36,7 @@
 #include "MagickCore/colorspace-rgb-to-cie-private.h"
 #include "MagickCore/colorspace-jzazbz-private.h"
 #include "MagickCore/colorspace-jzazbz-oklab-private.h"
+#include "MagickCore/colorspace-rgb-to-luma-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
