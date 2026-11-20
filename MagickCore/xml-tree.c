@@ -3194,13 +3194,9 @@ static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
         const XMLStartTagTargets
           start_targets = { &attribute, &attributes, &p, &l, &ignore_depth };
 
-        XMLStartTagInput
-          start_input;
+        const XMLStartTagInput
+          start_input = { root, tag, terminal, exception };
 
-        start_input.root=root;
-        start_input.tag=tag;
-        start_input.terminal=terminal;
-        start_input.exception=exception;
         if (ParseXMLStartTag(&start_input,&start_targets) == MagickFalse)
           return(MagickFalse);
       }
