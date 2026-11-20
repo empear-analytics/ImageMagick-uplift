@@ -948,9 +948,14 @@ static void XMakeMagnifyWindow(const DisplayEventContext *context,
     "Magnify %uX",resource_info->magnify);
   if (windows->magnify.cursor != (Cursor) NULL)
     (void) XFreeCursor(display,windows->magnify.cursor);
-  windows->magnify.cursor=XMakeCursor(display,windows->image.id,
-    map_info->colormap,resource_info->background_color,
-    resource_info->foreground_color);
+  {
+    const XCursorColors
+      cursor_colors = { resource_info->background_color,
+        resource_info->foreground_color };
+
+    windows->magnify.cursor=XMakeCursor(display,windows->image.id,
+      map_info->colormap,&cursor_colors);
+  }
   if (windows->magnify.cursor == (Cursor) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateCursor",
       display_image->filename);

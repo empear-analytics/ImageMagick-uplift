@@ -1266,12 +1266,16 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
 %
 */
 MagickPrivate Cursor XMakeCursor(Display *display,Window window,
-  Colormap colormap,char *background_color,char *foreground_color)
+  Colormap colormap,const XCursorColors *colors)
 {
 #define scope_height 17
 #define scope_x_hot 8
 #define scope_y_hot 8
 #define scope_width 17
+
+  char
+    *const background_color = colors->background_color,
+    *const foreground_color = colors->foreground_color;
 
   static const unsigned char
     scope_bits[] =

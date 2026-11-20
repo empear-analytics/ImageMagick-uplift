@@ -1082,8 +1082,14 @@ static MagickBooleanType XColorEditImage(Display *display,
   /*
     Make cursor.
   */
-  cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
-    resource_info->background_color,resource_info->foreground_color);
+  {
+    const XCursorColors
+      cursor_colors = { resource_info->background_color,
+        resource_info->foreground_color };
+
+    cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
+      &cursor_colors);
+  }
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
   /*
     Track pointer until button 1 is pressed.

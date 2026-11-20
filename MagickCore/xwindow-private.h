@@ -494,8 +494,15 @@ typedef struct _XWindows
     dnd_protocols;
 } XWindows;
 
+typedef struct _XCursorColors
+{
+  char
+    *background_color,
+    *foreground_color;
+} XCursorColors;
+
 extern MagickPrivate Cursor
-  XMakeCursor(Display *,Window,Colormap,char *,char *);
+  XMakeCursor(Display *,Window,Colormap,const XCursorColors *);
 
 extern MagickPrivate int
   XCheckDefineCursor(Display *,Window,Cursor);
