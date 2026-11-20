@@ -26142,6 +26142,184 @@ Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
+## Recipe DC - Run Twin Dialog Commands Through One Runner Taking a Command Struct
+
+**Use when:** CodeScene reports *Code Duplication* (or *Lines of Code in a Single File*) in
+a file whose `static` command functions are copies of one dialog command: each keeps a
+`static char` reply buffer, asks the user for it with a dialog whose title and prompt are
+string literals, returns when the reply is empty, applies one function of the file to the
+reply, and ends with the same refresh tail. `display-image-apply-effects-private.h`'s
+`XApplySharpenCommand`, `XApplyBlurCommand`, `XApplySwirlCommand` and five more differ only
+in the dialog's two literals, the buffer they own (its name and initial text) and the
+`XApply*ToImage` function they call.
+
+**Not covered by:** Recipe CF, whose copies differ only in the function called (its step
+1 renames no literal, and these differ in two string literals and the buffer); Recipes SV
+and SC, whose differing values are constants passed to an extracted block, while here a
+function designator differs too and the buffer must stay owned by its command; Recipe D,
+which refuses differing literals and callees; Recipe KD and Recipe KF, which replace a
+dispatch by a table and leave the dispatched functions' bodies alone.
+
+**How:**
+
+1. Copies. Two or more `static void` functions of one file (or of one private header that
+   only one file includes) whose bodies are the same token sequence once each copy's
+   reply buffer is renamed to one name, the two literals of its dialog request are
+   replaced by two names and the callee at the apply role by `apply`; comments are
+   ignored. Each copy declares its buffer as a `static char` array of the function, with
+   its initialiser, among its first declarations, and every other local is one of the
+   copies' common `const` bindings from the context parameter. Checked by a script that
+   prints each copy's title, prompt, buffer and callee, and refuses any other difference.
+2. The method type. Every callee is a `static` function of the file (or of a header the
+   file includes before it) with the same parameter types; it is called only from its
+   copy (`git grep -w` over the tree). Write `typedef void (*NameMethod)(T1,T2,...);` with
+   exactly those types.
+3. The command struct, typed directly above the runner: the dialog's own request type as
+   its first member (`XDialogRequest request;`, title, prompt and buffer in the request's
+   member order) and `NameMethod apply;`. It holds pointers only: the buffer stays a
+   `static` of its command.
+4. The runner, a `static void` function directly above the first copy: its parameters are
+   the copies' common parameters with `const Name *command` after the first, at most four
+   in all. Its body is a copy's text with the request built by the copy replaced by
+   `&command->request`, the buffer by a `char *const` local bound from
+   `command->request.reply`, and the call at the apply role by `command->apply(...)` with
+   the copy's arguments; nothing else changes.
+5. Replace each copy's body by its buffer declaration (unchanged), one `const Name command
+   = { { title, prompt, buffer }, callee };` declaration (the copy's two literals, the
+   buffer's name, a function designator) and the call of the runner passing the copy's
+   parameters and `&command`. The copy's comments stay above the call. The function
+   keeps its name and parameters for its dispatcher.
+6. All copies change in one commit (rule 1); the message names each copy and its callee.
+7. Checks: the build in every configuration that compiles the file (`WIDE=1` for X11) and
+   `ci_linux_warnings.sh`, `cxx_warnings` (or the lane's C++ check), `refactor_guard.py`
+   (literals unchanged; `--calls` shows the copies' common callees down by one call per
+   copy but one, each callee down by one, the runner up by its definition and one call per
+   copy, `apply` up by one) and the oracle on every copy and every callee (each must be
+   reached: an unreached copy does not take this recipe).
+8. No timing: dialog commands run once per user command (owner 2026-11-18 evening).
+
+**Before:** (`display-image-apply-effects-private.h`, one of eight)
+
+```c
+static void XApplySharpenCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+  ...
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  /*
+    Query user for sharpen radius.
+  */
+  {
+    const XDialogRequest
+      dialog_request = { "Sharpen",
+        "Enter the sharpen radius and standard deviation:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
+  if (*radius == '\0')
+    return;
+  /*
+    Sharpen image scanlines.
+  */
+  XApplySharpenToImage(display,windows,flags,radius,image,exception);
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+```
+
+**After:**
+
+```c
+typedef void
+  (*XDialogApplyMethod)(Display *,XWindows *,MagickStatusType *,char *,
+    Image **,ExceptionInfo *);
+
+typedef struct _XDialogCommand
+{
+  XDialogRequest
+    request;
+
+  XDialogApplyMethod
+    apply;
+} XDialogCommand;
+
+static void XRunDialogCommand(const XMagickCommandContext *context,
+  const XDialogCommand *command,MagickStatusType *flags)
+{
+  ...
+  char
+    *const reply = command->request.reply;
+
+  (void) XDialogWidget(display,windows,&command->request);
+  if (*reply == '\0')
+    return;
+  command->apply(display,windows,flags,reply,image,exception);
+  CatchException(exception);
+  ...
+}
+...
+static void XApplySharpenCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  const XDialogCommand
+    command = { { "Sharpen", "Enter the sharpen radius and standard deviation:",
+      radius }, XApplySharpenToImage };
+
+  /*
+    Query user for sharpen radius.
+    Sharpen image scanlines.
+  */
+  XRunDialogCommand(context,&command,flags);
+}
+```
+
+**Careful:**
+
+- The buffer. It stays a `static` of its command, with its initialiser, so its storage,
+  its first value and the value it keeps from one command to the next are the same; the
+  runner only receives its address, as the dialog widget and the callee did. Two commands
+  never share a buffer.
+- The request. `XDialogWidget` receives a pointer to an `XDialogRequest` whose three
+  members hold the same title, prompt and buffer address as the copy's own request did;
+  the widget reads them and writes only through `reply`, into the same buffer.
+- The call through `apply` has the callee's exact type (step 2), so it calls that
+  function with the same arguments (C11 6.5.2.2, 6.3.2.3p8), and the build refuses a
+  designator of another type in the initialiser. Each command therefore runs its copy's
+  statements in the same order on the same values, with one more call level.
+- Speed: the copies run once per user command in the X11 display program, never per
+  pixel, so the indirect call costs nothing that matters (owner 2026-11-18 evening).
+- The step does not by itself clear *Code Duplication*: the commands become small
+  functions of one shape, which CodeScene may still group. It removes their tails from
+  the file (*Lines of Code in a Single File*) and gives the callees one type, so that
+  Recipe B can bundle their arguments in one commit through the method table (owner
+  2026-11-20: every entry of one function-pointer table in one commit).
+
+**Evidence level:** oracle (every copy and every callee reached; the wide catalogue for
+X11 code), with `refactor_guard.py --calls` and step 1's script.
+
+**Provenance:** 2026-11-20, from `display-image-apply-effects-private.h` (7.32; campaign A,
+W50 round 37, lane b): about twenty `XApply*Command` functions, carved out of
+`display.c`'s `XMagickCommand`, repeat the dialog, empty-reply test and refresh tail around
+one `XApply*ToImage` call; the round-37 brief asked for a table-driven runner in which
+each command keeps its own `static char` buffer. The first use takes the eight that pass
+`flags` and catch the exception (one callee type): 2249 to 2079 lines, score flat at 7.32
+(the file's *Code Duplication* and argument findings stay; a probe without the twenty
+callees' argument findings gives 7.55). Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26716,3 +26894,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | JN | Drop a Conditional Jump to the Label That Follows It: an `if (cond) goto L;` whose next point of execution is `L:` (nothing but closing braces between) is deleted when `cond` has no side effect, or becomes `(void) F(args);` when `cond` is one call compared with a constant; proof `obj_identical.sh` IDENTICAL, oracle where reached | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the last jump before `cleanup:`; a probe after the round's Recipe I step: cc 10 to 8 (leaves *Complex Method*), 8.97 to 8.98, object IDENTICAL (wide) | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | LM | Step 7, initialiser form: the copies may be the initialiser of a `const` struct declared in a block of its own whose only statement is the call that reads it; the struct is then declared, not `const`, among the declarations, initialised with the chosen locals' constants and the parameters it copied, each other local copied by `s.m=v;` where the block stood, and the block becomes the call; a local that text no build compiles names (a Recipe UB fragment) is not chosen | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the cleanup's `EqualizeBuffers` initialiser; a probe 77 to 69 lines, 8.98 to 9.38 | mandate (2026-11-19) |
 | 2026-11-20 | WORDING | JN | Step 1: the closing braces between the statement and `L:` exclude the closing brace of a `for`, `while` or `do` body, which returns to the loop head, so the test still decides something | Review of W50 lane c batch 1 (main session): the first wording let a jump out of a loop body's last statement count as a jump to the next point of execution; `835880ade` (no loop around it) is unaffected | mandate (2026-11-19) |
+| 2026-11-20 | NEW | DC | Run Twin Dialog Commands Through One Runner Taking a Command Struct: `static` dialog commands that differ only in the dialog's title and prompt literals, the `static char` reply buffer each owns and the function applied to the reply keep their buffers and pass a `const` struct `{ { title, prompt, buffer }, callee }` to one runner, which calls the callee through a method of the callees' exact type | `display-image-apply-effects-private.h` (7.32; campaign A, W50 round 37, lane b): about twenty `XApply*Command` copies of one dialog-apply-refresh body; CF refuses the differing literals and buffers. First use, the eight `flags` commands: 2249 to 2079 lines, score flat, the callees left with one type for a one-commit Recipe B through the method table | mandate (2026-11-19) |
