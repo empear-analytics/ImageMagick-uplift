@@ -279,10 +279,21 @@ static void XApplyTrimCommand(const XMagickCommandContext *context)
     }
 }
 
-static void XApplySaturationToImage(Display *display,XWindows *windows,
-  char *modulate_factors,char *saturation_percent,Image **image,
-  ExceptionInfo *exception)
+static void XApplySaturationToImage(const XMagickCommandContext *context,
+  char *modulate_factors,char *saturation_percent)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) CopyMagickString(modulate_factors,"100.0/",MagickPathExtent);
@@ -330,8 +341,7 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   /*
     Vary color saturation.
   */
-  XApplySaturationToImage(display,windows,modulate_factors,saturation_percent,
-    image,exception);
+  XApplySaturationToImage(context,modulate_factors,saturation_percent);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
@@ -339,10 +349,21 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyBrightnessToImage(Display *display,XWindows *windows,
-  char *modulate_factors,char *brightness_percent,Image **image,
-  ExceptionInfo *exception)
+static void XApplyBrightnessToImage(const XMagickCommandContext *context,
+  char *modulate_factors,char *brightness_percent)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) CopyMagickString(modulate_factors,brightness_percent,
@@ -389,8 +410,7 @@ static void XApplyBrightnessCommand(const XMagickCommandContext *context)
   /*
     Vary the color brightness.
   */
-  XApplyBrightnessToImage(display,windows,modulate_factors,brightness_percent,
-    image,exception);
+  XApplyBrightnessToImage(context,modulate_factors,brightness_percent);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
@@ -398,9 +418,21 @@ static void XApplyBrightnessCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyGammaToImage(Display *display,XWindows *windows,Image **image,
-  char *factor,ExceptionInfo *exception)
+static void XApplyGammaToImage(const XMagickCommandContext *context,
+  char *factor)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) GammaImage(*image,strtod(factor,(char **) NULL),exception);
@@ -440,7 +472,7 @@ static void XApplyGammaCommand(const XMagickCommandContext *context)
   /*
     Gamma correct image.
   */
-  XApplyGammaToImage(display,windows,image,factor,exception);
+  XApplyGammaToImage(context,factor);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
@@ -1032,9 +1064,21 @@ static void XApplyQuantizeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyReduceNoiseToImage(Display *display,XWindows *windows,
-  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+static void XApplyReduceNoiseToImage(const XMagickCommandContext *context,
+  MagickStatusType *flags,char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
