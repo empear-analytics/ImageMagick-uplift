@@ -3674,6 +3674,38 @@ static void RedrawTextViewWidget(const TextViewContext *context,
     }
 }
 
+static void UpdateTextViewSlider(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  /*
+    Update slider.
+  */
+  (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawMatte(display,&windows->widget,expose_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
 static void RedrawTextViewText(const TextViewContext *context,
   const TextViewWidgets *widgets)
 {
@@ -3699,12 +3731,6 @@ static void RedrawTextViewText(const TextViewContext *context,
     *const text_info = context->text_info;
 
   XWidgetInfo
-    *const north_info = widgets->north_info;
-
-  XWidgetInfo
-    *const south_info = widgets->south_info;
-
-  XWidgetInfo
     *const slider_info = widgets->slider_info;
 
   unsigned int
@@ -3715,9 +3741,6 @@ static void RedrawTextViewText(const TextViewContext *context,
 
   XWidgetInfo
     *const selection_info = widgets->selection_info;
-
-  XWidgetInfo
-    *const expose_info = widgets->expose_info;
 
   TextViewLines
     view;
@@ -3745,15 +3768,7 @@ static void RedrawTextViewText(const TextViewContext *context,
     font_info->fid);
   (void) XSetFont(display,windows->widget.highlight_context,
     font_info->fid);
-  /*
-    Update slider.
-  */
-  (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
-  XDrawTriangleNorth(display,&windows->widget,north_info);
-  XDrawMatte(display,&windows->widget,expose_info);
-  XDrawBeveledButton(display,&windows->widget,slider_info);
-  XDrawTriangleSouth(display,&windows->widget,south_info);
-  (*expose_info).y=(*slider_info).y;
+  UpdateTextViewSlider(context,widgets);
 }
 
 static void RedrawTextViewLines(const TextViewContext *context,
