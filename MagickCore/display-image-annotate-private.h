@@ -1373,12 +1373,9 @@ static MagickBooleanType XCompositeCommandBlock(
       {
         case CompositeOperatorsCommand:
         {
-          ComposeMenuInfo
-            menu_info;
+          const ComposeMenuInfo
+            menu_info = { display, windows, id };
 
-          menu_info.display=display;
-          menu_info.windows=windows;
-          menu_info.id=id;
           (*compose)=XSelectPasteOperator(&menu_info,CompositeMenu,(*compose));
           break;
         }
