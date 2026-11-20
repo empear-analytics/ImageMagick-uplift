@@ -2198,9 +2198,21 @@ static void XApplyBrowseDocumentationCommand(
   XSetCursorState(display,windows,MagickFalse);
 }
 
-static void XApplyAddNoiseToImage(Display *display,XWindows *windows,
-  Image **image,char *noise_type,ExceptionInfo *exception)
+static void XApplyAddNoiseToImage(const XMagickCommandContext *context,
+  char *noise_type)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   Image
     *noise_image;
 
@@ -2254,7 +2266,7 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   noises=DestroyStringList(noises);
   if (*noise_type == '\0')
     return;
-  XApplyAddNoiseToImage(display,windows,image,noise_type,exception);
+  XApplyAddNoiseToImage(context,noise_type);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
