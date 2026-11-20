@@ -360,9 +360,17 @@ static void TraceAccelerateCall(Image *image,ExceptionInfo *exception)
 }
 
 MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception)
+  const AccelerateFunctionRequest *request,ExceptionInfo *exception)
 {
+  const MagickFunction
+    function = request->function;
+
+  const size_t
+    number_parameters = request->number_parameters;
+
+  const double
+    *const parameters = request->parameters;
+
   MagickBooleanType
     status;
 

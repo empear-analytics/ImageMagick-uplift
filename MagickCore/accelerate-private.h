@@ -33,6 +33,18 @@ extern "C" {
 
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
+typedef struct _AccelerateFunctionRequest
+{
+  const MagickFunction
+    function;
+
+  const size_t
+    number_parameters;
+
+  const double
+    *parameters;
+} AccelerateFunctionRequest;
+
 typedef struct _AccelerateMotionBlurRequest
 {
   const double
@@ -74,8 +86,8 @@ extern MagickPrivate MagickBooleanType
   AccelerateContrastStretchImage(Image *,const double,const double,
     ExceptionInfo*),
   AccelerateEqualizeImage(Image *,ExceptionInfo *),
-  AccelerateFunctionImage(Image *,const MagickFunction,const size_t,
-    const double *,ExceptionInfo *),
+  AccelerateFunctionImage(Image *,const AccelerateFunctionRequest *,
+    ExceptionInfo *),
   AccelerateGrayscaleImage(Image *,const PixelIntensityMethod,
     ExceptionInfo *),
   AccelerateModulateImage(Image *,const double,const double,const double,
