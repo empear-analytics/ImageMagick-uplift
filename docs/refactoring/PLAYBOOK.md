@@ -23615,6 +23615,24 @@ same order. Step 4's proof compiles the `.c` file against the headers of `HEAD` 
 working tree (`tools/obj_identical.sh` and `pp_identical.sh` compile both sides against the
 working tree's headers and cannot see a header-only change): the preprocessed unit and the
 object, wide candidate's flags, `__LINE__` and `__FILE__` pinned, both identical.
+Mid-file conditional form (mandate, 2026-11-19; campaign A round 36; owner 2026-11-20, "private
+headers may be ... included mid-file", read by the main session as covering mid-file includes
+in general, not only in X11 files, and flagged in the PR): Form A also applies to a `.c` file
+whose include block is followed by a whole-file conditional (`#if
+defined(MAGICKCORE_OPENCL_SUPPORT)` in `opencl-initialize.c`) that itself opens with a
+conditional `#include` (`#if defined(MAGICKCORE_LTDL_DELEGATE)` / `#include "ltdl.h"` /
+`#endif`), which some build compiles, so that naming the new header in the include block would
+put the run's items before that header's tokens. The run then begins after that inner
+`#endif` and the blank line after it; the `.c` file names the new header on the line directly
+after the inner `#endif`, inside the file's conditional, where the run stood; the header holds
+the items verbatim and in order inside its include guard, with no conditional of its own (its
+one include stands inside the file's conditional). The translation unit has the same tokens in
+the same order in every configuration. Step 4's proof: `tools/pp_identical.sh` and
+`tools/obj_identical.sh` in every build that compiles the file (`WIDE=1`, and `BUILD=` each CI
+configuration that compiles it, such as `ci-gcc-x` and `ci-clang-x`), `IDENTICAL` (or
+`pp_identical` differing only in indentation, identical under `diff -b`), and `NOTHING
+COMPILED` in the narrow build before and after. Unbuilt branches inside the run (`#ifdef
+_WIN32` in the accelerate timer) move verbatim under the owner's 2026-11-20 ruling.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -26515,3 +26533,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | *X11 conditional form* on a header it produced that one `.c` file includes: the run begins after the header's own X11 opener, the new header wraps it in the same conditional, the `.c` file names the new header directly above the carved one; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags), since `obj_identical.sh`/`pp_identical.sh` cannot see a header-only change | `widget-list-actions-private.h` (campaign A, W48 round 35, lane a): at 998 lines of code it blocks the Recipe B bundle of `XEditText` (`widget-core-private.h` 9.68 to 10.0), whose two block-form call sites would put it at 1005 (9.38); a carve of its leading run up to `MoveListBrowserSliderByPage` leaves both headers at 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | NEW | UB | Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place: a conditional block no Linux build compiles (`#ifdef RECREATEBUFFER`, `#if 0`) inside a function moves, byte for byte, into a guard-less private header that the function `#include`s at the block's place; files holding the same block include the same header; proof by script (the text moved unchanged) and `pp_identical.sh`/`obj_identical.sh` IDENTICAL | `accelerate-histogram.c`'s `ComputeEqualizeImage` and `accelerate-contrast-stretch.c`'s `ComputeContrastStretchImage` (campaign A, W49 round 36, lane c), each holding the same two `RECREATEBUFFER` blocks; probes 8.85 to 8.95 and 7.30 to 7.38; the owner's ruling of 2026-11-20 that code no Linux build compiles may move verbatim into a header | mandate (2026-11-19) |
 | 2026-11-20 | WORDING | UB | Step 5: `pp_identical.sh` may print DIFFERENT only in the indentation of the line after the include (clang `-E -P` loses a leading blank after a nested file returns); the units must then be identical under `diff -b`, and `obj_identical.sh` must print IDENTICAL | The first use, `accelerate-histogram.c` (wide build): one line, `  {` against ` {`, object IDENTICAL | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *Mid-file conditional form* of Form A: when the file's whole-file conditional opens with a conditional `#include` that some build compiles (`ltdl.h` in `opencl-initialize.c`), the run begins after that include's `#endif` and the new header is named on the next line, inside the conditional (a mid-file include); the header has no conditional of its own; proof `pp_identical`/`obj_identical` in every build that compiles the file | `opencl-initialize.c` (campaign A, W49 round 36, lane c): *Lines of Code in a Single File* (1307 lines); a probe of the run from its typedefs to `LoadOpenCLBenchmarks` leaves the file at 10.0 and the header at 9.38 (the file's score before); naming the header in the include block would move `ltdl.h`'s tokens after the items in the wide build, which defines `MAGICKCORE_LTDL_DELEGATE`; owner 2026-11-20 on mid-file includes, as the main session reads it | mandate (2026-11-19) |
