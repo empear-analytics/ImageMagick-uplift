@@ -480,6 +480,9 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   static char
     bevel_width[MagickPathExtent] = "10";
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Query user for bevel width.
   */
@@ -494,8 +497,7 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   /*
     Raise an image.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XApplyRaiseToImage(context,bevel_width);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
@@ -961,6 +963,9 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   static char
     geometry[MagickPathExtent] = "+2+2";
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Query user for the roll geometry.
   */
@@ -975,8 +980,7 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   /*
     Roll image.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XApplyRollToImage(context,geometry);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
@@ -1329,6 +1333,9 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   static char
     radius[MagickPathExtent] = "0x1";
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Query user for charcoal radius.
   */
@@ -1344,8 +1351,7 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   /*
     Charcoal the image.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XApplyCharcoalDrawToImage(context,radius);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);

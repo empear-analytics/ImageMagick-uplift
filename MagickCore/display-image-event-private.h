@@ -1054,6 +1054,10 @@ static MagickBooleanType XSelectCommandWidgetEvent(
   int
     id;
 
+  const XImageCacheContext
+    display_context = { display, resource_info, windows, display_image,
+      exception };
+
   if ((*event).xany.window == windows->command.id)
     {
       /*
@@ -1068,8 +1072,7 @@ static MagickBooleanType XSelectCommandWidgetEvent(
           MagickFalse)
         return(MagickTrue);
       if (display_command != NullCommand)
-        (*nexus)=XMagickCommand(display,resource_info,windows,display_command,
-          display_image,exception);
+        (*nexus)=XMagickCommand(&display_context,display_command);
       return(MagickTrue);
     }
   return(MagickFalse);
@@ -1450,8 +1453,13 @@ static void XConfirmDisplayExit(const DisplayExitInputs *inputs,
     *const exception = inputs->exception;
 
   if ((*state & ExitState) == 0)
-    (void) XMagickCommand(display,resource_info,windows,FreeBuffersCommand,
-      &(*display_image),exception);
+    {
+      const XImageCacheContext
+        command_context = { display, resource_info, windows, &(*display_image),
+          exception };
+
+      (void) XMagickCommand(&command_context,FreeBuffersCommand);
+    }
   else
     if (resource_info->confirm_edit != MagickFalse)
       {
@@ -1470,8 +1478,13 @@ static void XConfirmDisplayExit(const DisplayExitInputs *inputs,
               *state&=(unsigned int) (~ExitState);
             else
               if (status > 0)
-                (void) XMagickCommand(display,resource_info,windows,SaveCommand,
-                  &(*display_image),exception);
+                {
+                  const XImageCacheContext
+                    command_context = { display, resource_info, windows,
+                      &(*display_image), exception };
+
+                  (void) XMagickCommand(&command_context,SaveCommand);
+                }
           }
       }
 }

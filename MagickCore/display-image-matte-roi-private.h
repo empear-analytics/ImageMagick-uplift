@@ -780,12 +780,14 @@ static void XMatteEditControl(const MatteCommandInput *input,const int id,
   ExceptionInfo
     *const exception = input->exception;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   switch (MatteEditCommands[id])
   {
     case MatteEditUndoCommand:
     {
-      (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-        image,exception);
+      (void) XMagickCommand(&command_context,UndoCommand);
       break;
     }
     case MatteEditHelpCommand:
@@ -1140,6 +1142,9 @@ static void XMattePress(const MatteCommandInput *input,const XEvent *event,
   size_t
     *const state = targets->state;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   if ((*event).xbutton.button != Button1)
     return;
   if (((*event).xbutton.window != windows->image.id) &&
@@ -1150,8 +1155,7 @@ static void XMattePress(const MatteCommandInput *input,const XEvent *event,
   */
   (*x)=(*event).xbutton.x;
   (*y)=(*event).xbutton.y;
-  (void) XMagickCommand(display,resource_info,windows,
-    SaveToUndoBufferCommand,image,exception);
+  (void) XMagickCommand(&command_context,SaveToUndoBufferCommand);
   (*state)|=UpdateConfigurationState;
 }
 
@@ -3020,6 +3024,10 @@ static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
     height,
     width;
 
+  const XImageCacheContext
+    roi_context = { display, resource_info, windows, (&roi_image), exception },
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Region of interest is relative to image configuration.
   */
@@ -3050,12 +3058,10 @@ static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
     Apply image processing technique to the region of interest.
   */
   windows->image.orphan=MagickTrue;
-  (void) XMagickCommand(display,resource_info,windows,
-    display_command,&roi_image,exception);
+  (void) XMagickCommand(&roi_context,display_command);
   progress_monitor=SetImageProgressMonitor(*image,
     (MagickProgressMonitor) NULL,(*image)->client_data);
-  (void) XMagickCommand(display,resource_info,windows,
-    SaveToUndoBufferCommand,image,exception);
+  (void) XMagickCommand(&command_context,SaveToUndoBufferCommand);
   windows->image.orphan=MagickFalse;
   (void) CompositeImage(*image,roi_image,CopyCompositeOp,
     MagickTrue,(*crop_info).x,(*crop_info).y,exception);
@@ -3089,6 +3095,9 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
   const char
     *const text = region_input->text;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   if (((*state) & UpdateRegionState) != 0)
     {
       (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -3097,8 +3106,7 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
         case UndoCommand:
         case RedoCommand:
         {
-          (void) XMagickCommand(display,resource_info,windows,
-            display_command,image,exception);
+          (void) XMagickCommand(&command_context,display_command);
           break;
         }
         default:

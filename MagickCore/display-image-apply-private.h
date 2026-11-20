@@ -142,6 +142,9 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
   static char
     geometry[MagickPathExtent] = "45.0x45.0";
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Query user for shear color and geometry.
   */
@@ -159,8 +162,7 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
   /*
     Shear image.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) QueryColorCompliance(color,AllCompliance,
@@ -786,10 +788,24 @@ static void XApplyFileCommands(const XMagickCommandContext *context,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,const DisplayCommand command,Image **image,
-  ExceptionInfo *exception)
+static Image *XMagickCommand(const XImageCacheContext *target,
+  const DisplayCommand command)
 {
+  Display
+    *const display = target->display;
+
+  XResourceInfo
+    *const resource_info = target->resource_info;
+
+  XWindows
+    *const windows = target->windows;
+
+  Image
+    **const image = target->image;
+
+  ExceptionInfo
+    *const exception = target->exception;
+
   GeometryInfo
     geometry_info;
 
