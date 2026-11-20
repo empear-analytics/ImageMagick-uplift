@@ -5669,19 +5669,10 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   p=primitive_info;
   for (i=0; i < (ssize_t) arc_segments; i++)
   {
-    ArcSegmentInput
-      segment;
+    const ArcSegmentInput
+      segment = { alpha, theta, arc_segments, center, cosine, sine, radii,
+        start, end, primitive_info };
 
-    segment.alpha=alpha;
-    segment.theta=theta;
-    segment.arc_segments=arc_segments;
-    segment.center=center;
-    segment.cosine=cosine;
-    segment.sine=sine;
-    segment.radii=radii;
-    segment.start=start;
-    segment.end=end;
-    segment.primitive_info=primitive_info;
     TraceArcSegmentPoints(&segment,i,p,points);
     status&=(MagickStatusType) TraceBezier(mvg_info,4);
     if (status == 0)
