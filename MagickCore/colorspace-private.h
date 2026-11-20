@@ -42,53 +42,11 @@
 #include "MagickCore/colorspace-conversions-private.h"
 #include "MagickCore/colorspace-predicates-private.h"
 #include "MagickCore/colorspace-lab-compatible-private.h"
+#include "MagickCore/colorspace-rgb-predicates-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
-
-static inline MagickBooleanType IsRGBColorspace(const ColorspaceType colorspace)
-{
-  switch (colorspace)
-  {
-    case RGBColorspace:
-    case scRGBColorspace:
-    case LinearGRAYColorspace:
-      return(MagickTrue);
-    default:
-      break;
-  }
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IssRGBColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == sRGBColorspace) || (colorspace == TransparentColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IssRGBCompatibleColorspace(
-  const ColorspaceType colorspace)
-{
-  switch (colorspace)
-  {
-    case sRGBColorspace:
-    case RGBColorspace:
-    case Adobe98Colorspace:
-    case ProPhotoColorspace:
-    case DisplayP3Colorspace:
-    case scRGBColorspace:
-    case TransparentColorspace:
-    case GRAYColorspace:
-    case LinearGRAYColorspace:
-      return(MagickTrue);
-    default:
-      break;
-  }
-  return(MagickFalse);
-}
 
 static inline MagickBooleanType IsYCbCrCompatibleColorspace(
   const ColorspaceType colorspace)
