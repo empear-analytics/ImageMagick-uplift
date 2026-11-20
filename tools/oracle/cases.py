@@ -5652,6 +5652,19 @@ LOAD_SENSITIVE.update({label: _DISK_MATRIX for label in (
     "-hough-lines accumulator, matrix on disk",
     "-hough-lines matrix on disk",
 )})
+# Two more, listed by the owner (2026-11-20). infra/0fd402f13a writes 10300 files in one command
+# (about 11-15 s alone): in full runs a side has passed the 30 s TIMEOUT, the wide baseline of
+# e644889a92 among them (cached as a timeout, so it diverged in every later wide run); alone it
+# agrees. xevents/0e762518fe presses the preview list's scroll trough: it diverged once in a full
+# wide run and agreed three times alone (round 32).
+LOAD_SENSITIVE.update({
+    "10300 frames to 10300 files":
+        "10300 files written in one command take about 11-15 s alone and passed the 30 s timeout "
+        "in full runs, on either side",
+    "xevents grab: preview list, trough pressed":
+        "an X11 press on the preview list's scroll trough: whether the grab sees the list scrolled "
+        "depends on scheduling under load",
+})
 # The magnifier (plus): a q or Escape sent to the magnify window itself (use:2) closes it, which a
 # q to the image window did not; the grab, with no use before it, is the magnify window. Moved
 # with the arrow keys, its factor set with a digit (xwindow.c XMakeMagnifyImage, display.c's
