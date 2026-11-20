@@ -3844,6 +3844,72 @@ static void SetStrokeIntersections(const StrokeBoxes *boxes,
     }
 }
 
+typedef struct _StrokeSegmentInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  ssize_t
+    n,
+    i;
+
+  PointInfo
+    offset;
+
+  StrokeSegment
+    dx,
+    dy;
+} StrokeSegmentInput;
+
+static void SetStrokeSegmentBoxes(const StrokeBoxes *boxes,
+  const StrokeSegmentInput *segment)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  PrimitiveInfo
+    *const polygon_primitive = segment->polygon_primitive;
+
+  const ssize_t
+    n = segment->n,
+    i = segment->i;
+
+  const PointInfo
+    offset = segment->offset;
+
+  const StrokeSegment
+    dx = segment->dx,
+    dy = segment->dy;
+
+  double
+    dot_product;
+
+  dot_product=dy.q*offset.x-dx.q*offset.y;
+  if (dot_product > 0.0)
+    {
+      box_p[2].x=polygon_primitive[n].point.x-offset.x;
+      box_p[2].y=polygon_primitive[n].point.y-offset.y;
+      box_p[3].x=polygon_primitive[i].point.x-offset.x;
+      box_p[3].y=polygon_primitive[i].point.y-offset.y;
+      box_q[2].x=polygon_primitive[n].point.x+offset.x;
+      box_q[2].y=polygon_primitive[n].point.y+offset.y;
+      box_q[3].x=polygon_primitive[i].point.x+offset.x;
+      box_q[3].y=polygon_primitive[i].point.y+offset.y;
+    }
+  else
+    {
+      box_p[2].x=polygon_primitive[n].point.x+offset.x;
+      box_p[2].y=polygon_primitive[n].point.y+offset.y;
+      box_p[3].x=polygon_primitive[i].point.x+offset.x;
+      box_p[3].y=polygon_primitive[i].point.y+offset.y;
+      box_q[2].x=polygon_primitive[n].point.x-offset.x;
+      box_q[2].y=polygon_primitive[n].point.y-offset.y;
+      box_q[3].x=polygon_primitive[i].point.x-offset.x;
+      box_q[3].y=polygon_primitive[i].point.y-offset.y;
+    }
+}
+
 typedef struct _StrokeFirstInput
 {
   PrimitiveInfo
@@ -4112,6 +4178,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   StrokeFirstInput
     first;
 
+  StrokeSegmentInput
+    segment;
+
   /*
     Allocate paths.
   */
@@ -4199,29 +4268,13 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     GetStrokeSlope(dx.q,dy.q,&slope.q,&inverse_slope.q);
     offset.x=sqrt((double) (mid*mid/(inverse_slope.q*inverse_slope.q+1.0)));
     offset.y=(double) (offset.x*inverse_slope.q);
-    dot_product=dy.q*offset.x-dx.q*offset.y;
-    if (dot_product > 0.0)
-      {
-        box_p[2].x=polygon_primitive[n].point.x-offset.x;
-        box_p[2].y=polygon_primitive[n].point.y-offset.y;
-        box_p[3].x=polygon_primitive[i].point.x-offset.x;
-        box_p[3].y=polygon_primitive[i].point.y-offset.y;
-        box_q[2].x=polygon_primitive[n].point.x+offset.x;
-        box_q[2].y=polygon_primitive[n].point.y+offset.y;
-        box_q[3].x=polygon_primitive[i].point.x+offset.x;
-        box_q[3].y=polygon_primitive[i].point.y+offset.y;
-      }
-    else
-      {
-        box_p[2].x=polygon_primitive[n].point.x+offset.x;
-        box_p[2].y=polygon_primitive[n].point.y+offset.y;
-        box_p[3].x=polygon_primitive[i].point.x+offset.x;
-        box_p[3].y=polygon_primitive[i].point.y+offset.y;
-        box_q[2].x=polygon_primitive[n].point.x-offset.x;
-        box_q[2].y=polygon_primitive[n].point.y-offset.y;
-        box_q[3].x=polygon_primitive[i].point.x-offset.x;
-        box_q[3].y=polygon_primitive[i].point.y-offset.y;
-      }
+    segment.polygon_primitive=polygon_primitive;
+    segment.n=n;
+    segment.i=i;
+    segment.offset=offset;
+    segment.dx=dx;
+    segment.dy=dy;
+    SetStrokeSegmentBoxes(&boxes,&segment);
     SetStrokeIntersections(&boxes,slope);
     DisableMSCWarning(4127)
     CheckPathExtent(MaxStrokePad,MaxStrokePad);
