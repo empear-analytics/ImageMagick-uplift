@@ -500,6 +500,17 @@ static void XRepeatSaveCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XUpdateStepState(MagickStatusType *state,
+  const AnimateCommand animate_command)
+{
+  *state|=StepAnimationState;
+  *state&=(~PlayAnimationState);
+  if (animate_command == StepBackwardCommand)
+    *state&=(~ForwardAnimationState);
+  if (animate_command == StepForwardCommand)
+    *state|=ForwardAnimationState;
+}
+
 static void XStepCommand(const AnimateCommandTile *tile,
   const AnimateCommand animate_command)
 {
@@ -512,12 +523,7 @@ static void XStepCommand(const AnimateCommandTile *tile,
     case StepBackwardCommand:
     case StepForwardCommand:
     {
-      *state|=StepAnimationState;
-      *state&=(~PlayAnimationState);
-      if (animate_command == StepBackwardCommand)
-        *state&=(~ForwardAnimationState);
-      if (animate_command == StepForwardCommand)
-        *state|=ForwardAnimationState;
+      XUpdateStepState(state,animate_command);
       break;
     }
     default:
