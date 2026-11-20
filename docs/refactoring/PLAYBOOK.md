@@ -24041,6 +24041,25 @@ which moves zeroing writes and keeps the variable.
    pixel or per row is timed against its parent as the timing rule asks; a function that
    runs once per call is timed on its cases with callgrind instruction counts and an A/A
    run beside the comparison.
+7. *Initialiser form* (2026-11-20). The copies may instead be the initialiser of a `const`
+   struct `s` declared in a block of its own whose only statement is the one call that
+   reads it, `{ const T s = { e1, ..., en }; F(&s); }` (Recipe FB's form), standing where
+   nothing follows it in the function but statements that name none of `s`'s elements
+   (`accelerate-histogram.c`'s `ComputeEqualizeImage`, whose cleanup copies seven values
+   into `EqualizeBuffers` for `ReleaseEqualizeBuffers`). Every element `ek` is a plain
+   identifier: a chosen local (steps 2 and 4: declared with the member's exact type and a
+   constant initialiser, named nowhere after the block), a parameter the function never
+   assigns and whose address it never takes, or a local that is not chosen. Then:
+   (a) `s` is declared, not `const`, among the function's declarations, after every
+   declaration its initialiser names, with the initialiser that lists, member by member,
+   the constant of the chosen local's declarator, the parameter itself, or the constant
+   `NULL`, `0` or `MagickFalse` of the member's type for a local that is not chosen;
+   (b) each chosen local's declarator goes and every other use of it is written `s.m`
+   (step 3); (c) the block is replaced by one statement `s.m=v;` per local not chosen, in
+   member order, followed by the call `F(&s);` unchanged. A local is left unchosen when
+   text no build compiles names it (a Recipe UB fragment, which is never edited), or when
+   step 2 does not hold for it. No statement names `s` between its declaration and the
+   call except through the renamed uses.
 
 **Before:**
 
@@ -24100,6 +24119,17 @@ which moves zeroing writes and keeps the variable.
   addresses were; the struct already lived in memory (the call takes `&s`). The step
   removes copies, it adds none.
 
+- Under step 7 the struct is initialised when execution reaches the declarations, so each
+  chosen member holds its local's constant from the point the local did, and a parameter
+  read there has the value the block's initialiser read, since the function never assigns
+  it. Every later write of a chosen local lands in its member (step 3), so at the call each
+  member holds what the initialiser copied from the local; a local not chosen is copied
+  into its member at the point where the initialiser read it, by `s.m=v;`, and the
+  placeholder constant it replaces is never read. The callee receives the address of a
+  struct of the same type holding the same member values (a `T *` where the block passed
+  a `const T *`, converted implicitly). A path that leaves before the call leaves the
+  struct unread, as it left the locals.
+
 **Evidence level:** oracle on the function's cases, with `refactor_guard.py` and
 `--calls`, `ci_warnings.sh`, `ci_linux_warnings.sh --campaign-a` and `cxx_warnings.sh`,
 steps 1 and 2 checked by reading; callgrind instruction counts and A/A-bounded timing
@@ -24110,7 +24140,7 @@ round 31 third batch, lane c): a *Large Method* of 107 lines after rounds 30 and
 held by thirteen locals and their copies into `rows`, with its seven public arguments
 staying; a probe of this step takes it to 80 lines (9.11 to 9.25), and with a Recipe HN
 head and a Recipe E defaults block below the threshold (9.68). Added by Claude Code
-(Claude Opus 5.5) under the mandate of 2026-10-24.
+(Claude Opus 5.5) under the mandate of 2026-10-24. Step 7 (2026-11-20, campaign A, W50 round 37, lane c): `accelerate-histogram.c`'s `ComputeEqualizeImage` (77 lines after the round's Recipe I, JN and H steps), whose cleanup copies `clEnv`, `imageBuffer`, `map`, `equalizeMapBuffer`, `equalize_map`, `histogramBuffer` and `histogram` into a `const EqualizeBuffers` initialiser for `ReleaseEqualizeBuffers`; `imageBuffer` stays a local because the `RECREATEBUFFER` fragments name it. A probe: 69 lines, the file 8.98 to 9.38. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
@@ -26682,3 +26712,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | *Mid-file conditional form* of Form A: when the file's whole-file conditional opens with a conditional `#include` that some build compiles (`ltdl.h` in `opencl-initialize.c`), the run begins after that include's `#endif` and the new header is named on the next line, inside the conditional (a mid-file include); the header has no conditional of its own; proof `pp_identical`/`obj_identical` in every build that compiles the file | `opencl-initialize.c` (campaign A, W49 round 36, lane c): *Lines of Code in a Single File* (1307 lines); a probe of the run from its typedefs to `LoadOpenCLBenchmarks` leaves the file at 10.0 and the header at 9.38 (the file's score before); naming the header in the include block would move `ltdl.h`'s tokens after the items in the wide build, which defines `MAGICKCORE_LTDL_DELEGATE`; owner 2026-11-20 on mid-file includes, as the main session reads it | mandate (2026-11-19) |
 | 2026-11-20 | WORDING | OH | *Mid-file conditional form*: the run begins with the blank line after the inner `#endif` (which stays in the `.c` file below the include); "no conditional of its own" means no wrapping conditional around the items; the conditional blocks inside the run (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and all, unedited | Review of `247c503b7` (campaign A, W49 round 36, lane c): the wording left the start of the run and the inner conditionals ambiguous; `02688eb72` did exactly this | mandate (2026-11-19) |
 | 2026-11-20 | NEW | JN | Drop a Conditional Jump to the Label That Follows It: an `if (cond) goto L;` whose next point of execution is `L:` (nothing but closing braces between) is deleted when `cond` has no side effect, or becomes `(void) F(args);` when `cond` is one call compared with a constant; proof `obj_identical.sh` IDENTICAL, oracle where reached | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the last jump before `cleanup:`; a probe after the round's Recipe I step: cc 10 to 8 (leaves *Complex Method*), 8.97 to 8.98, object IDENTICAL (wide) | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | LM | Step 7, initialiser form: the copies may be the initialiser of a `const` struct declared in a block of its own whose only statement is the call that reads it; the struct is then declared, not `const`, among the declarations, initialised with the chosen locals' constants and the parameters it copied, each other local copied by `s.m=v;` where the block stood, and the block becomes the call; a local that text no build compiles names (a Recipe UB fragment) is not chosen | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the cleanup's `EqualizeBuffers` initialiser; a probe 77 to 69 lines, 8.98 to 9.38 | mandate (2026-11-19) |
