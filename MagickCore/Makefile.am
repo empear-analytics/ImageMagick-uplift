@@ -98,6 +98,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
   MagickCore/animate-window-command-private.h \
+  MagickCore/animate-window-menu-private.h \
   MagickCore/animate-window-scene-private.h \
   MagickCore/animate-window-events-private.h \
   MagickCore/animate-window-session-private.h \
@@ -727,6 +728,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
   MagickCore/animate-window-command-private.h \
+  MagickCore/animate-window-menu-private.h \
   MagickCore/animate-window-scene-private.h \
   MagickCore/animate-window-events-private.h \
   MagickCore/animate-window-session-private.h \
