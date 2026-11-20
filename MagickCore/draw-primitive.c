@@ -3567,6 +3567,23 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
   return(status != 0 ? MagickTrue : MagickFalse);
 }
 
+static ssize_t FindLinecapStartVertex(const PrimitiveInfo *primitive_info,
+  const size_t number_vertices,double *dx,double *dy)
+{
+  ssize_t
+    i;
+
+  for (i=1; i < (ssize_t) number_vertices; i++)
+  {
+    (*dx)=primitive_info[0].point.x-primitive_info[i].point.x;
+    (*dy)=primitive_info[0].point.y-primitive_info[i].point.y;
+    if ((fabs((double) (*dx)) >= MagickEpsilon) ||
+        (fabs((double) (*dy)) >= MagickEpsilon))
+      break;
+  }
+  return(i);
+}
+
 static MagickBooleanType TraceSquareLinecap(PrimitiveInfo *primitive_info,
   const size_t number_vertices,const double offset)
 {
@@ -3585,14 +3602,7 @@ static MagickBooleanType TraceSquareLinecap(PrimitiveInfo *primitive_info,
 
   dx=0.0;
   dy=0.0;
-  for (i=1; i < (ssize_t) number_vertices; i++)
-  {
-    dx=primitive_info[0].point.x-primitive_info[i].point.x;
-    dy=primitive_info[0].point.y-primitive_info[i].point.y;
-    if ((fabs((double) dx) >= MagickEpsilon) ||
-        (fabs((double) dy) >= MagickEpsilon))
-      break;
-  }
+  i=FindLinecapStartVertex(primitive_info,number_vertices,&dx,&dy);
   if (i == (ssize_t) number_vertices)
     i=(ssize_t) number_vertices-1L;
   distance=hypot((double) dx,(double) dy);
