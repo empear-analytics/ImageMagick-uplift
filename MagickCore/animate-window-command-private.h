@@ -452,6 +452,17 @@ static void XCreateScenePixmap(const AnimateBackgroundSetup *setup,
     (void) XClearWindow(display,(*window_info).id);
 }
 
+static void XDelayBackgroundScene(Display *display,XResourceInfo *resources,
+  Image **image_list,const int scene)
+{
+  size_t
+    delay;
+
+  delay=1000*image_list[scene]->delay/(size_t) MagickMax(
+    image_list[scene]->ticks_per_second,1L);
+  XDelay(display,(*resources).delay*(delay == 0 ? 10 : delay));
+}
+
 static void XRunBackgroundAnimation(const AnimateBackgroundSetup *setup,
   const AnimateBackgroundTargets *targets)
 {
@@ -463,9 +474,6 @@ static void XRunBackgroundAnimation(const AnimateBackgroundSetup *setup,
 
   int
     scene;
-
-  size_t
-    delay;
 
   ssize_t
     iterations;
@@ -494,9 +502,7 @@ static void XRunBackgroundAnimation(const AnimateBackgroundSetup *setup,
         (*window_info).pixmap);
       (void) XClearWindow(display,(*window_info).id);
       (void) XSync(display,MagickFalse);
-      delay=1000*image_list[scene]->delay/(size_t) MagickMax(
-        image_list[scene]->ticks_per_second,1L);
-      XDelay(display,(*resources).delay*(delay == 0 ? 10 : delay));
+      XDelayBackgroundScene(display,resources,image_list,scene);
     }
     iterations++;
     if (iterations == (ssize_t) image_list[0]->iterations)
