@@ -1459,6 +1459,7 @@ static const char *DelegateTag(const char *decode,const char *encode)
 static void OpenInvokeDelegate(const ImageInfo *image_info,
   const Image *image)
 {
+  magick_unreferenced(image_info);
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
   assert(image != (Image *) NULL);

@@ -166,6 +166,7 @@ MagickPrivate SignatureInfo *AcquireSignatureInfo(void)
 */
 static void CheckSignatureInfo(const SignatureInfo *signature_info)
 {
+  magick_unreferenced(signature_info);
   assert(signature_info != (SignatureInfo *) NULL);
   assert(signature_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
