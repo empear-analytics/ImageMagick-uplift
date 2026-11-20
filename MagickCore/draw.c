@@ -2534,9 +2534,6 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
     const char
       *mvg_class;
 
-    RenderableClassInput
-      renderable;
-
     (void) GetNextToken(q,&q,extent,token);
     if ((*token == '\0') || (*token == ';'))
       {
@@ -2559,33 +2556,33 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
         break;
       }
     mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-    renderable.graphic_context=graphic_context;
-    renderable.n=n;
-    renderable.mvg_class=mvg_class;
-    renderable.p=p;
-    renderable.primitive=primitive;
-    if (IsRenderableClass(&renderable) != MagickFalse)
-      {
-        char
-          *elements;
+    {
+      const RenderableClassInput
+        renderable = { graphic_context, n, mvg_class, p, primitive };
 
-        ssize_t
-          offset;
+      if (IsRenderableClass(&renderable) != MagickFalse)
+        {
+          char
+            *elements;
 
-        /*
-          Inject class elements in stream.
-        */
-        (void) CloneString(&graphic_context[n]->id,token);
-        offset=(ssize_t) (p-primitive);
-        elements=AcquireString(primitive);
-        elements[offset]='\0';
-        (void) ConcatenateString(&elements,mvg_class);
-        (void) ConcatenateString(&elements,"\n");
-        (void) ConcatenateString(&elements,q);
-        primitive=DestroyString(primitive);
-        primitive=elements;
-        q=primitive+offset;
-      }
+          ssize_t
+            offset;
+
+          /*
+            Inject class elements in stream.
+          */
+          (void) CloneString(&graphic_context[n]->id,token);
+          offset=(ssize_t) (p-primitive);
+          elements=AcquireString(primitive);
+          elements[offset]='\0';
+          (void) ConcatenateString(&elements,mvg_class);
+          (void) ConcatenateString(&elements,"\n");
+          (void) ConcatenateString(&elements,q);
+          primitive=DestroyString(primitive);
+          primitive=elements;
+          q=primitive+offset;
+        }
+    }
     break;
   } while (0);
   (*state->primitive)=primitive;
