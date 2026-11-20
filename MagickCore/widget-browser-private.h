@@ -603,17 +603,7 @@ static inline XWidgetInfo ApplyListBrowserControlKey(XWidgetInfo reply_info,
 static inline XWidgetInfo TrackListBrowserSlider(XWidgetInfo slider_info,
   const XEvent event,const unsigned int entries)
 {
-  slider_info.y=event.xmotion.y-(int)
-    ((slider_info.height+slider_info.bevel_width) >> 1)+1;
-  if (slider_info.y < slider_info.min_y)
-    slider_info.y=slider_info.min_y;
-  if (slider_info.y > slider_info.max_y)
-    slider_info.y=slider_info.max_y;
-  slider_info.id=0;
-  if (slider_info.y != slider_info.min_y)
-    slider_info.id=((int) entries*(slider_info.y-
-      slider_info.min_y+1))/(slider_info.max_y-slider_info.min_y+1);
-  return(slider_info);
+  return(TrackFontBrowserSlider(slider_info,event,(int) entries));
 }
 
 static inline XWidgetInfo PlaceTextViewExpose(XWidgetInfo expose_info,
