@@ -598,8 +598,12 @@ static void XHandlePropertyNotify(const DisplayEventContext *context,
     return;
   if (LocaleCompare((char *) data,"-quit") == 0)
     {
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_exit,CurrentTime);
+      {
+        const XClientReason
+          reason = { windows->im_exit, CurrentTime };
+
+        XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+      }
       (void) XFree((void *) data);
       return;
     }

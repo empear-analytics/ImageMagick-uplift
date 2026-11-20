@@ -988,8 +988,12 @@ static void XMapColorEditCommand(Display *display,XWindows *windows)
   windows->command.data=4;
   (void) XCommandWidget(display,windows,ColorEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static void XReleaseColorEditCursor(Display *display,XWindows *windows,

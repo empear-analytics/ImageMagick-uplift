@@ -1329,8 +1329,12 @@ static void XMapMatteEditCommand(Display *display,XWindows *windows,
   windows->command.data=4;
   (void) XCommandWidget(display,windows,MatteEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static MagickBooleanType XMatteEditImage(Display *display,
@@ -1620,8 +1624,12 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (nexus != (Image *) NULL)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_next_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
   else
     {
       char
@@ -2507,8 +2515,12 @@ static MagickBooleanType XPasteImage(Display *display,
   windows->command.data=1;
   (void) XCommandWidget(display,windows,PasteMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */

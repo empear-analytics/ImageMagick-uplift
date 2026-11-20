@@ -473,8 +473,12 @@ static Image *XApplyLaunchCommand(const XMagickCommandContext *context,
     {
       nexus=ReadImage(resource_info->image_info,exception);
       CatchException(exception);
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_next_image,CurrentTime);
+      {
+        const XClientReason
+          reason = { windows->im_next_image, CurrentTime };
+
+        XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+      }
     }
   (void) RelinquishUniqueFileResource(filename);
   XSetCursorState(display,windows,MagickFalse);
@@ -743,8 +747,12 @@ static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
     return(nexus);
   nexus=CloneImage(*image,0,0,MagickTrue,exception);
   if (nexus != (Image *) NULL)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_next_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
   return(nexus);
 }
 
@@ -775,8 +783,12 @@ static void XApplySlideShowCommand(const XMagickCommandContext *context)
   if (*delay == '\0')
     return;
   resource_info->delay=StringToUnsignedLong(delay);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_next_image,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_next_image, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
@@ -808,8 +820,12 @@ static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
     return(nexus);
   nexus=CloneImage(*image,0,0,MagickTrue,exception);
   if (nexus != (Image *) NULL)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_next_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
   return(nexus);
 }
 

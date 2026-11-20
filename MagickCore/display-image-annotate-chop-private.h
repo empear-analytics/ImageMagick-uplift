@@ -3471,8 +3471,11 @@ static void XStartAnnotateTracking(Display *display,XWindows *windows,
   windows->command.data=4;
   (void) XCommandWidget(display,windows,AnnotateMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */
@@ -3673,8 +3676,11 @@ static MagickBooleanType XBackgroundImage(
   status=XDisplayBackgroundImage(display,&background_resources,*image,
     exception) == MagickFalse ? 0 : 1;
   if (status != MagickFalse)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_retain_colors,CurrentTime);
+    {
+      const XClientReason reason = { windows->im_retain_colors, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
   XSetCursorState(display,windows,MagickFalse);
   (void) XMagickCommand(&command_context,UndoCommand);
   return(MagickTrue);
@@ -4338,8 +4344,11 @@ static MagickBooleanType XChopImage(Display *display,
   windows->command.data=1;
   (void) XCommandWidget(display,windows,ChopMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */

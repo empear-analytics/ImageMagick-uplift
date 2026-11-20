@@ -108,8 +108,12 @@ static Image *XApplyNewCommand(const XMagickCommandContext *context,
   (void) CloneString(&image_info->size,geometry);
   nexus=ReadImage(image_info,exception);
   CatchException(exception);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_next_image,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_next_image, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   return(nexus);
 }
 

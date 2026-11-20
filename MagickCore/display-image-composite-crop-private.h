@@ -388,8 +388,11 @@ static MagickBooleanType XCompositeImage(Display *display,
   windows->command.data=1;
   (void) XCommandWidget(display,windows,CompositeEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */
@@ -1982,8 +1985,11 @@ static void XMapCropCommand(Display *display,XWindows *windows,
   windows->command.data=0;
   (void) XCommandWidget(display,windows,CropModeMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static void XSetCropCommandName(XWindows *windows,const ClipboardMode mode)

@@ -636,8 +636,13 @@ static void XPauseAnimation(Display *display,XResourceInfo *resource_info,
         *(command+length)='\0';
         if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
           {
-            XClientMessage(display,windows->image.id,
-              windows->im_protocols,windows->im_exit,CurrentTime);
+            {
+              const XClientReason
+                reason = { windows->im_exit, CurrentTime };
+
+              XClientMessage(display,windows->image.id,windows->im_protocols,
+                &reason);
+            }
             break;
           }
       }

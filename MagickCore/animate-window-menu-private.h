@@ -245,8 +245,12 @@ static void XConfirmAnimateExit(Display *display,
   status=XConfirmWidget(display,windows,"Do you really want to exit",
     resource_info->client_name);
   if (status != 0)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_exit,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_exit, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
 }
 
 static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
@@ -274,8 +278,12 @@ static void XQuitAnimate(Display *display,XResourceInfo *resource_info,
   XWindows *windows)
 {
   if (resource_info->confirm_exit == MagickFalse)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_exit,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_exit, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
   else
     XConfirmAnimateExit(display,resource_info,windows);
 }

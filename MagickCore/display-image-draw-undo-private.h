@@ -319,8 +319,12 @@ static void XMapDrawCommandWidget(Display *display,XWindows *windows,
   windows->command.data=4;
   (void) XCommandWidget(display,windows,DrawMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static MagickBooleanType XAcquireDrawCoordinates(ExceptionInfo *exception,
@@ -1580,8 +1584,12 @@ static void XApplyNextCommand(const XMagickCommandContext *context)
     Display next image.
   */
   for (i=0; i < resource_info->quantum; i++)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_next_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
 }
 
 static void XApplyFormerCommand(const XMagickCommandContext *context)
@@ -1602,8 +1610,12 @@ static void XApplyFormerCommand(const XMagickCommandContext *context)
     Display former image.
   */
   for (i=0; i < resource_info->quantum; i++)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_former_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_former_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
 }
 
 static Image *XApplySelectCommand(const XMagickCommandContext *context)

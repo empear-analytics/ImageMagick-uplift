@@ -197,8 +197,11 @@ static MagickBooleanType XROIImage(Display *display,
   windows->command.data=0;
   (void) XCommandWidget(display,windows,ROIMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */
@@ -1028,8 +1031,11 @@ static MagickBooleanType XSelectRotateAngle(
       windows->command.data=2;
       (void) XCommandWidget(display,windows,RotateMenu,(XEvent *) NULL);
       (void) XMapRaised(display,windows->command.id);
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_update_widget,CurrentTime);
+      {
+        const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+        XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+      }
       /*
         Wait for first button press.
       */

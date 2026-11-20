@@ -456,8 +456,14 @@ MagickPrivate void XCheckRefreshWindows(Display *display,XWindows *windows)
 %
 */
 MagickPrivate void XClientMessage(Display *display,const Window window,
-  const Atom protocol,const Atom reason,const Time timestamp)
+  const Atom protocol,const XClientReason *message)
 {
+  const Atom
+    reason = message->reason;
+
+  const Time
+    timestamp = message->timestamp;
+
   XClientMessageEvent
     client_event;
 
@@ -534,8 +540,12 @@ MagickPrivate void XConfigureImageColormap(Display *display,
   if (windows->pan.mapped != MagickFalse)
     (void) XSetWindowColormap(display,windows->pan.id,colormap);
   XSetCursorState(display,windows,MagickFalse);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_colormap,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_colormap, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 /*

@@ -1123,8 +1123,12 @@ static Image *XTileCommand(const XTileInput *input)
       /*
         Display next image.
       */
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_next_image,CurrentTime);
+      {
+        const XClientReason
+          reason = { windows->im_next_image, CurrentTime };
+
+        XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+      }
       break;
     }
     case TileFormerCommand:
@@ -1132,8 +1136,12 @@ static Image *XTileCommand(const XTileInput *input)
       /*
         Display former image.
       */
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_former_image,CurrentTime);
+      {
+        const XClientReason
+          reason = { windows->im_former_image, CurrentTime };
+
+        XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+      }
       break;
     }
     case TileDeleteCommand:
@@ -1670,8 +1678,12 @@ static Image *XMontageImageDirectory(const DirectoryInput *input,
   XSetCursorState(display,windows,MagickFalse);
   if (montage_image == (Image *) NULL)
     return(montage_image);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_next_image,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_next_image, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   return(montage_image);
 }
 
