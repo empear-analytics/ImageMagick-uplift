@@ -111,6 +111,7 @@
 #include "MagickCore/display-image-annotate-chop-private.h"
 #include "MagickCore/display-image-annotate-private.h"
 
+#include "MagickCore/display-image-composite-crop-private.h"
 #include "MagickCore/display-image-crop-private.h"
 
 #include "MagickCore/display-image-draw-private.h"
