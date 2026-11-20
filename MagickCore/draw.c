@@ -5612,6 +5612,17 @@ static double GetArcRadiiDelta(const PointInfo center,const PointInfo radii)
   return(delta);
 }
 
+static PointInfo GetArcUnitPoint(const PointInfo point,const double cosine,
+  const double sine,const PointInfo radii)
+{
+  PointInfo
+    unit_point;
+
+  unit_point.x=(double) (cosine*point.x/radii.x+sine*point.y/radii.x);
+  unit_point.y=(double) (cosine*point.y/radii.y-sine*point.x/radii.y);
+  return(unit_point);
+}
+
 static PointInfo GetArcCenter(const PointInfo *points,const double factor,
   const double alpha,const double beta)
 {
@@ -5726,10 +5737,8 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   if (delta < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
   radii=ScaleArcRadii(radii,delta);
-  points[0].x=(double) (cosine*start.x/radii.x+sine*start.y/radii.x);
-  points[0].y=(double) (cosine*start.y/radii.y-sine*start.x/radii.y);
-  points[1].x=(double) (cosine*end.x/radii.x+sine*end.y/radii.x);
-  points[1].y=(double) (cosine*end.y/radii.y-sine*end.x/radii.y);
+  points[0]=GetArcUnitPoint(start,cosine,sine,radii);
+  points[1]=GetArcUnitPoint(end,cosine,sine,radii);
   alpha=points[1].x-points[0].x;
   beta=points[1].y-points[0].y;
   if (fabs(alpha*alpha+beta*beta) < MagickEpsilon)
