@@ -1120,8 +1120,13 @@ static void XCreateSceneXImage(const AnimateBackgroundSetup *setup,
   (*window_info).matte_pixmap=(Pixmap) NULL;
   if ((IsTrueColorMap((*resources).map_type,visual_info) != MagickFalse) &&
       (image_list[scene]->storage_class == PseudoClass))
-    XGetPixelInfo(setup->display,visual_info,map_info,resources,
-      image_list[scene],(*window_info).pixel_info);
+    {
+      const XPixelInfoSource
+        pixel_source = { visual_info, map_info, resources };
+
+      XGetPixelInfo(setup->display,&pixel_source,image_list[scene],
+        (*window_info).pixel_info);
+    }
   columns=(unsigned int) image_list[scene]->columns;
   rows=(unsigned int) image_list[scene]->rows;
   if ((image_list[scene]->columns != columns) ||

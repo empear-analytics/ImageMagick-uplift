@@ -399,9 +399,17 @@ static void XGetPenColors(const XPixelColorContext *context,
 }
 
 MagickPrivate void XGetPixelInfo(Display *display,
-  const XVisualInfo *visual_info,const XStandardColormap *map_info,
-  const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
+  const XPixelInfoSource *source,Image *image,XPixelInfo *pixel)
 {
+  const XVisualInfo
+    *const visual_info = source->visual_info;
+
+  const XStandardColormap
+    *const map_info = source->map_info;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
   static const char
     *PenColors[MaxNumberPens]=
     {

@@ -533,6 +533,18 @@ typedef struct _XDisplayImageInfoTarget
     *windows;
 } XDisplayImageInfoTarget;
 
+typedef struct _XPixelInfoSource
+{
+  const XVisualInfo
+    *visual_info;
+
+  const XStandardColormap
+    *map_info;
+
+  const XResourceInfo
+    *resource_info;
+} XPixelInfoSource;
+
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
   XBestPixel(Display *,const Colormap,XColor *,unsigned int,XColor *),
@@ -554,8 +566,7 @@ extern MagickPrivate void
   XHighlightLine(Display *,Window,GC,const XSegment *),
   XHighlightRectangle(Display *,Window,GC,const RectangleInfo *),
   XGetAnnotateInfo(XAnnotateInfo *),
-  XGetPixelInfo(Display *,const XVisualInfo *,const XStandardColormap *,
-    const XResourceInfo *,Image *,XPixelInfo *),
+  XGetPixelInfo(Display *,const XPixelInfoSource *,Image *,XPixelInfo *),
   XGetMapInfo(const XVisualInfo *,const Colormap,XStandardColormap *),
   XGetWindowInfo(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,
     XFontStruct *,XResourceInfo *,XWindowInfo *),

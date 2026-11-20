@@ -448,8 +448,12 @@ static void XInitializeRenderColormap(Display *display,
 
   XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
     (*map_info));
-  XGetPixelInfo(display,(*visual_info),(*map_info),resource_info,(Image *) NULL,
-    pixel);
+  {
+    const XPixelInfoSource
+      pixel_source = { (*visual_info), (*map_info), resource_info };
+
+    XGetPixelInfo(display,&pixel_source,(Image *) NULL,pixel);
+  }
   (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
 }
 

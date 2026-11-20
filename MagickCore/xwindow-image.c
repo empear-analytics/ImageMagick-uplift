@@ -6681,8 +6681,12 @@ static void XImproveColorRecovery(const XColormapContext *context,
           (void) RemapImage(resource_info->quantize_info,image,
             affinity_image,exception);
         }
-      XGetPixelInfo(display,visual_info,map_info,resource_info,image,
-        pixel);
+      {
+        const XPixelInfoSource
+          pixel_source = { visual_info, map_info, resource_info };
+
+        XGetPixelInfo(display,&pixel_source,image,pixel);
+      }
       (void) SetImageStorageClass(image,DirectClass,exception);
       affinity_image=DestroyImage(affinity_image);
     }
@@ -6941,8 +6945,12 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       /*
         Standard Colormap is already defined (i.e. xstdcmap).
       */
-      XGetPixelInfo(display,visual_info,map_info,resource_info,image,
-        pixel);
+      {
+        const XPixelInfoSource
+          pixel_source = { visual_info, map_info, resource_info };
+
+        XGetPixelInfo(display,&pixel_source,image,pixel);
+      }
       number_colors=(unsigned int) (map_info->base_pixel+
         (map_info->red_max+1)*(map_info->green_max+1)*(map_info->blue_max+1));
       XImproveColorRecovery(&context,number_colors);
@@ -6959,7 +6967,12 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     Initialize the map and pixel info structures.
   */
   XGetMapInfo(visual_info,colormap,map_info);
-  XGetPixelInfo(display,visual_info,map_info,resource_info,image,pixel);
+  {
+    const XPixelInfoSource
+      pixel_source = { visual_info, map_info, resource_info };
+
+    XGetPixelInfo(display,&pixel_source,image,pixel);
+  }
   /*
     Allocating colors in server colormap is based on visual class.
   */
