@@ -148,6 +148,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-xyz-to-rgb-private.h \
   MagickCore/colorspace-hcl-plain-to-rgb-private.h \
   MagickCore/colorspace-hcl-to-rgb-private.h \
+  MagickCore/colorspace-hsb-hsi-to-rgb-private.h \
   MagickCore/colorspace-to-rgb-private.h \
   MagickCore/colorspace-lab-to-rgb-private.h \
   MagickCore/colorspace-luv-lms-to-rgb-private.h \
@@ -711,6 +712,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colorspace-xyz-to-rgb-private.h \
   MagickCore/colorspace-hcl-plain-to-rgb-private.h \
   MagickCore/colorspace-hcl-to-rgb-private.h \
+  MagickCore/colorspace-hsb-hsi-to-rgb-private.h \
   MagickCore/colorspace-to-rgb-private.h \
   MagickCore/colorspace-lab-to-rgb-private.h \
   MagickCore/colorspace-luv-lms-to-rgb-private.h \
