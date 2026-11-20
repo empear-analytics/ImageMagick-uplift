@@ -791,6 +791,24 @@ static MagickBooleanType IsNonPathPrimitive(const PrimitiveType primitive)
   return(MagickFalse);
 }
 
+static PathInfo *AcquirePrimitivePathInfo(const PrimitiveInfo *primitive_info,
+  ExceptionInfo *exception)
+{
+  PathInfo
+    *path_info;
+
+  size_t
+    i;
+
+  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++) ;
+  path_info=(PathInfo *) AcquireQuantumMemory((size_t) (3UL*i+1UL),
+    sizeof(*path_info));
+  if (path_info == (PathInfo *) NULL)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+  return(path_info);
+}
+
 static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
@@ -820,15 +838,9 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   */
   if (IsNonPathPrimitive(primitive_info->primitive) != MagickFalse)
     return((PathInfo *) NULL);
-  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++) ;
-  path_info=(PathInfo *) AcquireQuantumMemory((size_t) (3UL*i+1UL),
-    sizeof(*path_info));
+  path_info=AcquirePrimitivePathInfo(primitive_info,exception);
   if (path_info == (PathInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return((PathInfo *) NULL);
-    }
+    return((PathInfo *) NULL);
   coordinates=0;
   closed_subpath=MagickFalse;
   n=0;
