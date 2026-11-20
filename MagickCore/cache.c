@@ -1837,17 +1837,17 @@ static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
       ssize_t
         x_offset;
 
-      VirtualPixelOffsets
-        offsets;
-
       x_offset=x+u;
       length=(MagickSizeType) MagickMin((ssize_t) cache_info->columns-
         x_offset,(ssize_t) columns-u);
-      offsets.x_offset=x_offset;
-      offsets.y_offset=y_offset;
-      if (TransferVirtualPixel(virtual_rows,&offsets,&targets,&broke) ==
-          MagickFalse)
-        continue;
+      {
+        const VirtualPixelOffsets
+          offsets = { x_offset, y_offset };
+
+        if (TransferVirtualPixel(virtual_rows,&offsets,&targets,&broke) ==
+            MagickFalse)
+          continue;
+      }
       if (broke != MagickFalse)
         break;
       /*
