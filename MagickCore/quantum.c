@@ -489,6 +489,7 @@ MagickExport void SetQuantumAlphaType(QuantumInfo *quantum_info,
 static void TraceQuantumSetter(const Image *image,
   const QuantumInfo *quantum_info)
 {
+  magick_unreferenced(quantum_info);
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(quantum_info != (QuantumInfo *) NULL);

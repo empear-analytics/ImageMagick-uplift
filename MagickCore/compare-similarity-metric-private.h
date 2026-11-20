@@ -149,12 +149,12 @@ static inline void AccumulateMAEPixel(const ComparePixels *pixels,
   }
 }
 
-static inline MagickBooleanType GetMAESimilarity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+static inline MagickBooleanType GetNormalizedMetricSimilarity(
+  const PixelMetricInfo *info,double *similarity,ExceptionInfo *exception)
 {
-  const PixelMetricInfo
-    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
-      0.0 };
+  const Image
+    *const image = info->image,
+    *const reconstruct_image = info->reconstruct_image;
 
   double
     area;
@@ -162,13 +162,23 @@ static inline MagickBooleanType GetMAESimilarity(const Image *image,
   MagickBooleanType
     status;
 
+  status=GetPixelMetricSimilarity(info,similarity,&area,exception);
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
+  return(status);
+}
+
+static inline MagickBooleanType GetMAESimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  const PixelMetricInfo
+    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
+      0.0 };
+
   /*
     Compute the mean absolute error similarity.
   */
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
-  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
-  return(status);
+  return(GetNormalizedMetricSimilarity(&info,similarity,exception));
 }
 
 static inline void AccumulateMEPPPixel(const ComparePixels *pixels,
@@ -423,18 +433,10 @@ static inline MagickBooleanType GetMSESimilarity(const Image *image,
     info = { image, reconstruct_image, MeanSquaredErrorMetric,
       0.0 };
 
-  double
-    area;
-
-  MagickBooleanType
-    status;
-
   /*
     Compute the mean sequared error similarity.
   */
-  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
-  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
-  return(status);
+  return(GetNormalizedMetricSimilarity(&info,similarity,exception));
 }
 
 static inline MagickBooleanType GetNCCSimilarity(const Image *image,
@@ -550,6 +552,9 @@ static inline void AccumulatePAPixel(const ComparePixels *pixels,
   }
 }
 
+static inline MagickBooleanType
+  GetClearedMetricSimilarity(const PixelMetricInfo,double *,ExceptionInfo *);
+
 static inline MagickBooleanType GetPASimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -557,14 +562,10 @@ static inline MagickBooleanType GetPASimilarity(const Image *image,
     info = { image, reconstruct_image, PeakAbsoluteErrorMetric,
       0.0 };
 
-  double
-    area;
-
   /*
     Compute the peak absolute similarity.
   */
-  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
+  return(GetClearedMetricSimilarity(info,similarity,exception));
 }
 
 static inline void AccumulatePDCPixel(const ComparePixels *pixels,const double fuzz,
@@ -833,6 +834,16 @@ static inline MagickBooleanType GetPixelMetricSimilarity(const PixelMetricInfo *
   return(status);
 }
 
+static inline MagickBooleanType GetClearedMetricSimilarity(
+  const PixelMetricInfo info,double *similarity,ExceptionInfo *exception)
+{
+  double
+    area;
+
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
+}
+
 static inline MagickBooleanType GetPDCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -840,14 +851,10 @@ static inline MagickBooleanType GetPDCSimilarity(const Image *image,
     info = { image, reconstruct_image, PixelDifferenceCountErrorMetric,
       GetFuzzyColorDistance(image,reconstruct_image) };
 
-  double
-    area;
-
   /*
     Compute the pixel difference count similarity.
   */
-  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
+  return(GetClearedMetricSimilarity(info,similarity,exception));
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

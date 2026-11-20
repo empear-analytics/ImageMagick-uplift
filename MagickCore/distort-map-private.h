@@ -286,8 +286,32 @@ static inline MagickBooleanType IsArcPageReset(const DistortMethod method,
     MagickTrue : MagickFalse);
 }
 
-static void PrintArcFX(const double *coeff,const char *image_gen)
+typedef struct _DistortVerboseFX
 {
+  DistortMethod
+    method;
+
+  const Image
+    *image;
+
+  double
+    *coeff;
+
+  char
+    *image_gen;
+
+  const char
+    *lookup;
+} DistortVerboseFX;
+
+static void PrintArcFX(const DistortVerboseFX *fx)
+{
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   ssize_t
     i;
 
@@ -308,8 +332,14 @@ static void PrintArcFX(const double *coeff,const char *image_gen)
   (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
 }
 
-static void PrintDePolarFX(const double *coeff,const char *image_gen)
+static void PrintDePolarFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   ssize_t
     i;
 
@@ -331,9 +361,15 @@ static void PrintDePolarFX(const double *coeff,const char *image_gen)
   (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
 }
 
-static void PrintCylinder2PlaneFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintCylinder2PlaneFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   (void) FormatLocaleFile(stderr,
     "Cylinder to Plane Distort, Internal Coefficients\n");
   (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
@@ -360,9 +396,20 @@ static void PrintBarrelCenter(const double *coeff,const double xc,
       0.5,coeff[9]-0.5);
 }
 
-static void PrintBarrelFX(const Image *image,const double *coeff,
-  const DistortMethod method,const char *image_gen)
+static void PrintBarrelFX(const DistortVerboseFX *fx)
 {
+  const Image
+    *const image = fx->image;
+
+  const double
+    *const coeff = fx->coeff;
+
+  const DistortMethod
+    method = fx->method;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   double
     xc,
     yc;
@@ -405,9 +452,15 @@ static void PrintPolynomialXTerms(const double *coeff,const size_t nterms)
   }
 }
 
-static void PrintPolynomialFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintPolynomialFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   size_t
     nterms =  CastDoubleToSizeT(coeff[1]);
 
@@ -1024,9 +1077,16 @@ static void PrintAffineProjection(const double *inverse)
     GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
 }
 
-static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
-  const char *lookup,ExceptionInfo *exception)
+static MagickBooleanType PrintAffineFX(const DistortVerboseFX *fx,
+  ExceptionInfo *exception)
 {
+  double
+    *coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   double
     *inverse;
 
@@ -1056,9 +1116,16 @@ static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
   return(MagickTrue);
 }
 
-static MagickBooleanType PrintPerspectiveFX(double *coeff,
-  const char *image_gen,const char *lookup,ExceptionInfo *exception)
+static MagickBooleanType PrintPerspectiveFX(const DistortVerboseFX *fx,
+  ExceptionInfo *exception)
 {
+  double
+    *coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   double
     *inverse;
 
@@ -1107,8 +1174,11 @@ static MagickBooleanType PrintPerspectiveFX(double *coeff,
   return(MagickTrue);
 }
 
-static void PrintBilinearForwardYTerm(const double *coeff)
+static void PrintBilinearForwardYTerm(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
   /* Handle Special degenerate (non-quadratic) or trapezoidal case */
   if (coeff[9] != 0)
     {
@@ -1123,9 +1193,14 @@ static void PrintBilinearForwardYTerm(const double *coeff)
       -coeff[4],coeff[0]);
 }
 
-static void PrintBilinearForwardLookup(const double *coeff,
-  const char *lookup)
+static void PrintBilinearForwardLookup(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const lookup = fx->lookup;
+
   if ( coeff[9] != 0 )
     (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
       lookup);
@@ -1133,9 +1208,14 @@ static void PrintBilinearForwardLookup(const double *coeff,
     (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
-static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintBilinearForwardFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   (void) FormatLocaleFile(stderr,"BilinearForward Mapping Equations:\n");
   (void) FormatLocaleFile(stderr,"%s", image_gen);
   (void) FormatLocaleFile(stderr,"    i = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
@@ -1155,16 +1235,22 @@ static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
     coeff[7]);
   (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
     coeff[6], -coeff[2], coeff[8]);
-  PrintBilinearForwardYTerm(coeff);
+  PrintBilinearForwardYTerm(fx);
   (void) FormatLocaleFile(stderr,
     "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
     coeff[2]);
-  PrintBilinearForwardLookup(coeff,lookup);
+  PrintBilinearForwardLookup(fx);
 }
 
-static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintBilinearReverseFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
 #if 0
         (void) FormatLocaleFile(stderr, "Polynomial Projection Distort:\n");
         (void) FormatLocaleFile(stderr, "  -distort PolynomialProjection \\\n");
@@ -1187,31 +1273,10 @@ static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
-typedef struct _DistortVerboseFX
-{
-  DistortMethod
-    method;
-
-  const Image
-    *image;
-
-  double
-    *coeff;
-
-  char
-    *image_gen;
-
-  const char
-    *lookup;
-} DistortVerboseFX;
-
 static void PrintLensDistortFX(const DistortVerboseFX *fx)
 {
   const DistortMethod
     method = fx->method;
-
-  const Image
-    *const image = fx->image;
 
   double
     *const coeff = fx->coeff;
@@ -1245,7 +1310,7 @@ static void PrintLensDistortFX(const DistortVerboseFX *fx)
     case BarrelDistortion:
     case BarrelInverseDistortion:
     {
-      PrintBarrelFX(image,coeff,method,image_gen);
+      PrintBarrelFX(fx);
       break;
     }
     default:
@@ -1264,9 +1329,6 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
   char
     *const image_gen = fx->image_gen;
 
-  const char
-    *const lookup = fx->lookup;
-
   ssize_t
     i;
 
@@ -1274,7 +1336,7 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
   {
     case ArcDistortion:
     {
-      PrintArcFX(coeff,image_gen);
+      PrintArcFX(fx);
       break;
     }
     case PolarDistortion:
@@ -1299,12 +1361,12 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
     }
     case DePolarDistortion:
     {
-      PrintDePolarFX(coeff,image_gen);
+      PrintDePolarFX(fx);
       break;
     }
     case Cylinder2PlaneDistortion:
     {
-      PrintCylinder2PlaneFX(coeff,image_gen,lookup);
+      PrintCylinder2PlaneFX(fx);
       break;
     }
     default:
@@ -1320,30 +1382,21 @@ static void PrintDistortFX(const DistortVerboseFX *fx)
   const DistortMethod
     method = fx->method;
 
-  double
-    *const coeff = fx->coeff;
-
-  char
-    *const image_gen = fx->image_gen;
-
-  const char
-    *const lookup = fx->lookup;
-
   switch (method)
   {
     case BilinearForwardDistortion:
     {
-      PrintBilinearForwardFX(coeff,image_gen,lookup);
+      PrintBilinearForwardFX(fx);
       break;
     }
     case BilinearReverseDistortion:
     {
-      PrintBilinearReverseFX(coeff,image_gen,lookup);
+      PrintBilinearReverseFX(fx);
       break;
     }
     case PolynomialDistortion:
     {
-      PrintPolynomialFX(coeff,image_gen,lookup);
+      PrintPolynomialFX(fx);
       break;
     }
     default:

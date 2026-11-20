@@ -92,6 +92,7 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/version.h"
 #include "MagickCore/compare-similarity-private.h"
+#include "MagickCore/compare-similarity-frequency-images-private.h"
 #include "MagickCore/compare-similarity-frequency-private.h"
 
 /*
@@ -157,6 +158,9 @@ static double GetSimilarityMetric(const Image *image,
   RectangleInfo
     geometry;
 
+  SimilarityImages
+    images;
+
   size_t
     length = MaxPixelChannels+1UL;
 
@@ -175,8 +179,9 @@ static double GetSimilarityMetric(const Image *image,
   if (channel_similarity == (double *) NULL)
     return(NAN);
   (void) memset(channel_similarity,0,length*sizeof(*channel_similarity));
-  status=GetSimilarityForMetric(similarity_image,reconstruct_image,metric,
-    channel_similarity,exception);
+  images.image=similarity_image;
+  images.reconstruct_image=reconstruct_image;
+  status=GetSimilarityForMetric(&images,metric,channel_similarity,exception);
   similarity_image=DestroyImage(similarity_image);
   similarity=channel_similarity[CompositePixelChannel];
   channel_similarity=(double *) RelinquishMagickMemory(channel_similarity);
@@ -573,6 +578,8 @@ static Image *AcquireSimilarityImage(const Image *image,
   return(similarity_image);
 }
 
+#define SimilarityImageTag  "Similarity/Image"
+
 static void SetSimilarityProperties(const Image *image,
   const double *similarity_metric,const RectangleInfo *offset)
 {
@@ -584,20 +591,95 @@ static void SetSimilarityProperties(const Image *image,
     GetMagickPrecision(),(double) offset->y);
 }
 
-MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
-  const MetricType metric,const double similarity_threshold,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
+static const FrequencySimilarity *GetRequestedFrequencySimilarity(
+  const Image *image,const MetricType metric)
 {
-#define SimilarityImageTag  "Similarity/Image"
+  const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"compare:accelerate-ncc");
+  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
+    return(GetFrequencySimilarity(metric));
+  return((const FrequencySimilarity *) NULL);
+}
+#endif
+
+typedef struct _SimilarityScan
+{
+  const Image
+    *image,
+    *reconstruct;
+
+  MetricType
+    metric;
+
+  double
+    similarity_threshold;
+
+  RectangleInfo
+    *offset;
+
+  double
+    *similarity_metric;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} SimilarityScan;
+
+static void SetSimilarityResult(const SimilarityScan *scan,
+  const SimilarityInfo similarity_info)
+{
+  const Image
+    *const image = scan->image;
+
+  *scan->similarity_metric=similarity_info.similarity;
+  if (fabs(*scan->similarity_metric) < MagickEpsilon)
+    *scan->similarity_metric=0.0;
+  scan->offset->x=similarity_info.x;
+  scan->offset->y=similarity_info.y;
+  SetSimilarityProperties(image,scan->similarity_metric,scan->offset);
+}
+
+static void ReportSimilarityProgress(MagickBooleanType *status,
+  MagickOffsetType *progress,const Image *image)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      (*progress)++;
+      proceed=SetImageProgress(image,SimilarityImageTag,(*progress),
+        image->rows);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
+static Image *MeasureSimilarityImage(const SimilarityScan *scan,
+  Image *similarity_image)
+{
+  const Image
+    *const image = scan->image,
+    *const reconstruct = scan->reconstruct;
+
+  const MetricType
+    metric = scan->metric;
+
+  const double
+    similarity_threshold = scan->similarity_threshold;
+
+  ExceptionInfo
+    *const exception = scan->exception;
 
   CacheView
     *similarity_view;
 
-  Image
-    *similarity_image = (Image *) NULL;
-
   MagickBooleanType
-    status = MagickTrue;
+    status = scan->status;
 
   MagickOffsetType
     progress = 0;
@@ -608,45 +690,6 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   ssize_t
     y;
 
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  assert(offset != (RectangleInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  SetGeometry(reconstruct,offset);
-  *similarity_metric=0.0;
-  offset->x=0;
-  offset->y=0;
-#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
-{
-  const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
-  if (artifact == (const char *) NULL)
-    artifact=GetImageArtifact(image,"compare:accelerate-ncc");
-  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
-    {
-      const FrequencySimilarity
-        *frequency = GetFrequencySimilarity(metric);
-
-      if (frequency != (const FrequencySimilarity *) NULL)
-        {
-          similarity_image=frequency->similarity_image(image,reconstruct,
-            offset,similarity_metric,exception);
-          return(similarity_image);
-        }
-    }
-}
-#endif
-  similarity_image=AcquireSimilarityImage(image,reconstruct,exception);
-  if (similarity_image == (Image *) NULL)
-    return((Image *) NULL);
-  similarity_image->depth=32;
-  similarity_image->colorspace=GRAYColorspace;
-  similarity_image->alpha_trait=UndefinedPixelTrait;
-  status=SetImageStorageClass(similarity_image,DirectClass,exception);
-  if (status == MagickFalse)
-    return(DestroyImage(similarity_image));
   /*
     Measure similarity of reconstruction image against image.
   */
@@ -682,25 +725,68 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
     MergeSimilarityInfo(&merge,&similarity_info,&threshold_trigger);
     if (SyncCacheViewAuthenticPixels(similarity_view,exception) == MagickFalse)
       status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(image,SimilarityImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    ReportSimilarityProgress(&status,&progress,image);
   }
   similarity_view=DestroyCacheView(similarity_view);
   if (status == MagickFalse)
     similarity_image=DestroyImage(similarity_image);
-  *similarity_metric=similarity_info.similarity;
-  if (fabs(*similarity_metric) < MagickEpsilon)
-    *similarity_metric=0.0;
-  offset->x=similarity_info.x;
-  offset->y=similarity_info.y;
-  SetSimilarityProperties(image,similarity_metric,offset);
+  SetSimilarityResult(scan,similarity_info);
   return(similarity_image);
+}
+
+MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
+  const MetricType metric,const double similarity_threshold,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
+  Image
+    *similarity_image = (Image *) NULL;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  SimilarityScan
+    scan;
+
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  assert(offset != (RectangleInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  SetGeometry(reconstruct,offset);
+  *similarity_metric=0.0;
+  offset->x=0;
+  offset->y=0;
+#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
+{
+  const FrequencySimilarity
+    *frequency = GetRequestedFrequencySimilarity(image,metric);
+
+  if (frequency != (const FrequencySimilarity *) NULL)
+    {
+      similarity_image=frequency->similarity_image(image,reconstruct,
+        offset,similarity_metric,exception);
+      return(similarity_image);
+    }
+}
+#endif
+  similarity_image=AcquireSimilarityImage(image,reconstruct,exception);
+  if (similarity_image == (Image *) NULL)
+    return((Image *) NULL);
+  similarity_image->depth=32;
+  similarity_image->colorspace=GRAYColorspace;
+  similarity_image->alpha_trait=UndefinedPixelTrait;
+  status=SetImageStorageClass(similarity_image,DirectClass,exception);
+  if (status == MagickFalse)
+    return(DestroyImage(similarity_image));
+  scan.image=image;
+  scan.reconstruct=reconstruct;
+  scan.metric=metric;
+  scan.similarity_threshold=similarity_threshold;
+  scan.offset=offset;
+  scan.similarity_metric=similarity_metric;
+  scan.status=status;
+  scan.exception=exception;
+  return(MeasureSimilarityImage(&scan,similarity_image));
 }

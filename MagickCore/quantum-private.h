@@ -127,8 +127,6 @@ static inline EndianType GetHostEndian(void)
   return((*(char *) &lsb_first) == 1 ? LSBEndian : MSBEndian);
 }
 
-static inline float HalfToSinglePrecision(const unsigned short half)
-{
 #define ExponentBias  (127-15)
 #define ExponentMask  (0x7c00U)
 #define ExponentShift  23
@@ -136,6 +134,35 @@ static inline float HalfToSinglePrecision(const unsigned short half)
 #define SignificandShift  13
 #define SignificandMask  (0x00000400U)
 
+static inline unsigned int NormalizeHalfSubnormal(const unsigned int sign_bit,
+  unsigned int exponent,unsigned int significand)
+{
+  while ((significand & SignificandMask) == 0)
+  {
+    significand<<=1;
+    exponent--;
+  }
+  exponent++;
+  significand&=(~SignificandMask);
+  exponent+=ExponentBias;
+  return((sign_bit << SignBitShift) | (exponent << ExponentShift) |
+    (significand << SignificandShift));
+}
+
+static inline unsigned int HalfInfinityOrNaN(const unsigned int sign_bit,
+  const unsigned int significand)
+{
+  unsigned int
+    value;
+
+  value=(sign_bit << SignBitShift) | 0x7f800000;
+  if (significand != 0)
+    value|=(significand << SignificandShift);
+  return(value);
+}
+
+static inline float HalfToSinglePrecision(const unsigned short half)
+{
   typedef union _SinglePrecision
   {
     unsigned int
@@ -169,26 +196,11 @@ static inline float HalfToSinglePrecision(const unsigned short half)
       if (significand == 0)
         value=sign_bit << SignBitShift;
       else
-        {
-          while ((significand & SignificandMask) == 0)
-          {
-            significand<<=1;
-            exponent--;
-          }
-          exponent++;
-          significand&=(~SignificandMask);
-          exponent+=ExponentBias;
-          value=(sign_bit << SignBitShift) | (exponent << ExponentShift) |
-            (significand << SignificandShift);
-        }
+        value=NormalizeHalfSubnormal(sign_bit,exponent,significand);
     }
   else
     if (exponent == SignBitShift)
-      {
-        value=(sign_bit << SignBitShift) | 0x7f800000;
-        if (significand != 0)
-          value|=(significand << SignificandShift);
-      }
+      value=HalfInfinityOrNaN(sign_bit,significand);
     else
       {
         exponent+=ExponentBias;
@@ -717,6 +729,38 @@ static inline Quantum ScaleShortToQuantum(const unsigned short value)
 }
 #endif
 
+static inline unsigned short HalfFromSubnormalSingle(
+  const unsigned int sign_bit,const int exponent,unsigned int significand)
+{
+  int
+    shift;
+
+  if (exponent < -10)
+    return((unsigned short) sign_bit);
+  significand=significand | 0x00800000;
+  shift=(int) (14-exponent);
+  significand=(unsigned int) ((significand+((1U << (shift-1))-1)+
+    ((significand >> shift) & 0x01)) >> shift);
+  return((unsigned short) (sign_bit | significand));
+}
+
+static inline unsigned short HalfFromInfinityOrNaNSingle(
+  const unsigned int sign_bit,unsigned int significand)
+{
+  unsigned short
+    half;
+
+  if (significand == 0)
+    return((unsigned short) (sign_bit | ExponentMask));
+  else
+    {
+      significand>>=SignificandShift;
+      half=(unsigned short) (sign_bit | significand |
+        (significand == 0) | ExponentMask);
+      return(half);
+    }
+}
+
 static inline unsigned short SinglePrecisionToHalf(const double value)
 {
   typedef union _SinglePrecision
@@ -753,31 +797,10 @@ static inline unsigned short SinglePrecisionToHalf(const double value)
   exponent=(int) ((map.fixed_point >> ExponentShift) & 0x000000ff)-ExponentBias;
   significand=map.fixed_point & 0x007fffff;
   if (exponent <= 0)
-    {
-      int
-        shift;
-
-      if (exponent < -10)
-        return((unsigned short) sign_bit);
-      significand=significand | 0x00800000;
-      shift=(int) (14-exponent);
-      significand=(unsigned int) ((significand+((1U << (shift-1))-1)+
-        ((significand >> shift) & 0x01)) >> shift);
-      return((unsigned short) (sign_bit | significand));
-    }
+    return(HalfFromSubnormalSingle(sign_bit,exponent,significand));
   else
     if (exponent == (0xff-ExponentBias))
-      {
-        if (significand == 0)
-          return((unsigned short) (sign_bit | ExponentMask));
-        else
-          {
-            significand>>=SignificandShift;
-            half=(unsigned short) (sign_bit | significand |
-              (significand == 0) | ExponentMask);
-            return(half);
-          }
-      }
+      return(HalfFromInfinityOrNaNSingle(sign_bit,significand));
   significand=significand+((significand >> SignificandShift) & 0x01)+0x00000fff;
   if ((significand & 0x00800000) != 0)
     {

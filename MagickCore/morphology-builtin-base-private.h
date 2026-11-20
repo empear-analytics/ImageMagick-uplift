@@ -25,6 +25,7 @@ static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
   if (IsKernelBuiltWithoutBase(type) != MagickFalse)
     return(MagickFalse); /* A pre-generated kernel is not needed */
   switch(type) {
+    case UndefinedKernel:  /* not reached: answered above; a label for MSVC C4065 */
 #if 0
     /* set to 1 to do a compile-time check that we haven't missed anything */
     case UnityKernel:

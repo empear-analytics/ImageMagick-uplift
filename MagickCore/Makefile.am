@@ -141,6 +141,33 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
   MagickCore/colorspace-private.h \
+  MagickCore/colorspace-rgb-predicates-private.h \
+  MagickCore/colorspace-lab-compatible-private.h \
+  MagickCore/colorspace-predicates-private.h \
+  MagickCore/colorspace-illuminant-xyz-private.h \
+  MagickCore/colorspace-xyz-to-rgb-private.h \
+  MagickCore/colorspace-hcl-plain-to-rgb-private.h \
+  MagickCore/colorspace-hcl-to-rgb-private.h \
+  MagickCore/colorspace-hsb-hsi-to-rgb-private.h \
+  MagickCore/colorspace-to-rgb-private.h \
+  MagickCore/colorspace-lab-to-rgb-private.h \
+  MagickCore/colorspace-luv-lms-to-rgb-private.h \
+  MagickCore/colorspace-cie-to-rgb-private.h \
+  MagickCore/colorspace-rgb-to-xyz-cmy-private.h \
+  MagickCore/colorspace-rgb-to-hcl-hsb-private.h \
+  MagickCore/colorspace-rgb-to-xyz-private.h \
+  MagickCore/colorspace-rgb-to-hue-private.h \
+  MagickCore/colorspace-rgb-to-lab-private.h \
+  MagickCore/colorspace-rgb-to-lchuv-private.h \
+  MagickCore/colorspace-rgb-to-cie-private.h \
+  MagickCore/colorspace-xyz-to-jzazbz-private.h \
+  MagickCore/colorspace-rgb-to-jzazbz-private.h \
+  MagickCore/colorspace-jzazbz-to-xyz-private.h \
+  MagickCore/colorspace-jzazbz-private.h \
+  MagickCore/colorspace-jzazbz-oklab-private.h \
+  MagickCore/colorspace-rgb-to-ycc-private.h \
+  MagickCore/colorspace-rgb-to-luma-private.h \
+  MagickCore/colorspace-conversions-private.h \
   MagickCore/colorspace-transform-srgb-private.h \
   MagickCore/compare.c \
   MagickCore/compare-similarity.c \
@@ -152,13 +179,19 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/compare-similarity-metric-private.h \
   MagickCore/compare-similarity-phase-private.h \
   MagickCore/compare-similarity-frequency-private.h \
+  MagickCore/compare-similarity-frequency-images-private.h \
   MagickCore/composite.c \
   MagickCore/composite-image.c \
   MagickCore/composite.h \
+  MagickCore/composite-channel-blend-private.h \
+  MagickCore/composite-channel-mix-private.h \
+  MagickCore/composite-channel-groups-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
   MagickCore/composite-image-virtual-private.h \
+  MagickCore/composite-image-alpha-coverage-private.h \
+  MagickCore/composite-image-alpha-private.h \
   MagickCore/composite-image-coverage-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
@@ -190,6 +223,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
   MagickCore/distort-resize.c \
+  MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
   MagickCore/distort.h \
@@ -244,11 +278,18 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier.c \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
+  MagickCore/fourier-forward-private.h \
   MagickCore/fx.c \
   MagickCore/fx-execute.c \
   MagickCore/fx.h \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
+  MagickCore/fx-translate-rpn-private.h \
+  MagickCore/fx-translate-attributes-private.h \
+  MagickCore/fx-translate-qualifiers-private.h \
+  MagickCore/fx-translate-functions-private.h \
+  MagickCore/fx-translate-operators-private.h \
+  MagickCore/fx-translate-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
@@ -279,6 +320,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/layer-composite.c \
   MagickCore/layer-merge.c \
   MagickCore/layer.h \
+  MagickCore/layer-frames-bounds-private.h \
   MagickCore/layer-frames-private.h \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
@@ -499,10 +541,25 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/vision-components-object-private.h \
   MagickCore/vision-components-label-private.h \
   MagickCore/widget.c \
+  MagickCore/widget-text.c \
+  MagickCore/widget-command.c \
+  MagickCore/widget-menu.c \
+  MagickCore/widget-list.c \
+  MagickCore/widget-font.c \
+  MagickCore/widget-file.c \
+  MagickCore/widget-color.c \
+  MagickCore/widget-prefs.c \
   MagickCore/widget-confirm.c \
   MagickCore/widget-dialog.c \
   MagickCore/widget.h \
   MagickCore/widget-core-private.h \
+  MagickCore/widget-browser-private.h \
+  MagickCore/widget-color-actions-private.h \
+  MagickCore/widget-font-actions-private.h \
+  MagickCore/widget-file-actions-private.h \
+  MagickCore/widget-text-view-private.h \
+  MagickCore/widget-list-actions-private.h \
+  MagickCore/widget-list-entries-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
   MagickCore/xml-tree-file.c \
@@ -517,6 +574,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-text.c \
   MagickCore/xwindow-visual.c \
   MagickCore/xwindow-import.c \
+  MagickCore/xwindow-import-image.c \
+  MagickCore/xwindow-import-private.h \
+  MagickCore/xwindow-import-image-window-private.h \
   MagickCore/xwindow-search.c \
   MagickCore/xwindow.h
 
@@ -651,6 +711,33 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/color-private.h \
   MagickCore/color-private.h \
   MagickCore/colorspace-private.h \
+  MagickCore/colorspace-rgb-predicates-private.h \
+  MagickCore/colorspace-lab-compatible-private.h \
+  MagickCore/colorspace-predicates-private.h \
+  MagickCore/colorspace-illuminant-xyz-private.h \
+  MagickCore/colorspace-xyz-to-rgb-private.h \
+  MagickCore/colorspace-hcl-plain-to-rgb-private.h \
+  MagickCore/colorspace-hcl-to-rgb-private.h \
+  MagickCore/colorspace-hsb-hsi-to-rgb-private.h \
+  MagickCore/colorspace-to-rgb-private.h \
+  MagickCore/colorspace-lab-to-rgb-private.h \
+  MagickCore/colorspace-luv-lms-to-rgb-private.h \
+  MagickCore/colorspace-cie-to-rgb-private.h \
+  MagickCore/colorspace-rgb-to-xyz-cmy-private.h \
+  MagickCore/colorspace-rgb-to-hcl-hsb-private.h \
+  MagickCore/colorspace-rgb-to-xyz-private.h \
+  MagickCore/colorspace-rgb-to-hue-private.h \
+  MagickCore/colorspace-rgb-to-lab-private.h \
+  MagickCore/colorspace-rgb-to-lchuv-private.h \
+  MagickCore/colorspace-rgb-to-cie-private.h \
+  MagickCore/colorspace-xyz-to-jzazbz-private.h \
+  MagickCore/colorspace-rgb-to-jzazbz-private.h \
+  MagickCore/colorspace-jzazbz-to-xyz-private.h \
+  MagickCore/colorspace-jzazbz-private.h \
+  MagickCore/colorspace-jzazbz-oklab-private.h \
+  MagickCore/colorspace-rgb-to-ycc-private.h \
+  MagickCore/colorspace-rgb-to-luma-private.h \
+  MagickCore/colorspace-conversions-private.h \
   MagickCore/colorspace-transform-srgb-private.h \
   MagickCore/compare-private.h \
   MagickCore/compare-similarity-private.h \
@@ -658,10 +745,16 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/compare-similarity-metric-private.h \
   MagickCore/compare-similarity-phase-private.h \
   MagickCore/compare-similarity-frequency-private.h \
+  MagickCore/compare-similarity-frequency-images-private.h \
+  MagickCore/composite-channel-blend-private.h \
+  MagickCore/composite-channel-mix-private.h \
+  MagickCore/composite-channel-groups-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
   MagickCore/composite-image-virtual-private.h \
+  MagickCore/composite-image-alpha-coverage-private.h \
+  MagickCore/composite-image-alpha-private.h \
   MagickCore/composite-image-coverage-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
@@ -670,6 +763,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
+  MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
   MagickCore/distribute-cache-private.h \
@@ -683,11 +777,19 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/feature-texture-measure-private.h \
+  MagickCore/fourier-forward-private.h \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
+  MagickCore/fx-translate-rpn-private.h \
+  MagickCore/fx-translate-attributes-private.h \
+  MagickCore/fx-translate-qualifiers-private.h \
+  MagickCore/fx-translate-functions-private.h \
+  MagickCore/fx-translate-operators-private.h \
+  MagickCore/fx-translate-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
+  MagickCore/layer-frames-bounds-private.h \
   MagickCore/layer-frames-private.h \
   MagickCore/linked-list-private.h \
   MagickCore/locale-private.h \
@@ -750,9 +852,18 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/vision-components-label-private.h \
   MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/widget-core-private.h \
+  MagickCore/widget-browser-private.h \
+  MagickCore/widget-color-actions-private.h \
+  MagickCore/widget-font-actions-private.h \
+  MagickCore/widget-file-actions-private.h \
+  MagickCore/widget-text-view-private.h \
+  MagickCore/widget-list-actions-private.h \
+  MagickCore/widget-list-entries-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-image-private.h \
+  MagickCore/xwindow-import-private.h \
+  MagickCore/xwindow-import-image-window-private.h \
   MagickCore/xwindow-private.h
 
 MAGICKCORE_INCLUDEARCH_HDRS = \

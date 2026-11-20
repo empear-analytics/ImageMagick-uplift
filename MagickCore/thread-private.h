@@ -47,6 +47,12 @@ extern "C" {
   typedef size_t MagickMutexType;
 #endif
 
+static inline MagickBooleanType IsNonMemoryCacheType(const CacheType type)
+{
+  return(((type != MemoryCache) && (type != MapCache)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline int GetMagickNumberThreads(const Image *source,
   const Image *destination,const size_t chunk,const double factor)
 {
@@ -66,8 +72,8 @@ static inline int GetMagickNumberThreads(const Image *source,
         MagickMin(max_threads,(total_pixels+pixels_per_thread-1)/
         pixels_per_thread);
     }
-  if (((source_type != MemoryCache) && (source_type != MapCache)) ||
-      ((destination_type != MemoryCache) && (destination_type != MapCache)))
+  if ((IsNonMemoryCacheType(source_type) != MagickFalse) ||
+      (IsNonMemoryCacheType(destination_type) != MagickFalse))
     number_threads=MagickMin(number_threads,4UL);
   return((int) number_threads);
 }

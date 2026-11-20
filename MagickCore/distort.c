@@ -173,14 +173,13 @@ static MagickBooleanType PrintDistortVerbose(
       case AffineDistortion:
       case RigidAffineDistortion:
       {
-        if (PrintAffineFX(coeff,image_gen,lookup,exception) == MagickFalse)
+        if (PrintAffineFX(&fx,exception) == MagickFalse)
           return(MagickFalse);
         break;
       }
       case PerspectiveDistortion:
       {
-        if (PrintPerspectiveFX(coeff,image_gen,lookup,exception) ==
-            MagickFalse)
+        if (PrintPerspectiveFX(&fx,exception) == MagickFalse)
           return(MagickFalse);
         break;
       }

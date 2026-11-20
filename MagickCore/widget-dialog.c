@@ -477,7 +477,12 @@ static void KeyDialogPress(const DialogContext *context,
       return;
     }
   ApplyDialogControlKey(key_symbol,(*state),reply_info);
-  XEditText(display,reply_info,key_symbol,command,(*state));
+  {
+    const WidgetTextKey
+      key = { key_symbol, command };
+
+    XEditText(display,reply_info,&key,(*state));
+  }
   XDrawMatteText(display,&windows->widget,reply_info);
 }
 
@@ -600,8 +605,12 @@ static void SelectDialogReply(const DialogContext *context,
         Insert primary selection in reply text.
       */
       *(data+length)='\0';
-      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
-        (*state));
+      {
+        const WidgetTextKey
+          key = { (KeySym) XK_Insert, (char *) data };
+
+        XEditText(display,reply_info,&key,(*state));
+      }
       XDrawMatteText(display,&windows->widget,reply_info);
     }
   (void) XFree((void *) data);

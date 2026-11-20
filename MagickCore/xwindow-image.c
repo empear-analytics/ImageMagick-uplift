@@ -1150,6 +1150,7 @@ MagickPrivate void XGetMapInfo(const XVisualInfo *visual_info,
 %      info from the X server database.
 %
 */
+#if defined(X11_APPLICATION_PATH)
 static int XResourceClassCharacter(const char *name)
 {
   int
@@ -1166,6 +1167,7 @@ static int XResourceClassCharacter(const char *name)
         c-=(XK_oslash-XK_Ooblique);
   return(c);
 }
+#endif
 
 MagickExport XrmDatabase XGetResourceDatabase(Display *display,
   const char *client_name)
@@ -1173,8 +1175,10 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
   char
     filename[MagickPathExtent];
 
+#if defined(X11_APPLICATION_PATH)
   int
     c;
+#endif
 
   const char
     *p;
@@ -1200,8 +1204,8 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
     p--;
   if (*p == '/')
     client_name=p+1;
-  c=XResourceClassCharacter(client_name);
 #if defined(X11_APPLICATION_PATH)
+  c=XResourceClassCharacter(client_name);
   (void) FormatLocaleString(filename,MagickPathExtent,"%s%c%s",
     X11_APPLICATION_PATH,c,client_name+1);
   (void) XrmCombineFileDatabase(filename,&resource_database,MagickFalse);
