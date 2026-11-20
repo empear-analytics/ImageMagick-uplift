@@ -1388,13 +1388,9 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
     }
   else
     {
-      EncodeFallbackInfo
-        fallback;
+      const EncodeFallbackInfo
+        fallback = { write_info, image, filename, exception };
 
-      fallback.write_info=write_info;
-      fallback.image=image;
-      fallback.filename=filename;
-      fallback.exception=exception;
       EncodeImageWithFallback(&fallback,&status);
     }
   if (temporary != MagickFalse)
