@@ -5591,6 +5591,48 @@ static void TraceArcSegmentPoints(const ArcSegmentInput *segment,
     (p+3)->point=end;
 }
 
+static PointInfo GetArcMidpointOffset(const PointInfo start,
+  const PointInfo end,const double cosine,const double sine)
+{
+  PointInfo
+    center;
+
+  center.x=(double) (cosine*(end.x-start.x)/2+sine*(end.y-start.y)/2);
+  center.y=(double) (cosine*(end.y-start.y)/2-sine*(end.x-start.x)/2);
+  return(center);
+}
+
+static double GetArcRadiiDelta(const PointInfo center,const PointInfo radii)
+{
+  double
+    delta;
+
+  delta=(center.x*center.x)/(radii.x*radii.x)+(center.y*center.y)/
+    (radii.y*radii.y);
+  return(delta);
+}
+
+static PointInfo GetArcCenter(const PointInfo *points,const double factor,
+  const double alpha,const double beta)
+{
+  PointInfo
+    center;
+
+  center.x=(double) ((points[0].x+points[1].x)/2-factor*beta);
+  center.y=(double) ((points[0].y+points[1].y)/2+factor*alpha);
+  return(center);
+}
+
+static size_t GetArcSegmentCount(const double theta)
+{
+  size_t
+    arc_segments;
+
+  arc_segments=(size_t) CastDoubleToSsizeT(ceil(fabs((double) (theta/(0.5*
+    MagickPI+MagickEpsilon)))));
+  return(arc_segments);
+}
+
 static PointInfo ScaleArcRadii(PointInfo radii,const double delta)
 {
   if (delta > 1.0)
@@ -5679,10 +5721,8 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     return(TraceLine(primitive_info,start,end));
   cosine=cos(DegreesToRadians(fmod((double) angle,360.0)));
   sine=sin(DegreesToRadians(fmod((double) angle,360.0)));
-  center.x=(double) (cosine*(end.x-start.x)/2+sine*(end.y-start.y)/2);
-  center.y=(double) (cosine*(end.y-start.y)/2-sine*(end.x-start.x)/2);
-  delta=(center.x*center.x)/(radii.x*radii.x)+(center.y*center.y)/
-    (radii.y*radii.y);
+  center=GetArcMidpointOffset(start,end,cosine,sine);
+  delta=GetArcRadiiDelta(center,radii);
   if (delta < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
   radii=ScaleArcRadii(radii,delta);
@@ -5695,13 +5735,11 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   if (fabs(alpha*alpha+beta*beta) < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
   factor=GetArcCenterFactor(alpha,beta,large_arc,sweep);
-  center.x=(double) ((points[0].x+points[1].x)/2-factor*beta);
-  center.y=(double) ((points[0].y+points[1].y)/2+factor*alpha);
+  center=GetArcCenter(points,factor,alpha,beta);
   alpha=atan2(points[0].y-center.y,points[0].x-center.x);
   theta=atan2(points[1].y-center.y,points[1].x-center.x)-alpha;
   theta=GetArcSweepTheta(theta,sweep);
-  arc_segments=(size_t) CastDoubleToSsizeT(ceil(fabs((double) (theta/(0.5*
-    MagickPI+MagickEpsilon)))));
+  arc_segments=GetArcSegmentCount(theta);
   p=primitive_info;
   {
     const ArcSegmentInput
