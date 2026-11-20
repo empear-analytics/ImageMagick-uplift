@@ -26666,6 +26666,113 @@ under the mandate of 2026-10-24.
 
 ---
 
+## Recipe DB - Merge Declaration Blocks of One Type
+
+**Use when:** CodeScene reports *Large Method* (or *Lines of Code in a Single File*), and
+the function's declarations hold two or more blocks with the same type line, each a type
+line followed by its declarators: `draw.c`'s `TraceArcPath`, whose earlier extractions
+left `double alpha, ..., theta;` and, further down, `double cosine, sine;`, and
+`PrimitiveInfo *primitive_info;` directly followed by `PrimitiveInfo *p;`. Each extra
+block costs its type line and the blank line after it.
+
+**Not covered by:** Recipes FI and FB, which turn a fill into an initialiser and move no
+other declaration; Recipe IC, which inlines a cast-only local; Recipe L, which hoists
+types, not variables. Nothing else in the catalogue edits a declaration list without
+moving code.
+
+**How:**
+
+1. The blocks stand in one declaration list (the declarations at the top of one compound
+   statement, before its first statement), and their type lines are the same text, token
+   for token (qualifiers and `magick_restrict` included; `const double` and `double` are
+   different types). A declarator's pointer stars stay on the declarator.
+2. No declarator of the later block has an initialiser, or every initialiser in both
+   blocks and between them is a constant expression: moving the later block's
+   declarators then changes no order of evaluation (C11 6.7.9p23: an automatic
+   object's initialiser runs when its declaration is reached, in order).
+3. No declaration between the two blocks names a declarator of the later block (in a
+   `sizeof`, an initialiser or an array bound), and no declarator of the later block has
+   the name of one between them (none can: they share one scope).
+4. Delete the later block (its type line, its declarators and the blank line after it) and
+   append its declarators, in their order and with their pointer stars, to the end of the
+   earlier block's declarator list, the earlier block's `;` becoming `,`.
+5. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert.
+6. All merges of one function go in one commit.
+
+**Before:**
+
+```c
+  double
+    alpha,
+    beta,
+    delta,
+    factor,
+    theta;
+
+  MagickStatusType
+    status;
+
+  PointInfo
+    center,
+    points[3],
+    radii;
+
+  double
+    cosine,
+    sine;
+
+  PrimitiveInfo
+    *primitive_info;
+
+  PrimitiveInfo
+    *p;
+```
+
+**After:**
+
+```c
+  double
+    alpha,
+    beta,
+    delta,
+    factor,
+    theta,
+    cosine,
+    sine;
+
+  MagickStatusType
+    status;
+
+  PointInfo
+    center,
+    points[3],
+    radii;
+
+  PrimitiveInfo
+    *primitive_info,
+    *p;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A declaration without an initialiser creates an object of
+  automatic storage duration whose lifetime is the whole block (C11 6.2.4p6), wherever in
+  the block's declaration list it stands, and it has no value until assigned; with only
+  constant initialisers nothing is evaluated in a different order. The names, types and
+  scope of every object are the same.
+- Identical object code under the oracle build's flags proves the step for this build.
+- The style rule of the file (one block per type, type line then indented declarators)
+  is kept; the merged block is ordered as the two blocks were read top to bottom.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`.
+
+**Provenance:** 2026-11-21, from `draw.c`'s `TraceArcPath` (campaign B, M141): after
+Recipes E and N took its radii scaling and segment loop, the function stood at 77 lines,
+four of them the type and blank lines of two second blocks. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27246,3 +27353,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | CM | Name a Clamp Selection: assignments `t=A < 0.0 ? 0.0 : A >= E ? L : A;` with side-effect-free `double` operands become `t=ClampBoundsCoordinate(A,E,L);`, one `static inline` helper; object code identical or differing only in register choice | `draw-primitive.c`'s `ClampPolygonBounds` (cc 9 from four clamps; probe 3.60 to 3.67, out of *Complex Method*); campaign B, M141 | mandate (2026-10-24) |
 | 2026-11-20 | NEW | SL | Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants: two `switch`es whose cases are the same text up to the struct local they fill, the controlling expression and some constants, with the same leaving `default:`, become one `static MagickBooleanType` helper taking `T *info`, the value, the read locals and a `const` struct of role constants (read as `roles->r`), split into a chain when it would be a finding; each `switch` becomes the call with `== MagickFalse` running the original exit | `profile.c`'s `ProfileImage` (campaign B, M141): the source and target colour-space switches; a probe 7.41 to 8.17, cc 49 to 29 | mandate (2026-10-24) |
 | 2026-11-21 | NEW | TG | Guard a Loop's Tail Block with a Continue: a loop body's last statement `if (c) { S }`, no `else`, whose `S` nests the bump, becomes `if (<inverse>) continue;` followed by `S` one level out; `continue` goes where falling off the body went; proof `obj_identical.sh` IDENTICAL; a step lowering the function's cc goes first when the `continue` would raise it into *Complex Method* | `constitute-write.c`'s `WriteImages` (campaign B, M141): the progress block's nested `break`; a probe after a Recipe E step, 9.92 to 10.0 | mandate (2026-10-24) |
+| 2026-11-21 | NEW | DB | Merge Declaration Blocks of One Type: a later declaration block whose type line equals an earlier one's in the same declaration list (no initialisers, or only constant ones, and no name between them that refers to its declarators) is deleted and its declarators appended to the earlier block; proof `obj_identical.sh` IDENTICAL | `draw.c`'s `TraceArcPath` (campaign B, M141): two second blocks (`double`, `PrimitiveInfo *`) left by earlier extractions, four lines of a Large Method | mandate (2026-10-24) |
