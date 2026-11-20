@@ -350,9 +350,21 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplyShadeToImage(Display *display,XWindows *windows,
-  char *geometry,Image **image,int status,ExceptionInfo *exception)
+static void XApplyShadeToImage(const XMagickCommandContext *context,
+  char *geometry,int status)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -414,7 +426,7 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   /*
     Shade image pixels.
   */
-  XApplyShadeToImage(display,windows,geometry,image,status,exception);
+  XApplyShadeToImage(context,geometry,status);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
