@@ -21328,8 +21328,10 @@ static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
   XTrackScreenMagnify(event,windows,display,exception);
 }
 
-static void XScreenUnmap(Display *display,XWindows *windows,XEvent *event)
+static void XScreenUnmap(Display *magick_unused(display),XWindows *windows,
+  XEvent *event)
 {
+  magick_unreferenced(display);
   if (event->xunmap.window == windows->magnify.id)
     {
       windows->magnify.mapped=MagickFalse;
