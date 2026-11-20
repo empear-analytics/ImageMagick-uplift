@@ -65,6 +65,7 @@
 #include "MagickCore/widget-private.h"
 #include "MagickCore/widget-core-private.h"
 #include "MagickCore/widget-browser-private.h"
+#include "MagickCore/widget-list-entries-private.h"
 #include "MagickCore/widget-list-actions-private.h"
 #if defined(MAGICKCORE_X11_DELEGATE)
 
