@@ -191,6 +191,9 @@ static MagickStatusType XDrawElementImage(const DrawEditContext *context,
   XWindows
     *const windows = context->windows;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   {
@@ -203,7 +206,7 @@ static MagickStatusType XDrawElementImage(const DrawEditContext *context,
   /*
     Update image colormap and return to image drawing.
   */
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
   return(status);
 }
@@ -319,8 +322,12 @@ static void XMapDrawCommandWidget(Display *display,XWindows *windows,
   windows->command.data=4;
   (void) XCommandWidget(display,windows,DrawMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static MagickBooleanType XAcquireDrawCoordinates(ExceptionInfo *exception,
@@ -849,6 +856,9 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   Image
     *cache_image;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Undo the last image transformation.
   */
@@ -878,7 +888,7 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   cache_image=DestroyImage(cache_image);
   if (windows->image.orphan != MagickFalse)
     return;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -927,6 +937,9 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   ExceptionInfo
     *const exception = cache_context->exception;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (command == RedoCommand)
     {
       /*
@@ -948,7 +961,7 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
       (*redo_image)=NewImageList();
       if (windows->image.orphan != MagickFalse)
         return;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+      XConfigureImageColormap(&cmap_target,*image,exception);
       (void) XConfigureImage(display,resource_info,windows,*image,exception);
       return;
     }
@@ -1580,8 +1593,12 @@ static void XApplyNextCommand(const XMagickCommandContext *context)
     Display next image.
   */
   for (i=0; i < resource_info->quantum; i++)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_next_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
 }
 
 static void XApplyFormerCommand(const XMagickCommandContext *context)
@@ -1602,8 +1619,12 @@ static void XApplyFormerCommand(const XMagickCommandContext *context)
     Display former image.
   */
   for (i=0; i < resource_info->quantum; i++)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_former_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_former_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
 }
 
 static Image *XApplySelectCommand(const XMagickCommandContext *context)

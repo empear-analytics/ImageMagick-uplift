@@ -313,9 +313,13 @@ static MagickStatusType XConfigureMagnifyWindow(
   if (windows->magnify.mapped != MagickFalse &&
       windows->magnify.stasis != MagickFalse)
     {
-      status=XMakeImage(display,resource_info,&windows->magnify,
-        display_image,windows->magnify.width,windows->magnify.height,
-        exception);
+      {
+        const XMakeImageRequest
+          image_request = { &windows->magnify, display_image,
+            windows->magnify.width, windows->magnify.height };
+
+        status=XMakeImage(display,resource_info,&image_request,exception);
+      }
       XMakeMagnifyImage(display,windows,exception);
     }
   return(status);
@@ -965,9 +969,11 @@ static void XUnmapIconWindow(const DisplayEventContext *context,
   XPixelInfo
     *const icon_pixel = context->icon_pixel;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (map_info->colormap == icon_map->colormap)
-    XConfigureImageColormap(display,resource_info,windows,
-      display_image,exception);
+    XConfigureImageColormap(&cmap_target,display_image,exception);
   (void) XFreeStandardColormap(display,icon_visual,icon_map,
     icon_pixel);
   windows->icon.mapped=MagickFalse;
@@ -1086,6 +1092,9 @@ static void XMakeBackdropWindow(XResourceInfo *resource_info,XWindows *windows,
   Display *display,XVisualInfo *visual_info,XWMHints *manager_hints,
   Window root_window,char **argv,int argc,XClassHint *class_hints)
 {
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
     {
       /*
@@ -1110,8 +1119,7 @@ static void XMakeBackdropWindow(XResourceInfo *resource_info,XWindows *windows,
       manager_hints->input=MagickTrue;
       manager_hints->initial_state=resource_info->iconic ? IconicState :
         NormalState;
-      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-        &windows->backdrop);
+      XMakeWindow(display,root_window,&hints,&windows->backdrop);
       if (resource_info->debug != MagickFalse)
         (void) LogMagickEvent(X11Event,GetMagickModule(),
           "Window id: 0x%lx (backdrop)",windows->backdrop.id);
@@ -1220,6 +1228,9 @@ static void XMakeImageWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   manager_hints->flags=IconWindowHint | InputHint | StateHint;
   manager_hints->icon_window=windows->icon.id;
   manager_hints->input=MagickTrue;
@@ -1228,7 +1239,7 @@ static void XMakeImageWindow(const DisplayEventContext *context)
   XFollowGroupLeader(windows,manager_hints,display,resource_info);
   XMakeWindow(display,
     (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
-    argv,argc,class_hints,manager_hints,&windows->image);
+    &hints,&windows->image);
   (void) XChangeProperty(display,windows->image.id,windows->im_protocols,
     XA_STRING,8,PropModeReplace,(unsigned char *) NULL,0);
   if (windows->group_leader.id != (Window) NULL)

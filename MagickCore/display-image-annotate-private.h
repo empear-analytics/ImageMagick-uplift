@@ -261,20 +261,17 @@ static MagickBooleanType XColorEditPixels(
       PixelInfo
         target;
 
-      XReplaceColorInput
-        replace;
-
       /*
         Update color information using replace algorithm.
       */
       (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
         x_offset,(ssize_t) y_offset,&target,exception);
-      replace.image=image;
-      replace.image_view=image_view;
-      replace.target=target;
-      replace.color=color;
-      replace.exception=exception;
-      XReplaceImageColor(&replace);
+      {
+        const XReplaceColorInput replace = { image, image_view, target, color,
+          exception };
+
+        XReplaceImageColor(&replace);
+      }
       break;
     }
     case FloodfillMethod:
@@ -439,8 +436,12 @@ static void XSelectPenColor(const EditMenuInput *menu,
   */
   (void) XParseColor(display,windows->map_info->colormap,
     resource_info->pen_colors[pen_number],color);
-  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-    (unsigned int) MaxColors,color);
+  {
+    const XBestPixelTarget
+      pixel_target = { display, windows->map_info->colormap };
+
+    XBestPixel(&pixel_target,(XColor *) NULL,(unsigned int) MaxColors,color);
+  }
   windows->pixel_info->pen_colors[pen_number]=(*color);
   (*pen_id)=(unsigned int) pen_number;
 }
@@ -745,8 +746,12 @@ static void XColorEditRelease(const ColorEditContext *context,
   */
   (*x)=(*event).xbutton.x;
   (*y)=(*event).xbutton.y;
-  XConfigureImageColormap(context->display,context->resource_info,
-    context->windows,*context->image,context->exception);
+  {
+    const XImageColormapTarget cmap_target = { context->display,
+      context->resource_info, context->windows };
+
+    XConfigureImageColormap(&cmap_target,*context->image,context->exception);
+  }
   (void) XConfigureImage(context->display,context->resource_info,
     context->windows,*context->image,context->exception);
   XInfoWidget(context->display,context->windows,context->text);
@@ -987,8 +992,21 @@ static void XMapColorEditCommand(Display *display,XWindows *windows)
   windows->command.data=4;
   (void) XCommandWidget(display,windows,ColorEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
+}
+
+static void XReleaseColorEditCursor(Display *display,XWindows *windows,
+  Cursor cursor)
+{
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XFreeCursor(display,cursor);
 }
 
 
@@ -1082,8 +1100,14 @@ static MagickBooleanType XColorEditImage(Display *display,
   /*
     Make cursor.
   */
-  cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
-    resource_info->background_color,resource_info->foreground_color);
+  {
+    const XCursorColors
+      cursor_colors = { resource_info->background_color,
+        resource_info->foreground_color };
+
+    cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
+      &cursor_colors);
+  }
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
   /*
     Track pointer until button 1 is pressed.
@@ -1110,10 +1134,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     if (XColorEditStep(&context,&targets) == MagickFalse)
       return(MagickFalse);
   } while ((state & ExitState) == 0);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XFreeCursor(display,cursor);
+  XReleaseColorEditCursor(display,windows,cursor);
   return(MagickTrue);
 }
 typedef struct _ComposeMenuInfo
@@ -1356,12 +1377,9 @@ static MagickBooleanType XCompositeCommandBlock(
       {
         case CompositeOperatorsCommand:
         {
-          ComposeMenuInfo
-            menu_info;
+          const ComposeMenuInfo
+            menu_info = { display, windows, id };
 
-          menu_info.display=display;
-          menu_info.windows=windows;
-          menu_info.id=id;
           (*compose)=XSelectPasteOperator(&menu_info,CompositeMenu,(*compose));
           break;
         }

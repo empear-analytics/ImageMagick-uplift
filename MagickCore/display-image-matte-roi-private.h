@@ -180,8 +180,13 @@ static void XMakePanImage(Display *display,XResourceInfo *resource_info,
   XCheckRefreshWindows(display,windows);
   windows->pan.x=(int) windows->image.x;
   windows->pan.y=(int) windows->image.y;
-  status=XMakeImage(display,resource_info,&windows->pan,image,
-    windows->pan.width,windows->pan.height,exception);
+  {
+    const XMakeImageRequest
+      image_request = { &windows->pan, image, windows->pan.width,
+        windows->pan.height };
+
+    status=XMakeImage(display,resource_info,&image_request,exception);
+  }
   if (status == MagickFalse)
     ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
@@ -1184,6 +1189,9 @@ static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
   size_t
     *const state = targets->state;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if ((*event).xbutton.button != Button1)
     return;
   if (((*event).xbutton.window != windows->image.id) &&
@@ -1194,7 +1202,7 @@ static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
   */
   (*x)=(*event).xbutton.x;
   (*y)=(*event).xbutton.y;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
   XInfoWidget(display,windows,input->text);
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
@@ -1317,6 +1325,21 @@ static const ModeType
     MatteEditDismissCommand
   };
 
+static void XMapMatteEditCommand(Display *display,XWindows *windows,
+  const char *const *MatteEditMenu)
+{
+  (void) CloneString(&windows->command.name,"Matte Edit");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,MatteEditMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -1374,17 +1397,18 @@ static MagickBooleanType XMatteEditImage(Display *display,
   /*
     Map Command widget.
   */
-  (void) CloneString(&windows->command.name,"Matte Edit");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,MatteEditMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapMatteEditCommand(display,windows,MatteEditMenu);
   /*
     Make cursor.
   */
-  cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
-    resource_info->background_color,resource_info->foreground_color);
+  {
+    const XCursorColors
+      cursor_colors = { resource_info->background_color,
+        resource_info->foreground_color };
+
+    cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
+      &cursor_colors);
+  }
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
   /*
     Track pointer until button 1 is pressed.
@@ -1603,8 +1627,12 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (nexus != (Image *) NULL)
-    XClientMessage(display,windows->image.id,windows->im_protocols,
-      windows->im_next_image,CurrentTime);
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
   else
     {
       char
@@ -2089,6 +2117,9 @@ static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
     height,
     width;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -2125,7 +2156,7 @@ static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
   /*
     Update image colormap.
   */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  XConfigureImageColormap(&cmap_target,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
 }
@@ -2490,8 +2521,12 @@ static MagickBooleanType XPasteImage(Display *display,
   windows->command.data=1;
   (void) XCommandWidget(display,windows,PasteMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */
@@ -3098,6 +3133,9 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (((*state) & UpdateRegionState) != 0)
     {
       (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -3118,8 +3156,7 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
       }
       if (display_command != InfoCommand)
         {
-          XConfigureImageColormap(display,resource_info,windows,*image,
-            exception);
+          XConfigureImageColormap(&cmap_target,*image,exception);
           (void) XConfigureImage(display,resource_info,windows,*image,
             exception);
         }

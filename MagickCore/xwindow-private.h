@@ -494,8 +494,15 @@ typedef struct _XWindows
     dnd_protocols;
 } XWindows;
 
+typedef struct _XCursorColors
+{
+  char
+    *background_color,
+    *foreground_color;
+} XCursorColors;
+
 extern MagickPrivate Cursor
-  XMakeCursor(Display *,Window,Colormap,char *,char *);
+  XMakeCursor(Display *,Window,Colormap,const XCursorColors *);
 
 extern MagickPrivate int
   XCheckDefineCursor(Display *,Window,Cursor);
@@ -509,6 +516,19 @@ typedef struct _XImageRenderTarget
     *pixel;
 } XImageRenderTarget;
 
+typedef struct _XMakeImageRequest
+{
+  XWindowInfo
+    *window;
+
+  Image
+    *image;
+
+  unsigned int
+    width,
+    height;
+} XMakeImageRequest;
+
 extern MagickPrivate MagickBooleanType
   XAnnotateImage(const XImageRenderTarget *,XAnnotateInfo *,Image *,
     ExceptionInfo *),
@@ -517,8 +537,8 @@ extern MagickPrivate MagickBooleanType
   XGetWindowColor(Display *,XWindows *,char *,ExceptionInfo *),
   XMagickProgressMonitor(const char *,const MagickOffsetType,
     const MagickSizeType,void *),
-  XMakeImage(Display *,const XResourceInfo *,XWindowInfo *,Image *,unsigned int,
-    unsigned int,ExceptionInfo *),
+  XMakeImage(Display *,const XResourceInfo *,const XMakeImageRequest *,
+    ExceptionInfo *),
   XQueryColorCompliance(const char *,XColor *);
 
 typedef struct _XDisplayImageInfoTarget
@@ -545,13 +565,77 @@ typedef struct _XPixelInfoSource
     *resource_info;
 } XPixelInfoSource;
 
+typedef struct _XMakeWindowHints
+{
+  char
+    **argv;
+
+  int
+    argc;
+
+  XClassHint
+    *class_hint;
+
+  XWMHints
+    *manager_hints;
+} XMakeWindowHints;
+
+typedef struct _XImageColormapTarget
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} XImageColormapTarget;
+
+typedef struct _XClientReason
+{
+  Atom
+    reason;
+
+  Time
+    timestamp;
+} XClientReason;
+
+typedef struct _XBestPixelTarget
+{
+  Display
+    *display;
+
+  Colormap
+    colormap;
+} XBestPixelTarget;
+
+typedef struct _XStandardColormapRequest
+{
+  XVisualInfo
+    *visual_info;
+
+  XResourceInfo
+    *resource_info;
+
+  Image
+    *image;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+} XStandardColormapRequest;
+
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
-  XBestPixel(Display *,const Colormap,XColor *,unsigned int,XColor *),
+  XBestPixel(const XBestPixelTarget *,XColor *,unsigned int,XColor *),
   XCheckRefreshWindows(Display *,XWindows *),
-  XClientMessage(Display *,const Window,const Atom,const Atom,const Time),
+  XClientMessage(Display *,const Window,const Atom,
+    const XClientReason *),
   XComponentTerminus(void),
-  XConfigureImageColormap(Display *,XResourceInfo *,XWindows *,Image *,
+  XConfigureImageColormap(const XImageColormapTarget *,Image *,
     ExceptionInfo *),
   XConstrainWindowPosition(Display *,XWindowInfo *),
   XDelay(Display *,const size_t),
@@ -571,10 +655,9 @@ extern MagickPrivate void
   XGetWindowInfo(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,
     XFontStruct *,XResourceInfo *,XWindowInfo *),
   XMakeMagnifyImage(Display *,XWindows *,ExceptionInfo *),
-  XMakeStandardColormap(Display *,XVisualInfo *,XResourceInfo *,Image *,
-    XStandardColormap *,XPixelInfo *,ExceptionInfo *),
-  XMakeWindow(Display *,Window,char **,int,XClassHint *,XWMHints *,
-    XWindowInfo *),
+  XMakeStandardColormap(Display *,const XStandardColormapRequest *,
+    ExceptionInfo *),
+  XMakeWindow(Display *,Window,const XMakeWindowHints *,XWindowInfo *),
   XQueryPosition(Display *,const Window,int *,int *),
   XRefreshWindow(Display *,const XWindowInfo *,const XEvent *),
   XSetCursorState(Display *,XWindows *,const MagickStatusType),

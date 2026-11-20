@@ -260,16 +260,11 @@ static void XHandleMapNotify(const AnimateEventContext *event_context,
     }
   if (event.xmap.window == windows->image.id)
     {
-      AnimateImageWindow
-        image_window;
+      const AnimateImageWindow
+        image_window = { display, resource_info, windows,
+          event_context->map_info, event_context->image_list,
+          event_context->display_image, event_context->exception };
 
-      image_window.display=display;
-      image_window.resource_info=resource_info;
-      image_window.windows=windows;
-      image_window.map_info=event_context->map_info;
-      image_window.image_list=event_context->image_list;
-      image_window.display_image=event_context->display_image;
-      image_window.exception=event_context->exception;
       XMapAnimateImageWindow(&image_window,nexus,image,state);
       return;
     }
@@ -283,13 +278,23 @@ static void XHandleMapNotify(const AnimateEventContext *event_context,
       /*
         Create an icon image.
       */
-      XMakeStandardColormap(display,event_context->icon_visual,
-        event_context->icon_resources,event_context->display_image,
-        event_context->icon_map,event_context->icon_pixel,
-        event_context->exception);
-      (void) XMakeImage(display,event_context->icon_resources,&windows->icon,
-        event_context->display_image,windows->icon.width,windows->icon.height,
-        event_context->exception);
+      {
+        const XStandardColormapRequest
+          colormap_request = { event_context->icon_visual,
+            event_context->icon_resources, event_context->display_image,
+            event_context->icon_map, event_context->icon_pixel };
+
+        XMakeStandardColormap(display,&colormap_request,
+          event_context->exception);
+      }
+      {
+        const XMakeImageRequest
+          image_request = { &windows->icon, event_context->display_image,
+            windows->icon.width, windows->icon.height };
+
+        (void) XMakeImage(display,event_context->icon_resources,&image_request,
+          event_context->exception);
+      }
       (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
         windows->icon.pixmap);
       (void) XClearWindow(display,windows->icon.id);
@@ -832,8 +837,13 @@ static void XCreateSceneWindows(const AnimateEventContext *event_context,
         (image_list[scene]->rows != rows))
       ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
         image_list[scene]->filename);
-    status=XMakeImage(display,resource_info,&windows->image,image_list[scene],
-      columns,rows,exception) == MagickFalse ? 0 : 1;
+    {
+      const XMakeImageRequest
+        image_request = { &windows->image, image_list[scene], columns, rows };
+
+      status=XMakeImage(display,resource_info,&image_request,
+        exception) == MagickFalse ? 0 : 1;
+    }
     if (status == MagickFalse)
       ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
         images->filename);
@@ -1123,6 +1133,9 @@ static void XCreateContextWindow(const AnimateWindowSetup *setup)
   const int
     argc = setup->argc;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   /*
     Initialize graphic context.
   */
@@ -1136,8 +1149,7 @@ static void XCreateContextWindow(const AnimateWindowSetup *setup)
   manager_hints->flags=InputHint | StateHint;
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=WithdrawnState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->context);
+  XMakeWindow(display,root_window,&hints,&windows->context);
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Window id: 0x%lx (context)",windows->context.id);
@@ -1184,6 +1196,9 @@ static void XCreateIconWindow(const AnimateWindowSetup *setup)
   Image
     *const display_image = setup->display_image;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   /*
     Initialize icon window.
   */
@@ -1197,8 +1212,7 @@ static void XCreateIconWindow(const AnimateWindowSetup *setup)
   manager_hints->flags=InputHint | StateHint;
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=IconicState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->icon);
+  XMakeWindow(display,root_window,&hints,&windows->icon);
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (icon)",
       windows->icon.id);
@@ -1239,6 +1253,9 @@ static void XCreateInfoWindow(const AnimateWindowSetup *setup)
   const int
     argc = setup->argc;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   /*
     Initialize Info widget.
   */
@@ -1257,8 +1274,7 @@ static void XCreateInfoWindow(const AnimateWindowSetup *setup)
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,windows->image.id,argv,argc,class_hints,manager_hints,
-    &windows->info);
+  XMakeWindow(display,windows->image.id,&hints,&windows->info);
   windows->info.highlight_stipple=XCreateBitmapFromData(display,
     windows->info.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
   windows->info.shadow_stipple=XCreateBitmapFromData(display,
@@ -1312,6 +1328,9 @@ static void XCreateCommandWindow(const AnimateWindowSetup *setup)
   char
     resource_name[MagickPathExtent];
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   /*
     Initialize Command widget.
   */
@@ -1333,8 +1352,7 @@ static void XCreateCommandWindow(const AnimateWindowSetup *setup)
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->command);
+  XMakeWindow(display,root_window,&hints,&windows->command);
   windows->command.highlight_stipple=XCreateBitmapFromData(display,
     windows->command.id,(char *) HighlightBitmap,HighlightWidth,
     HighlightHeight);

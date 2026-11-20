@@ -2113,6 +2113,14 @@ merges code, not parameters.
    two lines and 8.42 with the block form, and stays 8.46 in one; precedent for the
    declaration: `compare-similarity-image.c`'s `const SimilarityRow row = {...}`). Only
    the layout of these lines changes; the tokens are those of the two-line form.
+   The same one-line declaration may stand as the one declaration of the block form
+   below, and in either form it is also allowed when the two-line form would carry the
+   file past CodeScene's *Lines of Code in a Single File* bar enough to lower it
+   (mandate (2026-11-19), please confirm; `display-image-annotate-private.h`, 9.09 ->
+   8.54 with the two-line block form of `XConfigureImageColormap`'s call in
+   `XColorEditRelease`, 9.09 with one line): the file-level count reads the same lines
+   the function-level one does, and the tokens, their order and the evaluation stay
+   those of the two-line form.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
    Form for a call in a loop (2026-11-05): when the calls stand in the body of a loop of
@@ -26895,3 +26903,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | LM | Step 7, initialiser form: the copies may be the initialiser of a `const` struct declared in a block of its own whose only statement is the call that reads it; the struct is then declared, not `const`, among the declarations, initialised with the chosen locals' constants and the parameters it copied, each other local copied by `s.m=v;` where the block stood, and the block becomes the call; a local that text no build compiles names (a Recipe UB fragment) is not chosen | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the cleanup's `EqualizeBuffers` initialiser; a probe 77 to 69 lines, 8.98 to 9.38 | mandate (2026-11-19) |
 | 2026-11-20 | WORDING | JN | Step 1: the closing braces between the statement and `L:` exclude the closing brace of a `for`, `while` or `do` body, which returns to the loop head, so the test still decides something | Review of W50 lane c batch 1 (main session): the first wording let a jump out of a loop body's last statement count as a jump to the next point of execution; `835880ade` (no loop around it) is unaffected | mandate (2026-11-19) |
 | 2026-11-20 | NEW | DC | Run Twin Dialog Commands Through One Runner Taking a Command Struct: `static` dialog commands that differ only in the dialog's title and prompt literals, the `static char` reply buffer each owns and the function applied to the reply keep their buffers and pass a `const` struct `{ { title, prompt, buffer }, callee }` to one runner, which calls the callee through a method of the callees' exact type | `display-image-apply-effects-private.h` (7.32; campaign A, W50 round 37, lane b): about twenty `XApply*Command` copies of one dialog-apply-refresh body; CF refuses the differing literals and buffers. First use, the eight `flags` commands: 2249 to 2079 lines, score flat, the callees left with one type for a one-commit Recipe B through the method table | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | B | Step 5, one-line form: the one-line `const` declaration may also be the one declaration of the block form, and in either form it is allowed when the two-line form would carry the file past *Lines of Code in a Single File* enough to lower it, not only when it would make a *Large Method*; tokens, order and evaluation those of the two-line form | `XConfigureImageColormap`'s call in `display-image-annotate-private.h`'s `XColorEditRelease` (campaign A, W50 round 37, lane a): 9.09 -> 8.54 in a probe with the two-line block form, 9.09 with one line | mandate (2026-11-19) |

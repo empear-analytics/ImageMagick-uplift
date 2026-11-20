@@ -268,6 +268,9 @@ char
 const int
     argc = setup->argc;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
     setup->font_info,resource_info,&windows->backdrop);
   if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
@@ -294,8 +297,7 @@ const int
       manager_hints->input=MagickTrue;
       manager_hints->initial_state=
         resource_info->iconic ? IconicState : NormalState;
-      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-        &windows->backdrop);
+      XMakeWindow(display,root_window,&hints,&windows->backdrop);
       if (resource_info->debug != MagickFalse)
         (void) LogMagickEvent(X11Event,GetMagickModule(),
           "Window id: 0x%lx (backdrop)",windows->backdrop.id);
@@ -329,6 +331,9 @@ char
 const int
     argc = setup->argc;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   manager_hints->flags=IconWindowHint | InputHint | StateHint;
   manager_hints->icon_window=windows->icon.id;
   manager_hints->input=MagickTrue;
@@ -348,7 +353,7 @@ const int
     }
   XMakeWindow(display,
     (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
-    argv,argc,class_hints,manager_hints,&windows->image);
+    &hints,&windows->image);
   (void) XChangeProperty(display,windows->image.id,windows->im_protocols,
     XA_STRING,8,PropModeReplace,(unsigned char *) NULL,0);
   if (windows->group_leader.id != (Window) NULL)
@@ -388,6 +393,9 @@ char
 const int
     argc = setup->argc;
 
+  const XMakeWindowHints
+    hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
     setup->font_info,resource_info,&windows->widget);
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
@@ -404,8 +412,7 @@ const int
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->widget);
+  XMakeWindow(display,root_window,&hints,&windows->widget);
   windows->widget.highlight_stipple=XCreateBitmapFromData(display,
     windows->widget.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
   windows->widget.shadow_stipple=XCreateBitmapFromData(display,
@@ -428,8 +435,7 @@ const int
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->popup);
+  XMakeWindow(display,root_window,&hints,&windows->popup);
   windows->popup.highlight_stipple=XCreateBitmapFromData(display,
     windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
   windows->popup.shadow_stipple=XCreateBitmapFromData(display,
@@ -1195,8 +1201,13 @@ static Image *XStartAnimateSession(const AnimateStartInputs *start)
   scene_list.exception=exception;
   display_image=XPrepareSceneImages(&scene_list);
   XLogDisplayImage(resource_info,display_image);
-  XMakeStandardColormap(display,start->visual_info,resource_info,display_image,
-    start->map_info,start->pixel,exception);
+  {
+    const XStandardColormapRequest
+      colormap_request = { start->visual_info, resource_info, display_image,
+        start->map_info, start->pixel };
+
+    XMakeStandardColormap(display,&colormap_request,exception);
+  }
   {
     const AnimateWindowSetup
       setup = { display, resource_info, start->windows, start->visual_info,

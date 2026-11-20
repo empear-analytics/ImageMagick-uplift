@@ -219,6 +219,9 @@ static MagickBooleanType XCompositeIntoImage(
   XWindows
     *const windows = input->windows;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   /*
     Image compositing is relative to image configuration.
   */
@@ -259,7 +262,7 @@ static MagickBooleanType XCompositeIntoImage(
   /*
     Update image configuration.
   */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  XConfigureImageColormap(&cmap_target,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
 }
@@ -388,8 +391,11 @@ static MagickBooleanType XCompositeImage(Display *display,
   windows->command.data=1;
   (void) XCommandWidget(display,windows,CompositeEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */
@@ -621,8 +627,13 @@ static MagickBooleanType XConfigureImage(Display *display,
   windows->image.x=((int) width*windows->image.x/windows->image.ximage->width);
   windows->image.y=((int) height*windows->image.y/
     windows->image.ximage->height);
-  status=XMakeImage(display,resource_info,&windows->image,image,
-    (unsigned int) width,(unsigned int) height,exception);
+  {
+    const XMakeImageRequest
+      image_request = { &windows->image, image, (unsigned int) width,
+        (unsigned int) height };
+
+    status=XMakeImage(display,resource_info,&image_request,exception);
+  }
   if (status == MagickFalse)
     XNoticeWidget(display,windows,"Unable to configure X image:",
       windows->image.name);
@@ -1934,8 +1945,13 @@ static MagickBooleanType XCropCopyImage(const CropContext *context,Image *image,
   /*
     Update image configuration.
   */
-  XConfigureImageColormap(context->display,context->resource_info,
-    context->windows,image,context->exception);
+  {
+    const XImageColormapTarget
+      cmap_target = { context->display, context->resource_info,
+        context->windows };
+
+    XConfigureImageColormap(&cmap_target,image,context->exception);
+  }
   (void) XConfigureImage(context->display,context->resource_info,
     context->windows,image,context->exception);
   return(MagickTrue);
@@ -1977,8 +1993,11 @@ static void XMapCropCommand(Display *display,XWindows *windows,
   windows->command.data=0;
   (void) XCommandWidget(display,windows,CropModeMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 static void XSetCropCommandName(XWindows *windows,const ClipboardMode mode)
@@ -2280,8 +2299,12 @@ static void XSelectDrawColor(const DrawEditContext *context,const int id,
   */
   (void) XParseColor(display,windows->map_info->colormap,
     resource_info->pen_colors[pen_number],&color);
-  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-    (unsigned int) MaxColors,&color);
+  {
+    const XBestPixelTarget
+      pixel_target = { display, windows->map_info->colormap };
+
+    XBestPixel(&pixel_target,(XColor *) NULL,(unsigned int) MaxColors,&color);
+  }
   windows->pixel_info->pen_colors[pen_number]=color;
   (*pen_id)=(unsigned int) pen_number;
   (*draw_info).stencil=OpaqueStencil;

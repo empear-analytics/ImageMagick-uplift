@@ -197,8 +197,11 @@ static MagickBooleanType XROIImage(Display *display,
   windows->command.data=0;
   (void) XCommandWidget(display,windows,ROIMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  {
+    const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   /*
     Track pointer until button 1 is pressed.
   */
@@ -373,8 +376,12 @@ static void XSelectRotatePenColor(const RotatePenMenu *menu,
   */
   (void) XParseColor(display,windows->map_info->colormap,
     resource_info->pen_colors[pen_number],&color);
-  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-    (unsigned int) MaxColors,&color);
+  {
+    const XBestPixelTarget
+      pixel_target = { display, windows->map_info->colormap };
+
+    XBestPixel(&pixel_target,(XColor *) NULL,(unsigned int) MaxColors,&color);
+  }
   windows->pixel_info->pen_colors[pen_number]=color;
   (*pen_id)=(unsigned int) pen_number;
 }
@@ -1024,8 +1031,11 @@ static MagickBooleanType XSelectRotateAngle(
       windows->command.data=2;
       (void) XCommandWidget(display,windows,RotateMenu,(XEvent *) NULL);
       (void) XMapRaised(display,windows->command.id);
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_update_widget,CurrentTime);
+      {
+        const XClientReason reason = { windows->im_update_widget, CurrentTime };
+
+        XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+      }
       /*
         Wait for first button press.
       */
@@ -1185,6 +1195,9 @@ static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
     x,
     y;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (windows->image.orphan != MagickFalse)
     return(MagickTrue);
   if (normalized_degrees != 0.0)
@@ -1204,7 +1217,7 @@ static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
           windows->image.window_changes.width=(int) (*width);
           windows->image.window_changes.height=(int) (*height);
         }
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+      XConfigureImageColormap(&cmap_target,*image,exception);
     }
   else
     if (((rotations % 4) == 1) || ((rotations % 4) == 3))

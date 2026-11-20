@@ -281,9 +281,15 @@ static unsigned int XQueryColormap(Display *display,const Colormap colormap,
   return(number_colors);
 }
 
-MagickPrivate void XBestPixel(Display *display,const Colormap colormap,
-  XColor *colors,unsigned int number_colors,XColor *color)
+MagickPrivate void XBestPixel(const XBestPixelTarget *target,XColor *colors,
+  unsigned int number_colors,XColor *color)
 {
+  Display
+    *const display = target->display;
+
+  const Colormap
+    colormap = target->colormap;
+
   MagickBooleanType
     query_server;
 
@@ -450,8 +456,14 @@ MagickPrivate void XCheckRefreshWindows(Display *display,XWindows *windows)
 %
 */
 MagickPrivate void XClientMessage(Display *display,const Window window,
-  const Atom protocol,const Atom reason,const Time timestamp)
+  const Atom protocol,const XClientReason *message)
 {
+  const Atom
+    reason = message->reason;
+
+  const Time
+    timestamp = message->timestamp;
+
   XClientMessageEvent
     client_event;
 
@@ -500,10 +512,18 @@ MagickPrivate void XClientMessage(Display *display,const Window window,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickPrivate void XConfigureImageColormap(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+MagickPrivate void XConfigureImageColormap(
+  const XImageColormapTarget *target,Image *image,ExceptionInfo *exception)
 {
+  Display
+    *const display = target->display;
+
+  XResourceInfo
+    *const resource_info = target->resource_info;
+
+  XWindows
+    *const windows = target->windows;
+
   Colormap
     colormap;
 
@@ -512,8 +532,13 @@ MagickPrivate void XConfigureImageColormap(Display *display,
   */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  XMakeStandardColormap(display,windows->visual_info,resource_info,image,
-    windows->map_info,windows->pixel_info,exception);
+  {
+    const XStandardColormapRequest
+      colormap_request = { windows->visual_info, resource_info, image,
+        windows->map_info, windows->pixel_info };
+
+    XMakeStandardColormap(display,&colormap_request,exception);
+  }
   colormap=windows->map_info->colormap;
   (void) XSetWindowColormap(display,windows->image.id,colormap);
   (void) XSetWindowColormap(display,windows->command.id,colormap);
@@ -523,8 +548,12 @@ MagickPrivate void XConfigureImageColormap(Display *display,
   if (windows->pan.mapped != MagickFalse)
     (void) XSetWindowColormap(display,windows->pan.id,colormap);
   XSetCursorState(display,windows,MagickFalse);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_colormap,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_update_colormap, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
 }
 
 /*
@@ -1266,12 +1295,16 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
 %
 */
 MagickPrivate Cursor XMakeCursor(Display *display,Window window,
-  Colormap colormap,char *background_color,char *foreground_color)
+  Colormap colormap,const XCursorColors *colors)
 {
 #define scope_height 17
 #define scope_x_hot 8
 #define scope_y_hot 8
 #define scope_width 17
+
+  char
+    *const background_color = colors->background_color,
+    *const foreground_color = colors->foreground_color;
 
   static const unsigned char
     scope_bits[] =
@@ -1961,9 +1994,16 @@ static void XAssignWindowImage(XWindowInfo *window,Image *image)
 }
 
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
-  const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
-  unsigned int width,unsigned int height,ExceptionInfo *exception)
+  const XResourceInfo *resource_info,const XMakeImageRequest *request,
+  ExceptionInfo *exception)
 {
+  XWindowInfo
+    *const window = request->window;
+
+  unsigned int
+    width = request->width,
+    height = request->height;
+
   int
     depth,
     format;
@@ -1973,9 +2013,6 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 
   XMakeImageSource
     source;
-
-  XWindowTransform
-    transform;
 
   assert(display != (Display *) NULL);
   assert(resource_info != (XResourceInfo *) NULL);
@@ -1992,16 +2029,15 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   (void) XCheckDefineCursor(display,window->id,window->busy_cursor);
   (void) XFlush(display);
   depth=(int) window->depth;
-  XAssignWindowImage(window,image);
+  XAssignWindowImage(window,request->image);
   if (window->image != (Image *) NULL)
     {
-      transform.display=display;
-      transform.window=window;
-      transform.image=image;
-      transform.width=width;
-      transform.height=height;
-      transform.exception=exception;
-      XTransformWindowImage(&transform);
+      {
+        const XWindowTransform transform = { display, window, request->image,
+          width, height, exception };
+
+        XTransformWindowImage(&transform);
+      }
       width=(unsigned int) window->image->columns;
       assert((size_t) width == window->image->columns);
       height=(unsigned int) window->image->rows;
@@ -5967,12 +6003,14 @@ static void XSetVisualPixels(const XBestPixelSource *source,
   ssize_t
     i;
 
+  const XBestPixelTarget pixel_target = { display, colormap };
+
   /*
     Set foreground, background, border, etc. pixels.
   */
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->foreground_color);
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->background_color);
   if (pixel->background_color.pixel == pixel->foreground_color.pixel)
     {
@@ -5984,24 +6022,24 @@ static void XSetVisualPixels(const XBestPixelSource *source,
         (~pixel->foreground_color.green);
       pixel->background_color.blue=
         (~pixel->foreground_color.blue);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+      XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
         &pixel->background_color);
     }
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->border_color);
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->matte_color);
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->highlight_color);
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->shadow_color);
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->depth_color);
-  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+  XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
     &pixel->trough_color);
   for (i=0; i < MaxNumberPens; i++)
   {
-    XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    XBestPixel(&pixel_target,colors,(unsigned int) number_colors,
       &pixel->pen_colors[i]);
     pixel->pixels[(ssize_t) image->colors+i]=pixel->pen_colors[i].pixel;
   }
@@ -6371,6 +6409,8 @@ static size_t XAllocSharedColors(const XSharedColormapSource *shared_source,
   XServerColorSource
     server_source;
 
+  const XBestPixelTarget pixel_target = { display, colormap };
+
   XRankColorDiversity(image,diversity,shared_source->exception);
   /*
     Allocate colors.
@@ -6410,8 +6450,8 @@ static size_t XAllocSharedColors(const XSharedColormapSource *shared_source,
     color.blue=ScaleQuantumToShort(
       XBlueGamma(image->colormap[index].blue));
     XApplyGrayVisual(visual_info,&color);
-    XBestPixel(display,colormap,server_colors,(unsigned int)
-      visual_info->colormap_size,&color);
+    XBestPixel(&pixel_target,server_colors,
+      (unsigned int) visual_info->colormap_size,&color);
     shared_source->pixel->pixels[index]=color.pixel;
     *p++=color;
   }
@@ -6908,9 +6948,20 @@ static void XDefineColormapColors(const XColormapContext *context,
 }
 
 MagickPrivate void XMakeStandardColormap(Display *display,
-  XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
-  XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
+  const XStandardColormapRequest *request,ExceptionInfo *exception)
 {
+  XVisualInfo
+    *const visual_info = request->visual_info;
+
+  Image
+    *const image = request->image;
+
+  XStandardColormap
+    *const map_info = request->map_info;
+
+  XPixelInfo
+    *const pixel = request->pixel;
+
   Colormap
     colormap;
 
@@ -6929,25 +6980,25 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   assert(display != (Display *) NULL);
   assert(visual_info != (XVisualInfo *) NULL);
   assert(map_info != (XStandardColormap *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
+  assert(request->resource_info != (XResourceInfo *) NULL);
   assert(pixel != (XPixelInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   context.display=display;
   context.visual_info=visual_info;
-  context.resource_info=resource_info;
+  context.resource_info=request->resource_info;
   context.image=image;
   context.map_info=map_info;
   context.pixel=pixel;
   context.exception=exception;
-  if (resource_info->map_type != (char *) NULL)
+  if (request->resource_info->map_type != (char *) NULL)
     {
       /*
         Standard Colormap is already defined (i.e. xstdcmap).
       */
       {
         const XPixelInfoSource
-          pixel_source = { visual_info, map_info, resource_info };
+          pixel_source = { visual_info, map_info, request->resource_info };
 
         XGetPixelInfo(display,&pixel_source,image,pixel);
       }
@@ -6957,7 +7008,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       LogXStandardColormap(map_info);
       return;
     }
-  XQuantizeToVisual(visual_info,resource_info,image,exception);
+  XQuantizeToVisual(visual_info,request->resource_info,image,exception);
   /*
     Free previous and create new colormap.
   */
@@ -6969,7 +7020,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   XGetMapInfo(visual_info,colormap,map_info);
   {
     const XPixelInfoSource
-      pixel_source = { visual_info, map_info, resource_info };
+      pixel_source = { visual_info, map_info, request->resource_info };
 
     XGetPixelInfo(display,&pixel_source,image,pixel);
   }
@@ -6980,14 +7031,9 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   if ((visual_info->klass != DirectColor) &&
       (visual_info->klass != TrueColor))
     {
-      XBestPixelSource
-        best_source;
+      const XBestPixelSource
+        best_source = { display, colormap, colors, number_colors, image };
 
-      best_source.display=display;
-      best_source.colormap=colormap;
-      best_source.colors=colors;
-      best_source.number_colors=number_colors;
-      best_source.image=image;
       XSetVisualPixels(&best_source,pixel);
     }
   colors=(XColor *) RelinquishMagickMemory(colors);
@@ -7246,11 +7292,22 @@ static void XQueryShapeSupport(Display *display,XWindowInfo *window_info)
 }
 #endif
 
-MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
-  int argc,XClassHint *class_hint,XWMHints *manager_hints,
-  XWindowInfo *window_info)
+MagickPrivate void XMakeWindow(Display *display,Window parent,
+  const XMakeWindowHints *hints,XWindowInfo *window_info)
 {
 #define MinWindowSize  64
+
+  char
+    **const argv = hints->argv;
+
+  const int
+    argc = hints->argc;
+
+  XClassHint
+    *const class_hint = hints->class_hint;
+
+  XWMHints
+    *const manager_hints = hints->manager_hints;
 
   int
     gravity;

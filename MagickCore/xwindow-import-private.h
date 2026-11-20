@@ -231,8 +231,13 @@ static inline MagickBooleanType XGrabTargetCursor(Display *display,
   Status
     status;
 
-  (*target_cursor)=XMakeCursor(display,root_window,XDefaultColormap(display,
-    XDefaultScreen(display)),(char * ) "white",(char * ) "black");
+  {
+    const XCursorColors
+      cursor_colors = { (char * ) "white", (char * ) "black" };
+
+    (*target_cursor)=XMakeCursor(display,root_window,XDefaultColormap(display,
+      XDefaultScreen(display)),&cursor_colors);
+  }
   status=XGrabPointer(display,root_window,MagickFalse,(unsigned int)
     (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask),GrabModeSync,
     GrabModeAsync,root_window,(*target_cursor),CurrentTime);

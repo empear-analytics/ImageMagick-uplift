@@ -108,8 +108,12 @@ static Image *XApplyNewCommand(const XMagickCommandContext *context,
   (void) CloneString(&image_info->size,geometry);
   nexus=ReadImage(image_info,exception);
   CatchException(exception);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_next_image,CurrentTime);
+  {
+    const XClientReason
+      reason = { windows->im_next_image, CurrentTime };
+
+    XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+  }
   return(nexus);
 }
 
@@ -144,6 +148,9 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
 
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
+
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
 
   /*
     Query user for shear color and geometry.
@@ -183,7 +190,7 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
     return;
   windows->image.window_changes.width=(int) (*image)->columns;
   windows->image.window_changes.height=(int) (*image)->rows;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
@@ -205,6 +212,9 @@ static void XApplyCropAndScale(char *image_geometry,
   ExceptionInfo
     *const exception = context->exception;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
     windows->image.ximage->width,windows->image.ximage->height);
   (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
@@ -214,7 +224,7 @@ static void XApplyCropAndScale(char *image_geometry,
       windows->image.crop_geometry);
   windows->image.x=0;
   windows->image.y=0;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  XConfigureImageColormap(&cmap_target,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 

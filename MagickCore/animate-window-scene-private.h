@@ -165,9 +165,11 @@ static void XReleaseIconColormap(const AnimateIconColormaps *icon_colormaps)
   XPixelInfo
     *const icon_pixel = icon_colormaps->icon_pixel;
 
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
   if (map_info->colormap == icon_map->colormap)
-    XConfigureImageColormap(display,resource_info,windows,
-      display_image,exception);
+    XConfigureImageColormap(&cmap_target,display_image,exception);
   (void) XFreeStandardColormap(display,icon_visual,icon_map,
     icon_pixel);
   windows->icon.mapped=MagickFalse;
@@ -636,8 +638,13 @@ static void XPauseAnimation(Display *display,XResourceInfo *resource_info,
         *(command+length)='\0';
         if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
           {
-            XClientMessage(display,windows->image.id,
-              windows->im_protocols,windows->im_exit,CurrentTime);
+            {
+              const XClientReason
+                reason = { windows->im_exit, CurrentTime };
+
+              XClientMessage(display,windows->image.id,windows->im_protocols,
+                &reason);
+            }
             break;
           }
       }
