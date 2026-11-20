@@ -951,17 +951,17 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
     if (closed_subpath != MagickFalse)
       {
         closed_subpath=MagickFalse;
-        continue;
       }
-    {
-      const OpenSubpathInput
-        open_subpath = { path_info, start, primitive_info[i].point, p };
+    else
+      {
+        const OpenSubpathInput
+          open_subpath = { path_info, start, primitive_info[i].point, p };
 
-      /*
-        Mark the p point as open if the subpath is not closed.
-      */
-      n=AppendOpenSubpathEnd(&open_subpath,n);
-    }
+        /*
+          Mark the p point as open if the subpath is not closed.
+        */
+        n=AppendOpenSubpathEnd(&open_subpath,n);
+      }
   }
   return(TerminatePathInfo(path_info,n));
 }
