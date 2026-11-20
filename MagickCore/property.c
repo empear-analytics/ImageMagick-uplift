@@ -2851,6 +2851,13 @@ static void StartPSClippathSubpath(char *message,PointInfo *first,
   }
 }
 
+static inline void SkipClippathBytes(const unsigned char **blob,
+  size_t *length,const ssize_t count)
+{
+  (*blob)+=count;
+  (*length)=(size_t) ((ssize_t) (*length)-MagickMin(count,(ssize_t) (*length)));
+}
+
 typedef struct _PSClippathState
 {
   const unsigned char
@@ -3011,16 +3018,14 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
       {
         if (knot_count != 0)
           {
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         /*
           Expected subpath length record.
         */
         knot_count=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-        blob+=22;
-        length=(size_t) ((ssize_t) length-MagickMin(22,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,22);
         break;
       }
       case 1:
@@ -3033,8 +3038,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
             /*
               Unexpected subpath knot
             */
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         AddPSClippathKnot(&state);
@@ -3042,8 +3046,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
       }
       default:
       {
-        blob+=24;
-        length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,24);
         break;
       }
     }
