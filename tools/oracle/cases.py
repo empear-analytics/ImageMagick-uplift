@@ -4869,6 +4869,15 @@ GAP_COMMANDS += [
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
 ]
+# compare-similarity-frequency-private.h: the frequency-domain PSNR subimage search
+# (PSNRSimilarityImage, MSESimilarityImage's result turned into decibels), which no case ran:
+# PSNR took only the spatial path below (compare:frequency-domain=false). Against an exact
+# patch (MSE 0, the reciprocal guard) and a blurred one. Added under the owner's 2026-11-20
+# ruling that cases may be added for code no case reaches.
+GAP_COMMANDS += [
+    "compare -metric PSNR -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric PSNR -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+]
 # compare-similarity-image.c: spatial subimage searches with a metric where higher is
 # better, the HigherSimilaritySide merge of SimilarityImage's row loop, which no case ran
 # (in the HDRI build with FFTW, NCC, DPC, PSNR and PHASE take the frequency domain): NCC,
@@ -5405,6 +5414,23 @@ GAP_XEVENTS_GRAB_CASES = [
 ] + [("xevents grab: %s menu" % menu, _xev_menu_grab(menu, item, items), [])
      for menu, item, items in (("View", "Half Size", _XEV_VIEW), ("Transform", "Flip", _XEV_TRANSFORM),
                                ("Enhance", "Spiff", _XEV_ENHANCE))]
+# Widget code no case ran (round 36; owner 2026-11-20: cases may be added for code no case
+# reaches): the Commands widget following the pointer with the button held (widget-command.c
+# FollowCommandMotion, TrackCommandSelections: press on File, move over Edit, release on View,
+# whose menu then opens as for a click); a line of the image-info text view pressed and the
+# pointer moved over it (widget-text-view-private.h SelectTextViewLine, MoveTextViewPointer);
+# and a click in a list browser's reply field (widget-browser-private.h FindListBrowserCursor,
+# HighlightListBrowserReply), in the preview list below.
+GAP_XEVENTS_GRAB_CASES += [
+    ("xevents grab: View menu, opened by a drag from File",
+     _xev_menu_grab("View", "Half Size", _XEV_VIEW).replace(
+         "map click:65,165 ", "map press:65,101 move:65,133 move:65,165 release:65,165 "), []),
+    ("xevents grab: image info, a line pressed",
+     "map key:question map press:100,60 move:100,70 move:100,80 release:100,80 grab:out.ppm "
+     "key:Return use:1 key:q", []),
+]
+_XEV_LIST_CASES += [("xevents grab: preview list, a click in the field",
+                     _XEV_PREVIEW + "click:130,322 grab:out.ppm click:217,360 use:1 key:q", ["rose"])]
 # Drags (xevents press/move/release, 2026-10-06): display's crop and chop modes. c enters crop
 # mode (its mode widget maps; use:1 keeps the image window), a drag marks the rectangle, arrow
 # keys move its corner, Return crops and Escape gives up; Transform > Chop reuses the Commands
