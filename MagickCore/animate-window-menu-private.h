@@ -534,6 +534,21 @@ static void XStepCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XApplyAnimateTitle(XResourceInfo *resource_info,
+  XWindows *windows,Image **image,ExceptionInfo *exception)
+{
+  if (resource_info->title != (char *) NULL)
+    {
+      char
+        *title;
+
+      title=InterpretImageProperties(resource_info->image_info,*image,
+        resource_info->title,exception);
+      (void) CloneString(&windows->image.name,title);
+      title=DestroyString(title);
+    }
+}
+
 static void XPlayCommand(const AnimateCommandTile *tile,
   const AnimateCommand animate_command)
 {
@@ -578,16 +593,7 @@ static void XPlayCommand(const AnimateCommandTile *tile,
       (void) FormatLocaleString(name,MagickPathExtent,"%s: %s",
         MagickPackageName,basename);
       (void) CloneString(&windows->image.name,name);
-      if (resource_info->title != (char *) NULL)
-        {
-          char
-            *title;
-
-          title=InterpretImageProperties(resource_info->image_info,*image,
-            resource_info->title,exception);
-          (void) CloneString(&windows->image.name,title);
-          title=DestroyString(title);
-        }
+      XApplyAnimateTitle(resource_info,windows,image,exception);
       status=XStringListToTextProperty(&windows->image.name,1,&window_name);
       if (status == 0)
         break;
