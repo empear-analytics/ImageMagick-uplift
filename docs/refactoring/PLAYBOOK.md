@@ -26425,6 +26425,151 @@ only in one register choice inside `DrawPolygonPrimitive`, into which it is inli
 
 ---
 
+## Recipe SL - Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function that holds two `switch` statements filling two struct locals of one type, case by
+case the same text except for the local's name, the controlling expression and some
+constants, each with the same leaving `default:`: `profile.c`'s `ProfileImage`, whose
+source and target colour-space switches set `source_info` and `target_info` (an
+`LCMSInfo`) from an ICC signature, differing in the CMYK and Lab scales and the Lab
+translation, and whose `default:` throws `ThrowProfileException`.
+
+**Not covered by:** Recipe SC, whose copies may differ only in constants (here they write
+two different locals and switch on different expressions) and may not leave the function;
+Recipe D, which renames variables but allows a single differing value; Recipe SV, one
+value; Recipe W, whose block is one copy and returns success for a single exit but passes
+no constants; Recipe SD and SW, which split one selection rather than merge two.
+
+**How:**
+
+1. The two `switch` statements lie in one function, outside every OpenMP region, with no
+   `#pragma` line. Their controlling expressions have no side effect, or are one call
+   whose value is the only thing the switch reads of it. Every case group ends in
+   `break;` and holds no other `break`, `continue`, `goto`, `return` or label. Both
+   `default:` groups are the same statement `X` that leaves the function (a `return`, or a
+   throw macro that returns), and `X` reads nothing the cases write.
+2. Each switch writes members of one struct local `a` (`b` for the other) of one
+   `typedef struct` type `T`, as `a.m` and `&a` passed to callees that take `T *`, and
+   reads only `a`'s members, parameters and locals no case writes. Checked by script: with
+   `&a`/`&b` replaced by `info` and `a.`/`b.` by `info->`, and each differing constant by
+   its role name (Recipe SC step 2: a role at several positions has the same constant at
+   each in each copy), the two case lists are the same token sequence, preprocessor lines
+   included.
+3. Write a `typedef struct` of the roles directly above the new function (Recipe SC step 3:
+   one member per role, in order of first use, of the type of the object the constant is
+   assigned to or passed to).
+4. The new function is `static MagickBooleanType`, directly above the caller, taking
+   `T *info`, the controlling value (`const` of the type the cases are labels of), the
+   locals the cases read, and `const Roles *roles`, at most four parameters. Its body is
+   `switch` on the controlling parameter with one copy's cases, each role constant written
+   `roles->r` (a member read, not a bound local, so that a role used only inside an `#if`
+   leaves no unused local in the builds that skip it), `default:` written
+   `return(MagickFalse);`, and `return(MagickTrue);` after the `switch`.
+5. *Chain.* When the new function would itself be a *Complex Method* or *Large Method*,
+   split it at a case boundary in the same commit (the gate takes new code only at 10.0):
+   the first function keeps the first groups and its `default:` becomes
+   `return(<Second>(info,value,...,roles));`; the second, written directly above it with
+   the same parameters, holds the remaining groups and the `default: return(MagickFalse);`.
+   Each label stands in exactly one of them, in the original order.
+6. Replace each `switch` by a block `{ const Roles r = { c1, ... }; if (<First>(&a,<expr>,
+   ...,&r) == MagickFalse) X }`, the copy's constants in member order (Recipe FI's
+   initialiser) and its own controlling expression as the argument.
+7. Check by script that each copy equals the merged cases with its constants substituted
+   (step 2), and each initialiser lists that copy's constants in member order.
+8. Run the build, `ci_warnings.sh`, `cxx_warnings.sh`, `refactor_guard.py --calls` and the
+   oracle for the caller. One commit holds both copies, the helper and its chain.
+
+**Before:**
+
+```c
+            switch (cmsGetColorSpace(source_info.profile))
+            {
+              case cmsSigCmykData:
+              {
+                source_info.colorspace=CMYKColorspace;
+                source_info.channels=4;
+                if (highres != MagickFalse)
+                  {
+                    source_info.type=(cmsUInt32Number) TYPE_CMYK_DBL;
+                    SetLCMSInfoScale(&source_info,100.0);
+                  }
+                ...
+              default:
+                ThrowProfileException(ImageError,
+                  "ColorspaceColorProfileMismatch",name);
+            }
+            ...
+            switch (signature)
+            {
+              case cmsSigCmykData:
+              {
+                target_info.colorspace=CMYKColorspace;
+                ...
+                    SetLCMSInfoScale(&target_info,0.01);
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetLCMSInfoFromSignature(LCMSInfo *info,
+  const cmsColorSpaceSignature signature,const MagickBooleanType highres,
+  const LCMSInfoScales *scales)
+{
+  switch (signature)
+  {
+    case cmsSigCmykData:
+    {
+      info->colorspace=CMYKColorspace;
+      ...
+          SetLCMSInfoScale(info,scales->cmyk_scale);
+    ...
+    default:
+      return(SetLCMSInfoFromColorSignature(info,signature,highres,scales));
+  }
+  return(MagickTrue);
+}
+...
+            {
+              const LCMSInfoScales
+                source_scales = { 100.0, 100.0, 255.0, (-0.5) };
+
+              if (SetLCMSInfoFromSignature(&source_info,cmsGetColorSpace(
+                  source_info.profile),highres,&source_scales) == MagickFalse)
+                ThrowProfileException(ImageError,
+                  "ColorspaceColorProfileMismatch",name);
+            }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Each switch evaluated its controlling expression once and
+  ran the matching group, whose writes went to `a`'s members; the call evaluates the same
+  expression once, as an argument, at the point where the `switch` stood (step 1: nothing
+  else is evaluated between), and the helper runs the same group with `info` pointing at
+  `a`, so every write lands in the same member in the same order. A constant reaches its
+  object through a `const` member of its own declared type, so it converts as the
+  original assignment or argument did (a constant expression such as `1/255.0` is the
+  same `double` in an initialiser as in an assignment).
+- An unmatched value made the original run `X`; the helper returns `MagickFalse` without
+  writing anything, and the caller runs the same `X` at the same point, with `a` as the
+  default path left it (no case had run).
+- The chain (step 5) tests the labels of the first function, then those of the second:
+  every label stands once, so each value selects the same group as before.
+- The two copies' preprocessor lines are the same (step 2), so every configuration
+  compiles the same cases in both; the helper holds them verbatim.
+
+**Evidence level:** oracle for the caller, with steps 2 and 7 checked by script and
+`refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-20, from `profile.c`'s `ProfileImage` (campaign B, M141): the
+source and target colour-space switches, about 150 lines; a probe of the merge with a
+two-function chain, 7.41 to 8.17, `ProfileImage` cc 49 to 29 and 354 to 190 lines, no
+finding on the new functions. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27003,3 +27148,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | DC | Run Twin Dialog Commands Through One Runner Taking a Command Struct: `static` dialog commands that differ only in the dialog's title and prompt literals, the `static char` reply buffer each owns and the function applied to the reply keep their buffers and pass a `const` struct `{ { title, prompt, buffer }, callee }` to one runner, which calls the callee through a method of the callees' exact type | `display-image-apply-effects-private.h` (7.32; campaign A, W50 round 37, lane b): about twenty `XApply*Command` copies of one dialog-apply-refresh body; CF refuses the differing literals and buffers. First use, the eight `flags` commands: 2249 to 2079 lines, score flat, the callees left with one type for a one-commit Recipe B through the method table | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | B | Step 5, one-line form: the one-line `const` declaration may also be the one declaration of the block form, and in either form it is allowed when the two-line form would carry the file past *Lines of Code in a Single File* enough to lower it, not only when it would make a *Large Method*; tokens, order and evaluation those of the two-line form | `XConfigureImageColormap`'s call in `display-image-annotate-private.h`'s `XColorEditRelease` (campaign A, W50 round 37, lane a): 9.09 -> 8.54 in a probe with the two-line block form, 9.09 with one line | mandate (2026-11-19) |
 | 2026-11-20 | NEW | CM | Name a Clamp Selection: assignments `t=A < 0.0 ? 0.0 : A >= E ? L : A;` with side-effect-free `double` operands become `t=ClampBoundsCoordinate(A,E,L);`, one `static inline` helper; object code identical or differing only in register choice | `draw-primitive.c`'s `ClampPolygonBounds` (cc 9 from four clamps; probe 3.60 to 3.67, out of *Complex Method*); campaign B, M141 | mandate (2026-10-24) |
+| 2026-11-20 | NEW | SL | Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants: two `switch`es whose cases are the same text up to the struct local they fill, the controlling expression and some constants, with the same leaving `default:`, become one `static MagickBooleanType` helper taking `T *info`, the value, the read locals and a `const` struct of role constants (read as `roles->r`), split into a chain when it would be a finding; each `switch` becomes the call with `== MagickFalse` running the original exit | `profile.c`'s `ProfileImage` (campaign B, M141): the source and target colour-space switches; a probe 7.41 to 8.17, cc 49 to 29 | mandate (2026-10-24) |
