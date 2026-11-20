@@ -1011,9 +1011,21 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyEmbossToImage(Display *display,XWindows *windows,char *radius,
-  Image **image,ExceptionInfo *exception)
+static void XApplyEmbossToImage(const XMagickCommandContext *context,
+  char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -1072,7 +1084,7 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   /*
     Reduce noise in the image.
   */
-  XApplyEmbossToImage(display,windows,radius,image,exception);
+  XApplyEmbossToImage(context,radius);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
