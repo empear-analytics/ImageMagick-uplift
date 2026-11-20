@@ -1159,11 +1159,11 @@ static MagickBooleanType RunEqualizeHistogramStage(
   return(MagickTrue);
 }
 
+#define EqualizeImageTag  "Equalize/Image"
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
-#define EqualizeImageTag  "Equalize/Image"
-
   CacheView
     *image_view=NULL;
 
