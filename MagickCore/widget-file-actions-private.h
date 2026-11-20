@@ -939,6 +939,40 @@ static void PressFileBrowserReply(const FileBrowserContext *context,
     windows->widget.id,event.xbutton.time);
 }
 
+static void PressFileBrowserActions(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  PressFileBrowserReply(context,event,widgets);
+}
+
 static void PressFileBrowserButtons(const FileBrowserContext *context,
   const XEvent event,const FileBrowserWidgets *widgets)
 {
@@ -951,9 +985,7 @@ static void PressFileBrowserButtons(const FileBrowserContext *context,
   XWidgetInfo
     *const up_info = widgets->up_info,
     *const home_info = widgets->home_info,
-    *const special_info = widgets->special_info,
-    *const action_info = widgets->action_info,
-    *const cancel_info = widgets->cancel_info;
+    *const special_info = widgets->special_info;
 
   if (MatteIsActive((*up_info),event.xbutton))
     {
@@ -982,25 +1014,7 @@ static void PressFileBrowserButtons(const FileBrowserContext *context,
       XDrawBeveledButton(display,&windows->widget,special_info);
       return;
     }
-  if (MatteIsActive((*action_info),event.xbutton))
-    {
-      /*
-        User pressed action button.
-      */
-      (*action_info).raised=MagickFalse;
-      XDrawBeveledButton(display,&windows->widget,action_info);
-      return;
-    }
-  if (MatteIsActive((*cancel_info),event.xbutton))
-    {
-      /*
-        User pressed Cancel button.
-      */
-      (*cancel_info).raised=MagickFalse;
-      XDrawBeveledButton(display,&windows->widget,cancel_info);
-      return;
-    }
-  PressFileBrowserReply(context,event,widgets);
+  PressFileBrowserActions(context,event,widgets);
 }
 
 static void ChooseFileBrowserEntry(const FileBrowserContext *context,
