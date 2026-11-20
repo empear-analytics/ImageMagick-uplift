@@ -545,6 +545,10 @@ static void XSelectVirtualCommand(const DisplayEventContext *context,
   int
     entry;
 
+  const XImageCacheContext
+    display_context = { display, resource_info, windows, display_image,
+      exception };
+
   /*
     Select a command from the Virtual menu.
   */
@@ -555,8 +559,7 @@ static void XSelectVirtualCommand(const DisplayEventContext *context,
     entry=XMenuWidget(display,windows,&menu_request);
   }
   if (entry >= 0)
-    (*nexus)=XMagickCommand(display,resource_info,windows,
-      VirtualCommands[entry],display_image,exception);
+    (*nexus)=XMagickCommand(&display_context,VirtualCommands[entry]);
 }
 
 static void XPressImageButton1(const DisplayEventContext *context,
@@ -635,6 +638,10 @@ static void XPressImageButton3(const DisplayEventContext *context,
   int
     entry;
 
+  const XImageCacheContext
+    display_context = { display, resource_info, windows, display_image,
+      exception };
+
   if (resource_info->immutable)
     {
       XSelectVirtualCommand(context,targets);
@@ -663,8 +670,7 @@ static void XPressImageButton3(const DisplayEventContext *context,
     entry=XMenuWidget(display,windows,&menu_request);
   }
   if (entry >= 0)
-    (*nexus)=XMagickCommand(display,resource_info,windows,
-      ShortCutsCommands[entry],display_image,exception);
+    (*nexus)=XMagickCommand(&display_context,ShortCutsCommands[entry]);
 }
 
 static void XPressImageWindow(const DisplayEventContext *context,
@@ -691,6 +697,10 @@ static void XPressImageWindow(const DisplayEventContext *context,
   XEvent
     *const event = targets->event;
 
+  const XImageCacheContext
+    display_context = { display, resource_info, windows, display_image,
+      exception };
+
   switch ((*event).xbutton.button)
   {
     case Button1:
@@ -703,8 +713,7 @@ static void XPressImageWindow(const DisplayEventContext *context,
       /*
         User pressed the image magnify button.
       */
-      (void) XMagickCommand(display,resource_info,windows,ZoomCommand,
-        display_image,exception);
+      (void) XMagickCommand(&display_context,ZoomCommand);
       XMagnifyImage(display,windows,event,exception);
       break;
     }
@@ -861,10 +870,13 @@ static void XImageWindowKeyPress(const DisplayEventContext *context,
   const ImageWindowKeyInput
     input = { display, resource_info, windows, display_image, exception };
 
+  const XImageCacheContext
+    display_context = { display, resource_info, windows, display_image,
+      exception };
+
   display_command=XImageWindowCommand(&input,event.xkey.state,key_symbol);
   if (display_command != NullCommand)
-    (*nexus)=XMagickCommand(display,resource_info,windows,
-      display_command,display_image,exception);
+    (*nexus)=XMagickCommand(&display_context,display_command);
 }
 
 static void XPanWindowKeyPress(const DisplayEventContext *context,

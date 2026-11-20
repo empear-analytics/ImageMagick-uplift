@@ -1498,8 +1498,7 @@ static DisplayCommand
   XImageWindowCommand(const ImageWindowKeyInput *,const MagickStatusType,
     KeySym);
 static Image
-  *XMagickCommand(Display *,XResourceInfo *,XWindows *,const DisplayCommand,
-    Image **,ExceptionInfo *),
+  *XMagickCommand(const XImageCacheContext *,const DisplayCommand),
   *XOpenImage(Display *,XResourceInfo *,XWindows *,const MagickBooleanType),
   *XTileImage(Display *,XResourceInfo *,XWindows *,Image *,XEvent *,
     ExceptionInfo *),
@@ -1518,8 +1517,7 @@ static MagickBooleanType
   XCompositeImage(Display *,XResourceInfo *,XWindows *,Image *,
     ExceptionInfo *),
   XConfigureImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
-  XDrawEditImage(Display *,XResourceInfo *,XWindows *,Image **,
-    ExceptionInfo *),
+  XDrawEditImage(const XImageCacheContext *),
   XMatteEditImage(Display *,XResourceInfo *,XWindows *,Image **,
     ExceptionInfo *),
   XPasteImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
@@ -3631,6 +3629,9 @@ static MagickBooleanType XBackgroundImage(
   XWindows
     *const windows = window_input->windows;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
 #define BackgroundImageTag  "Background/Image"
 
   int
@@ -3654,8 +3655,7 @@ static MagickBooleanType XBackgroundImage(
   }
   if (*window_id == '\0')
     return(MagickFalse);
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XInfoWidget(display,windows,BackgroundImageTag);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
@@ -3668,8 +3668,7 @@ static MagickBooleanType XBackgroundImage(
     XClientMessage(display,windows->image.id,windows->im_protocols,
       windows->im_retain_colors,CurrentTime);
   XSetCursorState(display,windows,MagickFalse);
-  (void) XMagickCommand(display,resource_info,windows,UndoCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,UndoCommand);
   return(MagickTrue);
 }
 
@@ -4111,11 +4110,13 @@ static MagickBooleanType XChopApply(const ChopEventInput *input,Image **image,
   Image
     *chop_image;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Image chopping is relative to image configuration.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   windows->image.window_changes.width=windows->image.ximage->width-

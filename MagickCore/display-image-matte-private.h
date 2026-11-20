@@ -1271,9 +1271,11 @@ static MagickBooleanType XRotateApply(const RotateApplyInput *apply)
   Image
     *rotate_image;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   if (normalized_degrees != 0.0)
-    (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-      exception);
+    (void) XMagickCommand(&command_context,ApplyCommand);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (*image)->background_color.red=(double) ScaleShortToQuantum(

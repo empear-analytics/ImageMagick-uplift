@@ -763,12 +763,14 @@ static void XDrawCommandAction(const DrawEditContext *context,const int id,
   size_t
     *const state = targets->state;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   switch (DrawCommands[id])
   {
     case DrawUndoCommand:
     {
-      (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-        image,exception);
+      (void) XMagickCommand(&command_context,UndoCommand);
       break;
     }
     case DrawHelpCommand:
