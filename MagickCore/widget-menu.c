@@ -91,8 +91,8 @@
 %
 %  The format of the XMenuWidget method is:
 %
-%      int XMenuWidget(Display *display,XWindows *windows,const char *title,
-%        const char *const *selections,char *item)
+%      int XMenuWidget(Display *display,XWindows *windows,
+%        const XMenuRequest *request)
 %
 %  A description of each parameter follows:
 %
@@ -104,13 +104,16 @@
 %
 %    o window: Specifies a pointer to a XWindows structure.
 %
-%    o title: Specifies a character string that describes the menu selections.
+%    o request: the menu, in these members:
 %
-%    o selections: Specifies a pointer to one or more strings that comprise
-%      the choices in the menu.
+%      o title: Specifies a character string that describes the menu
+%        selections.
 %
-%    o item: Specifies a character array.  The item selected from the menu
-%      is returned here.
+%      o selections: Specifies a pointer to one or more strings that comprise
+%        the choices in the menu.
+%
+%      o item: Specifies a character array.  The item selected from the menu
+%        is returned here.
 %
 */
 static void PutBackMenuEvent(Display *display,XWindows *windows,

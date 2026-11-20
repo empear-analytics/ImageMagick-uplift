@@ -441,8 +441,7 @@ static void RunListBrowser(const ListBrowserContext *context,
 %  The format of the XListBrowserWidget method is:
 %
 %      void XListBrowserWidget(Display *display,XWindows *windows,
-%        XWindowInfo *window_info,const char *const *list,const char *action,
-%        const char *query,char *reply)
+%        XWindowInfo *window_info,const XListBrowserRequest *request)
 %
 %  A description of each parameter follows:
 %
@@ -451,14 +450,16 @@ static void RunListBrowser(const ListBrowserContext *context,
 %
 %    o window: Specifies a pointer to a XWindows structure.
 %
-%    o list: Specifies a pointer to an array of strings.  The user can
-%      select from these strings as a possible reply value.
+%    o request: the list and the query, in these members:
 %
-%    o action: Specifies a pointer to the action of this widget.
+%      o list: Specifies a pointer to an array of strings.  The user can
+%        select from these strings as a possible reply value.
 %
-%    o query: Specifies a pointer to the query to present to the user.
+%      o action: Specifies a pointer to the action of this widget.
 %
-%    o reply: the response from the user is returned in this parameter.
+%      o query: Specifies a pointer to the query to present to the user.
+%
+%      o reply: the response from the user is returned in this parameter.
 %
 */
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,

@@ -129,16 +129,17 @@
 %
 %  The format of the XAnnotateImage method is:
 %
-%      MagickBooleanType XAnnotateImage(Display *display,
-%        const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
-%        ExceptionInfo *exception)
+%      MagickBooleanType XAnnotateImage(const XImageRenderTarget *target,
+%        XAnnotateInfo *annotate_info,Image *image,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
+%    o target: the X server connection and pixel info, in these members:
 %
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
+%      o display: Specifies a connection to an X server;  returned from
+%        XOpenDisplay.
+%
+%      o pixel: Specifies a pointer to a XPixelInfo structure.
 %
 %    o annotate_info: Specifies a pointer to a XAnnotateInfo structure.
 %
@@ -547,15 +548,17 @@ MagickPrivate MagickBooleanType XAnnotateImage(
 %
 %  The format of the XDrawImage method is:
 %
-%    MagickBooleanType XDrawImage(Display *display,const XPixelInfo *pixel,
+%    MagickBooleanType XDrawImage(const XImageRenderTarget *target,
 %      XDrawInfo *draw_info,Image *image,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
+%    o target: the X server connection and pixel info, in these members:
 %
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
+%      o display: Specifies a connection to an X server;  returned from
+%        XOpenDisplay.
+%
+%      o pixel: Specifies a pointer to a XPixelInfo structure.
 %
 %    o draw_info: Specifies a pointer to a XDrawInfo structure.
 %

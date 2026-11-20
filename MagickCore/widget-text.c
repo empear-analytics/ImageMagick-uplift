@@ -414,20 +414,21 @@ static void RunTextView(const TextViewContext *context,
 %
 %  The format of the XTextViewWidget method is:
 %
-%      void XTextViewWidget(Display *display,const XResourceInfo *resource_info,
-%        XWindows *windows,const MagickBooleanType mono,const char *title,
+%      void XTextViewWidget(const XHelpView *view,const char *title,
 %        const char **textlist)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
+%    o view: where and how the text is shown, in these members:
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o display: Specifies a connection to an X server;  returned from
+%        XOpenDisplay.
 %
-%    o window: Specifies a pointer to a XWindows structure.
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
-%    o mono:  Use mono-spaced font when displaying text.
+%      o window: Specifies a pointer to a XWindows structure.
+%
+%      o mono:  Use mono-spaced font when displaying text.
 %
 %    o title: This character string is displayed at the top of the widget
 %      window.
