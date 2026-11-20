@@ -251,16 +251,15 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
     RestoreWriteProgressMonitor(p,number_images,progress_monitor);
     if (write_info->adjoin != MagickFalse)
       break;
-    if (number_images != 1)
-      {
+    if (number_images == 1)
+      continue;
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
+    #pragma omp atomic
 #endif
-        progress++;
-        proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
-        if (proceed == MagickFalse)
-          break;
-      }
+    progress++;
+    proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
+    if (proceed == MagickFalse)
+      break;
   }
   write_info=DestroyImageInfo(write_info);
   return((MagickBooleanType) (status != 0));
