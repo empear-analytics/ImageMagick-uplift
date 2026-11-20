@@ -982,6 +982,15 @@ static void XMapColorEditCommand(Display *display,XWindows *windows)
     windows->im_update_widget,CurrentTime);
 }
 
+static void XReleaseColorEditCursor(Display *display,XWindows *windows,
+  Cursor cursor)
+{
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XFreeCursor(display,cursor);
+}
+
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1101,10 +1110,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     if (XColorEditStep(&context,&targets) == MagickFalse)
       return(MagickFalse);
   } while ((state & ExitState) == 0);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XFreeCursor(display,cursor);
+  XReleaseColorEditCursor(display,windows,cursor);
   return(MagickTrue);
 }
 typedef struct _ComposeMenuInfo
