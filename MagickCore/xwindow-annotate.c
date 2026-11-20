@@ -430,8 +430,8 @@ static void XSetAnnotateAlphaTrait(const XAnnotateInfo *annotate_info,
     annotate_image->alpha_trait=BlendPixelTrait;
 }
 
-MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
-  const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
+MagickPrivate MagickBooleanType XAnnotateImage(
+  const XImageRenderTarget *target,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
 {
   AnnotatePixels
@@ -457,8 +457,8 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   /*
     Initialize annotated image.
   */
-  assert(display != (Display *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
+  assert(target->display != (Display *) NULL);
+  assert(target->pixel != (XPixelInfo *) NULL);
   assert(annotate_info != (XAnnotateInfo *) NULL);
   assert(image != (Image *) NULL);
   if (IsEventLogging() != MagickFalse)
@@ -466,7 +466,8 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   /*
     Initialize annotated pixmap.
   */
-  if (XDrawAnnotateText(display,annotate_info,&annotate_ximage) == MagickFalse)
+  if (XDrawAnnotateText(target->display,annotate_info,&annotate_ximage) ==
+      MagickFalse)
     return(MagickFalse);
   /*
     Initialize annotated image.
@@ -487,7 +488,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   XSetAnnotateAlphaTrait(annotate_info,annotate_image);
   annotate_pixels.annotate_image=annotate_image;
   annotate_pixels.annotate_ximage=annotate_ximage;
-  annotate_pixels.pixel=pixel;
+  annotate_pixels.pixel=target->pixel;
   annotate_pixels.annotate_info=annotate_info;
   annotate_pixels.exception=exception;
   y=XTransferAnnotatePixels(&annotate_pixels);
@@ -1036,10 +1037,15 @@ static Pixmap XCreateDrawPixmap(Display *display,const Window root_window,
     draw_info->height,depth));
 }
 
-MagickPrivate MagickBooleanType XDrawImage(Display *display,
-  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
-  ExceptionInfo *exception)
+MagickPrivate MagickBooleanType XDrawImage(const XImageRenderTarget *target,
+  XDrawInfo *draw_info,Image *image,ExceptionInfo *exception)
 {
+  Display
+    *const display = target->display;
+
+  const XPixelInfo
+    *const pixel = target->pixel;
+
   GC
     draw_context;
 

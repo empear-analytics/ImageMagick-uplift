@@ -819,8 +819,13 @@ static void XCreateSceneWindows(const AnimateEventContext *event_context,
     windows->image.matte_pixmap=(Pixmap) NULL;
     if ((IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse) &&
         (image_list[scene]->storage_class == PseudoClass))
-      XGetPixelInfo(display,visual_info,map_info,resource_info,
-        image_list[scene],windows->image.pixel_info);
+      {
+        const XPixelInfoSource
+          pixel_source = { visual_info, map_info, resource_info };
+
+        XGetPixelInfo(display,&pixel_source,image_list[scene],
+          windows->image.pixel_info);
+      }
     columns=(unsigned int) image_list[scene]->columns;
     rows=(unsigned int) image_list[scene]->rows;
     if ((image_list[scene]->columns != columns) ||

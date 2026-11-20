@@ -500,17 +500,50 @@ extern MagickPrivate Cursor
 extern MagickPrivate int
   XCheckDefineCursor(Display *,Window,Cursor);
 
+typedef struct _XImageRenderTarget
+{
+  Display
+    *display;
+
+  const XPixelInfo
+    *pixel;
+} XImageRenderTarget;
+
 extern MagickPrivate MagickBooleanType
-  XAnnotateImage(Display *,const XPixelInfo *,XAnnotateInfo *,Image *,
+  XAnnotateImage(const XImageRenderTarget *,XAnnotateInfo *,Image *,
     ExceptionInfo *),
   XComponentGenesis(void),
-  XDrawImage(Display *,const XPixelInfo *,XDrawInfo *,Image *,ExceptionInfo *),
+  XDrawImage(const XImageRenderTarget *,XDrawInfo *,Image *,ExceptionInfo *),
   XGetWindowColor(Display *,XWindows *,char *,ExceptionInfo *),
   XMagickProgressMonitor(const char *,const MagickOffsetType,
     const MagickSizeType,void *),
   XMakeImage(Display *,const XResourceInfo *,XWindowInfo *,Image *,unsigned int,
     unsigned int,ExceptionInfo *),
   XQueryColorCompliance(const char *,XColor *);
+
+typedef struct _XDisplayImageInfoTarget
+{
+  Display
+    *display;
+
+  const XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} XDisplayImageInfoTarget;
+
+typedef struct _XPixelInfoSource
+{
+  const XVisualInfo
+    *visual_info;
+
+  const XStandardColormap
+    *map_info;
+
+  const XResourceInfo
+    *resource_info;
+} XPixelInfoSource;
 
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
@@ -522,7 +555,7 @@ extern MagickPrivate void
     ExceptionInfo *),
   XConstrainWindowPosition(Display *,XWindowInfo *),
   XDelay(Display *,const size_t),
-  XDisplayImageInfo(Display *,const XResourceInfo *,XWindows *,Image *,Image *,
+  XDisplayImageInfo(const XDisplayImageInfoTarget *,Image *,Image *,
     ExceptionInfo *),
   XDestroyWindowColors(Display *,Window),
   XFreeResources(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,
@@ -533,8 +566,7 @@ extern MagickPrivate void
   XHighlightLine(Display *,Window,GC,const XSegment *),
   XHighlightRectangle(Display *,Window,GC,const RectangleInfo *),
   XGetAnnotateInfo(XAnnotateInfo *),
-  XGetPixelInfo(Display *,const XVisualInfo *,const XStandardColormap *,
-    const XResourceInfo *,Image *,XPixelInfo *),
+  XGetPixelInfo(Display *,const XPixelInfoSource *,Image *,XPixelInfo *),
   XGetMapInfo(const XVisualInfo *,const Colormap,XStandardColormap *),
   XGetWindowInfo(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,
     XFontStruct *,XResourceInfo *,XWindowInfo *),

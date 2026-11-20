@@ -959,8 +959,13 @@ static void XShowAnimationScene(const AnimateSceneView *scene_view,
   const ssize_t
     scene = scene_view->scene;
 
-  XGetPixelInfo(display,visual_info,map_info,resource_info,
-    image_list[scene],windows->image.pixel_info);
+  {
+    const XPixelInfoSource
+      pixel_source = { visual_info, map_info, resource_info };
+
+    XGetPixelInfo(display,&pixel_source,image_list[scene],
+      windows->image.pixel_info);
+  }
   if (image != (Image *) NULL)
     {
       windows->image.ximage->width=(int) image->columns;

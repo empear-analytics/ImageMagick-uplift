@@ -774,10 +774,18 @@ static void DestroyXTextList(char **textlist)
   textlist=(char **) RelinquishMagickMemory(textlist);
 }
 
-MagickPrivate void XDisplayImageInfo(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
-  Image *image,ExceptionInfo *exception)
+MagickPrivate void XDisplayImageInfo(const XDisplayImageInfoTarget *target,
+  Image *undo_image,Image *image,ExceptionInfo *exception)
 {
+  Display
+    *const display = target->display;
+
+  const XResourceInfo
+    *const resource_info = target->resource_info;
+
+  XWindows
+    *const windows = target->windows;
+
   char
     filename[MagickPathExtent],
     *text,

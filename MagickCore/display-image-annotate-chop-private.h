@@ -3135,8 +3135,13 @@ static MagickBooleanType XAnnotateRenderLine(const AnnotateContext *context,
   /*
     Annotate image with text.
   */
-  status=XAnnotateImage(display,windows->pixel_info,annotate_info,image,
-    exception) == MagickFalse ? 0 : 1;
+  {
+    const XImageRenderTarget
+      target = { display, windows->pixel_info };
+
+    status=XAnnotateImage(&target,annotate_info,image,exception) ==
+      MagickFalse ? 0 : 1;
+  }
   if (status == 0)
     return(MagickFalse);
   return(MagickTrue);
