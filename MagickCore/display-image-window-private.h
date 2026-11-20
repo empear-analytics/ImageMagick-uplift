@@ -13,9 +13,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of display-image.c: the window positioning, set-
-  up and event helpers of XDisplayImage and its constant menus, from
-  XPositionCommandAndWidget to Menus; included by that file only.
+  MagickCore private methods of display-image.c: the image reload, timer and
+  command menu helpers of XDisplayImage and its constant menus, from
+  XReloadModifiedImage to Menus; included by that file only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_WINDOW_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_WINDOW_PRIVATE_H

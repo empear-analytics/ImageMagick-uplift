@@ -13,10 +13,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of display-image.c: the typedefs, menus and
-  bitmaps at the top of its X11 branch, the annotate, chop and colour-edit
-  commands and the composite pointer handlers, to XCompositeRelease; included
-  by that file only.
+  MagickCore private methods of display-image.c: the colour-edit command and
+  the composite pointer handlers, from XColorFloodfill to XCompositeRelease;
+  included by that file only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_ANNOTATE_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_ANNOTATE_PRIVATE_H

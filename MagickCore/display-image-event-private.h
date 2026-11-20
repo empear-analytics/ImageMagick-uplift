@@ -1665,9 +1665,18 @@ static void XMakeDisplayWindows(const DisplayEventContext *context,
   XInitializePanWindow(context,windows,display);
 }
 
-static void XInitializeIconContext(XPixelInfo *icon_pixel,Display *display,
-  XGCValues *context_values,XWindows *windows,Image *display_image)
+static void XInitializeIconContext(const DisplayEventContext *context,
+  XGCValues *context_values,Image *display_image)
 {
+  XPixelInfo
+    *const icon_pixel = context->icon_pixel;
+
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
   if (icon_pixel->annotate_context != (GC) NULL)
     (void) XFreeGC(display,icon_pixel->annotate_context);
   (*context_values).background=icon_pixel->background_color.pixel;
@@ -1735,8 +1744,7 @@ static void XMakeIconWindow(const DisplayEventContext *context,
   /*
     Initialize graphic context for icon window.
   */
-  XInitializeIconContext(icon_pixel,display,context_values,windows,
-    display_image);
+  XInitializeIconContext(context,context_values,display_image);
 }
 
 static void XMakeContextWindow(const DisplayEventContext *context)

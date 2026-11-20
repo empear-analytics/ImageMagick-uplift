@@ -13,8 +13,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of display-image.c: the composite, configure and
-  crop commands and the draw-element pointer handlers, from XCompositeEvent to
+  MagickCore private methods of display-image.c: the draw stipple, draw-
+  element and preview handlers, from XCreateStippleBitmap to
   XErasePointLineBox; included by that file only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_CROP_PRIVATE_H
