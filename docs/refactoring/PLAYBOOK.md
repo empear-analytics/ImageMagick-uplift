@@ -17890,7 +17890,10 @@ functions of the file are twins in which one computes, from one of its parameter
 value the other takes as a parameter: `xml-tree.c`'s `ExtendXMLBuffer(source,length,
 extent,text)`, whose body is `ExtendXMLBufferBy(source,length,extent,size)`'s with
 `strlen(text)` at each place the twin has `size`. Removing the first function frees a
-place for the helper.
+place for the helper. Or (step 6's wrapper form) CodeScene reports *Code Duplication*
+between the two twins: `widget-browser-private.h`'s `TrackListBrowserSlider(slider_info,
+event,entries)`, whose body is `TrackFontBrowserSlider(slider_info,event,fonts)`'s with
+`(int) entries` in place of `fonts`.
 
 **Not covered by:** Recipe D, which needs blocks that are the same text once variables
 are renamed (here one has a call where the other has a parameter) and leaves both
@@ -17916,6 +17919,15 @@ parameter instead of a function.
    access or an array element of identifiers), as it is evaluated in the same order
    relative to the other arguments as C's unspecified argument order already allowed.
 5. Delete `F`. Build: a call left behind does not compile.
+6. *Wrapper form* (2026-11-20, mandate (2026-11-19)): when CodeScene reports *Code
+   Duplication* between `F` and `G` (rather than *Number of Functions*), and a caller of `F`
+   is not reached by any case or stands in another file (`F` and `G` `static inline` in one
+   private header, their callers in the files that include it), `F` stays, with its name,
+   parameters and callers, and its whole body becomes `return(G(p1,...,pn,E(t)));` (steps 1
+   to 3 hold as written). Steps 4 and 5 are not taken. Each call of `F` then evaluates
+   `E(t)` once, as step 2 allows, and runs `G`'s body, which is `F`'s old body with the
+   value in place of each `E(t)`. The evidence is the oracle on the cases that execute `F`
+   itself (`casemap.py F`), since only `F`'s text changes; no caller changes.
 
 **Before:**
 
@@ -25535,6 +25547,97 @@ owner's "New recipes are fine").
 
 ---
 
+## Recipe HM - Move a Family Header's Helpers into the Private Header It Includes
+
+**Use when:** CodeScene reports *Code Duplication* in a family header that a Recipe S split
+wrote (`<stem>-<family>-private.h`, which includes the split's first header
+`<stem>-core-private.h`), between `static inline` helpers that every file including the family
+header also sees through the first header, and moving those helpers into the first header
+clears the finding there while the first header keeps its score: `widget-browser-private.h`'s
+arrow helpers `XDrawTriangleEast`, `XDrawTriangleNorth` and `XDrawTriangleSouth` (near twins,
+three of the header's seven duplicated functions), which `widget-core-private.h` takes at its
+9.68 with no new finding.
+
+**Not covered by:** Recipe S step 2, which places a split's shared helpers when the split moves
+them out of a `.c` file, not afterwards between two headers; Recipe CH, which shares one
+helper defined identically in several headers through a new common header, and whose header
+must be new and 10.0; Recipe OH, which moves items of a `.c` file into a header only that file
+includes; Recipes MT, MV, CF and TI, which merge twins into one function (here the twins'
+texts differ in dozens of coordinate expressions, and they stay as they are).
+
+**How:**
+
+1. The family header `F` includes the first header `C` (its `#include` line stands above
+   its body), and every file that includes `F` therefore sees `C`'s definitions before
+   `F`'s; every item that moves is a `static inline` helper of `F` (with its `%` banner),
+   holding no `static` local and no pragma, standing under the same preprocessor
+   conditional in both headers (`#if defined(MAGICKCORE_X11_DELEGATE)`).
+2. Each moving helper names only library functions, `C`'s macros, types and helpers, and
+   other helpers that move with it (checked by reading); nothing of `F` that stays.
+3. Cut the helpers, in their order in `F`, with one blank line each, and paste them unchanged
+   at the end of `C`'s conditional, after its last helper. Nothing else changes; no `.c`
+   file changes.
+4. Every helper that moves is still used by at least two files (directly; `grep`), as Recipe S
+   asks of a shared header's items; the files that include `C` but not `F` gain unused
+   `static inline` definitions, which emit no code and draw no warning.
+5. Proof (Recipe CH step 5's form): every `.c` file that includes `C` or `F` (`grep -l`),
+   compiled with the build's flags (the wide candidate's for X11 code) at `-g0`, `__LINE__`
+   and `__FILE__` pinned, once against `HEAD`'s two headers and once against the working
+   tree's, gives byte-identical objects (`IDENTICAL` for every file).
+6. Checks: `tools/ci_linux_warnings.sh` on every including file (every configuration),
+   `refactor_guard.py --combined --calls` over both headers (`OK`), and `tools/ch.py` on both
+   headers: `F` rises and `C` does not fall.
+7. One commit for the set of helpers that clears the finding (rule 1's set), the message
+   naming each helper; `Recipe: HM`, `Verified: guard` with step 5's proof quoted (the oracle
+   is not needed when every object is identical; the branch's catalogues cover the step).
+
+**Before:** (`widget-browser-private.h`)
+
+```c
+#include "MagickCore/widget-core-private.h"
+...
+static inline void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  ...
+}
+```
+
+**After:** (the same text at the end of `widget-core-private.h`'s X11 conditional, gone from
+`widget-browser-private.h`)
+
+```c
+static inline size_t ClientWidgetMessage(Display *display,XWindows *windows,
+  ...
+}
+
+static inline void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  ...
+}
+```
+
+**Careful:**
+
+- A `static inline` helper of a header is one internal-linkage definition per translation unit,
+  before and after: a file that included `F` includes `C` through it (or before it), so it
+  compiles the same definition text, only earlier in the unit; step 2 makes every name it uses
+  visible at the new place. Step 5 proves every object unchanged byte for byte, so no
+  behaviour, timing or thread question arises.
+- Moving helpers out of `F` only to place them beside their twins in `C` would move the
+  finding, not clear it: step 6 requires that `C` keeps its score.
+
+**Evidence level:** guard, with object identity of every including file (step 5).
+
+**Provenance:** 2026-11-20, from `widget-browser-private.h` (campaign A, W47 round 34, lane
+b6): after the chain `7f769ef5c`..`0f15f5ac6` it scores 8.81 with *Code Duplication* in seven
+functions; a stub probe gave 9.38 without the four arrow helpers and `widget-core-private.h`
+9.68 with them (unchanged). Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-11-19 ("New recipes are fine"), for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26090,3 +26193,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | EL | Write an Equality-Chain Predicate as a Label Set: a `static` predicate whose body is `if (C) return(MagickTrue); return(MagickFalse);` (or the `?:` form), `C` a chain of `n == Li` over distinct enumeration constants, becomes `switch (n)` with the constants as labels in order, `return(MagickTrue);`, `default: break;`, `return(MagickFalse);` (Recipe LP step 2's shape); for a header, every including object compared with a snapshot and the changed functions' self Ir measured on their per-pixel users | `colorspace-private.h` (campaign A, W47 round 34, lane a): seven *Complex Conditional* findings in its `Is...Colorspace` predicates; the label-set probe 3.69 -> 4.89 (`IssRGBCompatibleColorspace` alone 3.99, its changed callers at equal or lower self Ir) | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | OH | Upstream shared form of Form A: an upstream private header that many files include gives its run after the include block (`#define`s, `static const` tables, `static inline` functions; the `extern "C"` opener between tables and functions stays) to a new header that only it includes, named last in its include block, the functions in an `extern "C"` pair of their own; proof: every including source preprocessed identical (C) and every including object of an OpenMP -O2 tree identical to a snapshot, C++ check on the MagickCore includers; both headers at least the carved header's score before | `colorspace-private.h` (campaign A, W47 round 34, lane a, reading 4): 4.32 after four EL steps, its 72 converters (Excess Arguments, Code Duplication, Complex and Large Method) per pixel in every colourspace transform; the carve gives 7.43 and the new `colorspace-conversions-private.h` 5.18, with no instruction changed in any includer | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | S | Step 2: a function-level `static` that a helper moving into the private header writes leaves the function for the original's file scope, renamed with a prefix from the function's name, storage, type, extent and initialiser unchanged, and is shared through one accessor; an array's accessor returns a pointer to the array (`T (*NameReference(void))[N]`), so `sizeof` keeps its value. One object as before, never a copy per including file; object comparison identical but the helper's accessor calls and the renamed `.bss` symbol | `widget.c`'s `ReleaseWidgetKey` (campaign A, W47 round 34, lane b6): its `command[MagickPathExtent]` and `key_symbol` serve the Color, File and Font browsers, which the chain stub-probed at widget.c 8.28 to 9.09 puts in three files; the main session refused per-file copies of writable state | mandate (2026-11-19) |
+| 2026-11-20 | NEW | HM | Move a family header's helpers into the private header it includes: `static inline` helpers of a Recipe S family header that every includer also sees through the first header move, unchanged, to the end of the first header when that clears *Code Duplication* in the family header and the first header keeps its score; proof: every including file's object byte-identical against HEAD's headers | `widget-browser-private.h` (campaign A, W47 round 34, lane b6): 8.81 with *Code Duplication* in seven functions, three of them the arrow helpers `XDrawTriangleEast`/`North`/`South`; a probe 9.38 without the four arrow helpers, `widget-core-private.h` 9.68 with them (unchanged) | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | FG | Step 6, *wrapper form*: for *Code Duplication* between the twins, when a caller of `F` is unreached or in another file (both `static inline` in one private header), `F` keeps its name, parameters and callers and its body becomes `return(G(...,E(t)));`; evidence the oracle on the cases that execute `F` | `widget-browser-private.h`'s `TrackListBrowserSlider` and `TrackFontBrowserSlider` (campaign A, W47 round 34, lane b6): two of the header's four duplicated functions after `a1492c8ff`; `TrackListBrowserSlider`'s callers are `widget-list.c`'s `MoveListBrowserPointer` (1 case) and `widget.c`'s `MoveTextViewPointer` (0 cases), so step 4 could not rewrite every call under the oracle | mandate (2026-11-19) |
