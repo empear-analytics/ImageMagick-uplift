@@ -1978,9 +1978,6 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   XMakeImageSource
     source;
 
-  XWindowTransform
-    transform;
-
   assert(display != (Display *) NULL);
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -1999,13 +1996,12 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   XAssignWindowImage(window,image);
   if (window->image != (Image *) NULL)
     {
-      transform.display=display;
-      transform.window=window;
-      transform.image=image;
-      transform.width=width;
-      transform.height=height;
-      transform.exception=exception;
-      XTransformWindowImage(&transform);
+      {
+        const XWindowTransform transform = { display, window, image, width,
+          height, exception };
+
+        XTransformWindowImage(&transform);
+      }
       width=(unsigned int) window->image->columns;
       assert((size_t) width == window->image->columns);
       height=(unsigned int) window->image->rows;
