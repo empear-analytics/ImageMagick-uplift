@@ -10,6 +10,9 @@
 # or renames a type must leave the object file unchanged. __LINE__
 # and __FILE__ are pinned and both copies share the file's basename, as in
 # pp_identical.sh.
+#
+# HDRS=1 compiles the REV side against REV's own headers (see below): the proof
+# for a step that changes a header its includers inline from.
 set -e
 file=$1
 rev=${2:-HEAD}
@@ -31,12 +34,32 @@ base=$(basename "$file")
 mkdir "$tmp/before" "$tmp/after"
 git -C "$root" show "$rev:$file" > "$tmp/before/$base"
 cp "$root/$file" "$tmp/after/$base"
+# HDRS=1: compile the REV side against REV's own headers. Without it both sides
+# include the working tree's headers, so a step that changes only a header (or a
+# header and the file) is invisible here. The .h files of MagickCore/, MagickWand/
+# and FILE's directory as committed at REV are extracted into a temporary tree that
+# the REV side searches before the working tree (after the build directory, whose
+# generated headers both sides share). Headers new in the working tree are not in
+# REV, so the REV side finds them in the working tree, as REV's code never names them.
+if [ -n "${HDRS:-}" ]
+then
+  mkdir "$tmp/hdrs"
+  git -C "$root" ls-tree -r --name-only "$rev" -- MagickCore MagickWand "$(dirname "$file")" |
+    grep '\.h$' | sort -u > "$tmp/hdrs.list"
+  (cd "$root" && xargs git archive "$rev" < "$tmp/hdrs.list") | tar -x -C "$tmp/hdrs"
+  echo "HDRS=1: the $rev side compiles against $rev's headers ($(wc -l < "$tmp/hdrs.list" | tr -d ' ') files)" >&2
+fi
 for side in before after
 do
+  hb= hd=
+  if [ "$side" = before ] && [ -n "${HDRS:-}" ]
+  then
+    hb="-I$tmp/hdrs" hd="-I$tmp/hdrs/$(dirname "$file")"
+  fi
   ( cd "$tmp/$side" &&
     eval clang -c -Wno-builtin-macro-redefined -D__LINE__=0 \
-      "-D__FILE__=\\\"pp\\\"" -DHAVE_CONFIG_H -I"$build" -I"$root" \
-      -I"$build/config" -I"$root/$(dirname "$file")" $cppflags $cflags ${EXTRA_CFLAGS:-} -g0 \
+      "-D__FILE__=\\\"pp\\\"" -DHAVE_CONFIG_H -I"$build" $hb -I"$root" \
+      -I"$build/config" $hd -I"$root/$(dirname "$file")" $cppflags $cflags ${EXTRA_CFLAGS:-} -g0 \
       -o "$tmp/$side.o" "$base" ) || { echo "BUILD FAILED ($side)"; exit 1; }
 done
 # An object file with no function in it proves nothing: the build does not
@@ -49,7 +72,14 @@ then
   exit 0
 fi
 echo "DIFFERENT $file"
-otool -tv "$tmp/before.o" > "$tmp/before.s"
-otool -tv "$tmp/after.o" > "$tmp/after.s"
+# otool on macOS; objdump elsewhere (otool is missing on Linux, and set -e
+# would end the script there with the status of the missing command).
+for side in before after
+do
+  if command -v otool > /dev/null
+  then otool -tv "$tmp/$side.o" > "$tmp/$side.s"
+  else objdump -d --no-show-raw-insn "$tmp/$side.o" > "$tmp/$side.s"
+  fi
+done
 diff "$tmp/before.s" "$tmp/after.s" | head -20
 exit 1

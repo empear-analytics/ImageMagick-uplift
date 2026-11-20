@@ -23,6 +23,9 @@
 # both sides (see below).
 # CALLER and HELPER themselves are not compared here: their text is checked by
 # refactor_guard.py (literals and calls) and by tools/struct_fill_check.py.
+# HDRS=1 compiles the REV side against REV's own headers, as in obj_identical.sh:
+# for a header step (a header Recipe B on a MagickPrivate function, say), run it on
+# each including .c file.
 set -e
 file=$1
 caller=$2
@@ -71,12 +74,32 @@ PY
   done
   echo "kept out of line on both sides: $NOINLINE"
 fi
+# HDRS=1: compile the REV side against REV's own headers. Without it both sides
+# include the working tree's headers, so a step that changes only a header (or a
+# header and the file) is invisible here. The .h files of MagickCore/, MagickWand/
+# and FILE's directory as committed at REV are extracted into a temporary tree that
+# the REV side searches before the working tree (after the build directory, whose
+# generated headers both sides share). Headers new in the working tree are not in
+# REV, so the REV side finds them in the working tree, as REV's code never names them.
+if [ -n "${HDRS:-}" ]
+then
+  mkdir "$tmp/hdrs"
+  git -C "$root" ls-tree -r --name-only "$rev" -- MagickCore MagickWand "$(dirname "$file")" |
+    grep '\.h$' | sort -u > "$tmp/hdrs.list"
+  (cd "$root" && xargs git archive "$rev" < "$tmp/hdrs.list") | tar -x -C "$tmp/hdrs"
+  echo "HDRS=1: the $rev side compiles against $rev's headers ($(wc -l < "$tmp/hdrs.list" | tr -d ' ') files)" >&2
+fi
 for side in before after
 do
+  hb= hd=
+  if [ "$side" = before ] && [ -n "${HDRS:-}" ]
+  then
+    hb="-I$tmp/hdrs" hd="-I$tmp/hdrs/$(dirname "$file")"
+  fi
   ( cd "$tmp/$side" &&
     eval clang -c -Wno-builtin-macro-redefined -D__LINE__=0 \
-      "-D__FILE__=\\\"pp\\\"" -DHAVE_CONFIG_H -I"$build" -I"$root" \
-      -I"$build/config" -I"$root/$(dirname "$file")" $cppflags $cflags ${EXTRA_CFLAGS:-} -g0 \
+      "-D__FILE__=\\\"pp\\\"" -DHAVE_CONFIG_H -I"$build" $hb -I"$root" \
+      -I"$build/config" $hd -I"$root/$(dirname "$file")" $cppflags $cflags ${EXTRA_CFLAGS:-} -g0 \
       -o "$tmp/$side.o" "$base" ) || { echo "BUILD FAILED ($side)"; exit 1; }
 done
 # An object file with no function in it proves nothing: the build does not

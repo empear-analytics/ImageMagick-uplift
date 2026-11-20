@@ -1,0 +1,53 @@
+# Private headers that cs-mcp cannot score ("Could not determine Code Health score.") and that
+# were read and found to hold no function definition. tools/codescene_precommit.py lets such a
+# header pass as 10.0 only when the content being scored has exactly the git blob hash listed
+# for its path here (`git hash-object <file>`): the entry names the reviewed content, not just
+# the file. Any edit to a listed header changes its hash, so the gate refuses it until the same
+# commit updates the entry to the new content's hash, which puts the edit and its re-review
+# (no function definition added) in one diff. Any other header without a score is refused:
+# cs-mcp says the same for a header it cannot parse, and a heuristic for "no function here" was
+# bypassed by a K&R definition and by a macro between ')' and '{' (review, round 36).
+# Format: path, blob hash, then '#' and the reason (no static or inline function, no ')'
+# followed by '{' outside a macro body). Seeded 2026-11-20 (campaign A round 36, lane c) from
+# a scan of all 172 gated *-private.h files on campaign/W49-c: these 41 gave no score.
+MagickCore/accelerate-private.h 055e84a4fac46dd165215db911f2c0a9b663fa54  # MagickPrivate declarations only
+MagickCore/accelerate-recreate-buffer-private.h 921d03af784c52f96a5e3914e5613316c5d18cca  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
+MagickCore/accelerate-recreate-release-private.h 9fd2fd49dac2444619c8c6efdd66ac9301c24a88  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
+MagickCore/animate-private.h 320dab7ba985d8f6fe8adc159b57428f228a42ce  # declarations only
+MagickCore/annotate-private.h dc6ede4f864d86b7fdef189a435b78bd97d1bb82  # declarations only
+MagickCore/blob-private.h 7e08e6884804d639e534a980bb2c9c071a6faa7c  # enums, macros and declarations
+MagickCore/coder-private.h 228dd338c5b9319afb4d23af8df8cb113eab55b8  # declarations only
+MagickCore/configure-private.h 25a0dace172e9a8ef83f18039c2c942301996f85  # declarations only
+MagickCore/display-private.h 26fb158c606bb08f20c8b521c091646f8a849935  # declarations only
+MagickCore/distribute-cache-private.h 4b602a4508276e878e58c84ad60029deb03f0ed5  # a struct and declarations
+MagickCore/exception-private.h b65d9ac7a3fbd7bbe6e817cb899fe6dc8f597f9f  # Throw*Exception statement macros and declarations
+MagickCore/fx-private.h 0c44c015c9028307f70a211c18775e1cac0813ef  # declarations only
+MagickCore/gem-private.h 15d570c9e4f788a0a3eaef31a2a1ba82c337ae06  # declarations only
+MagickCore/geometry-private.h 4e82a0c5b095769d45947062d6790a4f9ab9bf2f  # declarations only
+MagickCore/linked-list-private.h eb5e90c85edfe3b4ac6a610009ee46ebbf70aae8  # a struct and declarations
+MagickCore/log-private.h 515cfd2f9f1d7f992d335e1b9023f6778ac98ba4  # declarations only
+MagickCore/magic-private.h 64fb0e9ee390eeb0c003b188c2286e6907eae7e2  # declarations only
+MagickCore/matrix-private.h 8fc0968e262684e0900bca6ae93e8f8c9918546a  # declarations only
+MagickCore/mime-private.h 22f913a538b498ba177cc7eea8b2969f76c39113  # an enum and declarations
+MagickCore/module-private.h 33399b5a22bc3aeeed1f941ad12fad86dcc81829  # declarations only
+MagickCore/monitor-private.h 490149ef77ba41533261fb546176ff70877b3b9c  # declarations only
+MagickCore/morphology-private.h 86e6ff05982b27f4f9a44be15a0b361ae3c162a2  # declarations only
+MagickCore/opencl-private.h 3142689ede806483fc5aa3e706622def96f89c3d  # structs, typedefs of OpenCL entry points, macros and declarations
+MagickCore/option-private.h a7e73d8e7dce2bb2267cc8c473e0919fbfab515e  # declarations only
+MagickCore/pixel-private.h 202c0bdceb89b581bc8c3b1d9eea6176f16b1e82  # declarations only
+MagickCore/profile-private.h 96c7e56b4d37a4ff4bdd86b37a4790aee75d5bd7  # declarations only
+MagickCore/registry-private.h 02378c83f0c1ee59cf033d651c83e31a293e5554  # declarations only
+MagickCore/resize-private.h 638b891ee4631624c433973f49f1f7c3b30a1308  # an enum and declarations
+MagickCore/resource-private.h 0965d639613e7b32a63e0c65aefe8f23234bfa15  # declarations only
+MagickCore/semaphore-private.h 5ede08477f418a9663eaa301e19207ec29b6d714  # declarations only
+MagickCore/signature-private.h 14a5dcc6c252130bb0e2f0586a863b5dbc4a506c  # macros and declarations
+MagickCore/stream-private.h 85c6790218a0efe848f516489f9e2ce6a9749e74  # declarations only
+MagickCore/transform-private.h 9bc354f911881abab635f0d84794a150ae078012  # declarations only
+MagickCore/type-private.h 4b5718a1095d83f6d783e59065adb6c8395d58d5  # declarations only
+MagickCore/version-private.h 70c7df120efbe81d94324663a038de725e5c35ac  # declarations only
+MagickCore/xwindow-image-private.h 17c260a1f0a3ea5496d5e8d4df4b4d34fdfd9262  # declarations only
+MagickWand/mogrify-private.h 0544ce6ae8e3a70f4e35db68d5586455a0b8d896  # image-stack statement macros and a struct
+MagickWand/operation-private.h 114065db51182b7afbd82de2a1c711a004599cb1  # declarations only
+MagickWand/pixel-wand-private.h bef846a1f23c571ab9cea2f1540bbfb332bfdf75  # declarations only
+MagickWand/wandcli-private.h 2d93f9f1e4476b673c7df7908673975ca9cda4ee  # CLIWandException* statement macros, an enum and structs
+coders/psd-private.h 686d846dd35e090fe8bc5914317abf76e1f9d623  # a struct and declarations

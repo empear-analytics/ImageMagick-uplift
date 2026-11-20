@@ -23676,6 +23676,28 @@ against the headers of `HEAD` and of the working tree (the carved and the new he
 ahead of every `-I` path), wide candidate's flags, `__LINE__` and `__FILE__` pinned:
 preprocessed unit and object both identical. Step 1's bar is the carved header's score
 before the step; both products must reach it and one must rise above it.
+Mid-file conditional form (mandate, 2026-11-19; campaign A round 36; owner 2026-11-20, "private
+headers may be ... included mid-file", read by the main session as covering mid-file includes
+in general, not only in X11 files, and flagged in the PR): Form A also applies to a `.c` file
+whose include block is followed by a whole-file conditional (`#if
+defined(MAGICKCORE_OPENCL_SUPPORT)` in `opencl-initialize.c`) that itself opens with a
+conditional `#include` (`#if defined(MAGICKCORE_LTDL_DELEGATE)` / `#include "ltdl.h"` /
+`#endif`), which some build compiles, so that naming the new header in the include block would
+put the run's items before that header's tokens. The run then begins with the blank line after
+that inner `#endif` (the blank line stays in the `.c` file, below the new include) and ends
+directly before the first item that stays; the `.c` file names the new header on the line
+directly after the inner `#endif`, inside the file's conditional, where the run stood. The
+header holds the items verbatim and in order inside its include guard and adds no wrapping
+conditional of its own (no `#if defined(MAGICKCORE_OPENCL_SUPPORT)` around the items: its one
+include already stands inside the file's conditional); the conditional blocks inside the run
+(`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and
+all, unedited. The translation unit has the same tokens in the same order in every
+configuration. Step 4's proof: `tools/pp_identical.sh` and
+`tools/obj_identical.sh` in every build that compiles the file (`WIDE=1`, and `BUILD=` each CI
+configuration that compiles it, such as `ci-gcc-x` and `ci-clang-x`), `IDENTICAL` (or
+`pp_identical` differing only in indentation, identical under `diff -b`), and `NOTHING
+COMPILED` in the narrow build before and after. Unbuilt branches inside the run (`#ifdef
+_WIN32` in the accelerate timer) move verbatim under the owner's 2026-11-20 ruling.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -25912,6 +25934,105 @@ for the owner's confirmation.
 
 ---
 
+## Recipe UB - Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Overall Code
+Complexity* on a function that holds a conditional block no Linux build compiles (an
+`#ifdef` of a macro nothing defines, such as `RECREATEBUFFER` in the OpenCL histogram
+methods, or an `#if 0` block), whose text CodeScene counts (its `if`s and lines) although no
+compiler ever sees it. The block names the function's locals (or names that no longer exist:
+`accelerate-histogram.c`'s block assigns `mem_flags`, `length` and `clStatus` and reads
+`context`, none of which `ComputeEqualizeImage` declares), so it cannot move into a helper
+without being edited, and every extraction around it is blocked by the rule that unbuilt code
+is never edited.
+
+**Not covered by:** the *Preprocessor branches* exception for `#if 0`, which moves a dead
+branch together with the code that holds it (an extraction); here the block moves alone and
+nothing around it changes. Recipe OH, which moves file-scope items to a header named in the
+include block; here the block stays inside its function and the header is named where the
+block stood. Recipe S (whole functions, a branch inside them).
+
+**How:**
+
+1. Probe first: replace the block by the `#include` line of step 3 in a copy of the file and
+   score the copy with `tools/ch.py`. Take the step when the file rises, or when the step is
+   the first of a chain whose next step is named and probed (rule 2).
+2. The block. It runs from its opening directive (`#ifdef X`, `#if 0`) through its matching
+   `#endif`, both lines included, and no build compiles any line of it: its condition is
+   false in every configuration (`grep -rn X` over the tree, `configure.ac`, `config/` and
+   the Windows project files finds no definition; `#if 0` needs no check). A block with an
+   `#else` that some build compiles is not taken.
+3. The header. Create `MagickCore/<stem>-<theme>-private.h` holding the short licence comment
+   of the private headers, saying which functions include it in place, and then the block
+   byte for byte. It has no include guard and no other code: it is a fragment, included where
+   the block stood, possibly in several places. List it under `MAGICKCORE_NOINST_HDRS` and
+   `MAGICKCORE_BASE_SRCS` in `MagickCore/Makefile.am`, mirrored in `Makefile.in`.
+4. The file. Replace the block's lines by one line, `#include
+   "MagickCore/<stem>-<theme>-private.h"`, at column 0 where the opening directive stood.
+   Nothing else changes; a comment above the block stays above the include. Another function
+   (in this file or another) that holds the same block byte for byte includes the same header
+   in a commit of its own; no copy of the header is made.
+5. Proof. A script checks that the header's text after its licence comment equals the lines
+   removed from the file, and that `git show HEAD:<file>` with the include line replaced by
+   that text is the working file. `tools/obj_identical.sh` prints `IDENTICAL` in every build
+   that compiles the function (`WIDE=1` for OpenCL and X11), and in the narrow build when it
+   compiles it. `tools/pp_identical.sh` prints `IDENTICAL`, or `DIFFERENT` only in the
+   indentation of the line after the include (`clang -E -P` rebuilds a line's leading blanks
+   from its column and loses one after a nested file returns); then the units compared with
+   `diff -b` are identical, which the commit quotes. With the macro defined, the unit gets
+   the same tokens in the same place, because `#include` is textual.
+6. Checks: `tools/ci_linux_warnings.sh --campaign-a`, `refactor_guard.py --combined` over the
+   file and the header (every literal's total unchanged), the scores of the file and of the
+   header, and the wide oracle when a case reaches the function.
+
+**Before:** (`accelerate-histogram.c`, `ComputeEqualizeImage`)
+
+```c
+  /* recreate input buffer later, in case image updated */
+#ifdef RECREATEBUFFER
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+#endif
+```
+
+**After:**
+
+```c
+  /* recreate input buffer later, in case image updated */
+#include "MagickCore/accelerate-recreate-release-private.h"
+```
+
+with `accelerate-recreate-release-private.h` holding the licence comment and the four lines
+from `#ifdef RECREATEBUFFER` to `#endif`.
+
+**Careful:**
+
+- The block is dead text: nothing in it is edited, not even names that no longer exist in its
+  function. Whoever defines the macro later finds it, unchanged, in the header the function
+  names in its place, and must adjust it there, as before.
+- No include guard: a guard would make a second inclusion in one translation unit (two
+  functions of one file holding the same block) silently empty, so the second place would
+  lose its text under the macro.
+- `__LINE__` of the code after the block changes (fewer lines in the file); the proof pins it
+  and the oracle normalises it.
+- CodeScene does not see the block any more, so the function's score rises without any code
+  changing: this is the point of the recipe, and the reason it is limited to text no build
+  compiles (owner 2026-11-20: such code "may move verbatim into a header; it is never edited
+  or deleted").
+
+**Evidence level:** guard, with step 5's identities (the block is not compiled; the rest of
+the unit is unchanged).
+
+**Provenance:** 2026-11-20, from `accelerate-histogram.c` (8.85) and
+`accelerate-contrast-stretch.c` (7.30) (campaign A, W49 round 36, lane c): both hold the same
+two `#ifdef RECREATEBUFFER` blocks, which CodeScene counts in `ComputeEqualizeImage` (cc 16 to
+12 and 103 to 84 lines in a probe, the file 8.85 to 8.95) and `ComputeContrastStretchImage`
+(cc 79 to 75, 7.30 to 7.38). Written under the owner's ruling of 2026-11-20 that code no Linux
+build compiles may move verbatim into a header. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26479,3 +26600,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | Step 1's bar in a stub-probed chain of several headers out of one file is the file's score before the chain's first step, not the score an earlier header of the chain raised it to; the message names both numbers | `display-image.c`: the first two headers raise it 6.49 to 7.55, the next two (the draw and undo commands; the `XApply*` command appliers with their static argument counts and duplication) score 7.10 in the probe, above 6.49 and below the file's 7.32 to 7.55 at their steps; the chain ends at 9.68. Read from the owner's 2026-11-17 ruling (products "at or above the original's score"); redone from W41 lane b2's held `a71f4805d`; campaign A, W49 round 36, lane b | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | B | Step 1, *MagickPrivate form*: a `MagickPrivate` function of a private, not installed header may be bundled when the typedef stands in that header above the prototype (inside the same conditionals), every caller in the tree changes in the same commit (a caller in unbuilt code or in the other campaign's files holds the step), the function is never taken by address; proof object identity per file with `-fno-inline` against each side's own headers apart from the bundled function and the changed callers, identical objects for the other includers, the oracle on the function and reached callers, *Unreached functions: B and N* for unreached ones, the timing rule for calls in per-pixel loops or OpenMP regions; a `static` callee taking exactly the bound locals may take the same struct under step 8's *Existing input struct* form | The owner's 2026-11-20 answer ("I answer yes to that") allowing `MagickPrivate` signatures to change; about 51 campaign A files sit at 9.68 with *Excess Number of Function Arguments* alone, 13 of them held only by `MagickPrivate` or `static` functions (`AccelerateFunctionImage`, `AccelerateModulateImage`, `AccelerateResizeImage`, `AccelerateMotionBlurImage`, `EnqueueOpenCLKernel`, `MorphologyApply`, the widget and xwindow entry points; campaign A, W49 round 36, lane a) | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *Mid-file form*, carved again: a mid-file header's leading run (after its guard's `#define`) moves verbatim into a new header, and the `.c` file names it directly above its `#include` of the carved header; banners of functions left behind move to above them; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags); both products at or above the carved header's score, one above it | The `display-image-*` headers of round 36's first batch (6.89 to 9.09) carry *Number of Functions*, *Lines of Code* and, once smaller, *Overall Code Complexity* and the duplication the 27,000-line file hid; probes of one cut each: annotate 6.89 to 8.28 and 9.09, crop 6.89 to 8.54 and 8.28, draw 7.10 to 7.32 and 7.78, matte 7.55 to 8.54 and 9.09, apply 7.10 to 7.32 and 7.32, window 9.09 to 9.09 and 10.0; campaign A, W49 round 36, lane b | mandate (2026-11-19) |
+| 2026-11-20 | NEW | UB | Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place: a conditional block no Linux build compiles (`#ifdef RECREATEBUFFER`, `#if 0`) inside a function moves, byte for byte, into a guard-less private header that the function `#include`s at the block's place; files holding the same block include the same header; proof by script (the text moved unchanged) and `pp_identical.sh`/`obj_identical.sh` IDENTICAL | `accelerate-histogram.c`'s `ComputeEqualizeImage` and `accelerate-contrast-stretch.c`'s `ComputeContrastStretchImage` (campaign A, W49 round 36, lane c), each holding the same two `RECREATEBUFFER` blocks; probes 8.85 to 8.95 and 7.30 to 7.38; the owner's ruling of 2026-11-20 that code no Linux build compiles may move verbatim into a header | mandate (2026-11-19) |
+| 2026-11-20 | WORDING | UB | Step 5: `pp_identical.sh` may print DIFFERENT only in the indentation of the line after the include (clang `-E -P` loses a leading blank after a nested file returns); the units must then be identical under `diff -b`, and `obj_identical.sh` must print IDENTICAL | The first use, `accelerate-histogram.c` (wide build): one line, `  {` against ` {`, object IDENTICAL | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *Mid-file conditional form* of Form A: when the file's whole-file conditional opens with a conditional `#include` that some build compiles (`ltdl.h` in `opencl-initialize.c`), the run begins after that include's `#endif` and the new header is named on the next line, inside the conditional (a mid-file include); the header has no conditional of its own; proof `pp_identical`/`obj_identical` in every build that compiles the file | `opencl-initialize.c` (campaign A, W49 round 36, lane c): *Lines of Code in a Single File* (1307 lines); a probe of the run from its typedefs to `LoadOpenCLBenchmarks` leaves the file at 10.0 and the header at 9.38 (the file's score before); naming the header in the include block would move `ltdl.h`'s tokens after the items in the wide build, which defines `MAGICKCORE_LTDL_DELEGATE`; owner 2026-11-20 on mid-file includes, as the main session reads it | mandate (2026-11-19) |
+| 2026-11-20 | WORDING | OH | *Mid-file conditional form*: the run begins with the blank line after the inner `#endif` (which stays in the `.c` file below the include); "no conditional of its own" means no wrapping conditional around the items; the conditional blocks inside the run (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and all, unedited | Review of `247c503b7` (campaign A, W49 round 36, lane c): the wording left the start of the run and the inner conditionals ambiguous; `02688eb72` did exactly this | mandate (2026-11-19) |

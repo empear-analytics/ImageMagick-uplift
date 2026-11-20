@@ -90,6 +90,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-recreate-buffer-private.h \
+  MagickCore/accelerate-recreate-release-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate.c \
   MagickCore/animate-window.c \
@@ -402,6 +404,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
+  MagickCore/opencl-initialize-benchmark-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -718,6 +721,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-recreate-buffer-private.h \
+  MagickCore/accelerate-recreate-release-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
   MagickCore/animate-window-command-private.h \
@@ -852,6 +857,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
+  MagickCore/opencl-initialize-benchmark-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \

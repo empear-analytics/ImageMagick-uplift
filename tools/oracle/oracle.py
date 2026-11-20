@@ -1042,7 +1042,14 @@ def print_load_sensitive(run):
           % len(listed))
     for e in run.settled:
         print("  SETTLED %s  %s: %s under load, the same when rerun alone (%s)"
-              % (e["id"], e["label"], "; ".join(e["why"]), e["reason"]))
+              % (e["id"], e["label"], short_why(e["why"]), e["reason"]))
+
+
+def short_why(why, keep=3):
+    """The first KEEP reasons of a difference, and how many more (a timed-out side of
+    infra/0fd402f13a lists 10300 files)."""
+    more = len(why) - keep
+    return "; ".join(why[:keep]) + ("; and %d more" % more if more > 0 else "")
 
 
 def print_timeouts(slow):
