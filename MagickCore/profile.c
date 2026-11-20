@@ -767,6 +767,123 @@ static void SetLCMSInfoIntent(const Image *image,LCMSInfo *target_info)
   }
 }
 
+typedef struct _LCMSInfoScales
+{
+  double
+    cmyk_scale,
+    lab_scale_l,
+    lab_scale_ab,
+    lab_translate_ab;
+} LCMSInfoScales;
+
+static MagickBooleanType SetLCMSInfoFromColorSignature(LCMSInfo *info,
+  const cmsColorSpaceSignature signature,const MagickBooleanType highres,
+  const LCMSInfoScales *scales)
+{
+  switch (signature)
+  {
+    case cmsSigLabData:
+    {
+      info->colorspace=LabColorspace;
+      if (highres != MagickFalse)
+        {
+          info->type=(cmsUInt32Number) TYPE_Lab_DBL;
+          info->scale[0]=scales->lab_scale_l;
+          info->scale[1]=scales->lab_scale_ab;
+          info->scale[2]=scales->lab_scale_ab;
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
+          info->translate[1]=scales->lab_translate_ab;
+          info->translate[2]=scales->lab_translate_ab;
+#endif
+        }
+#if (MAGICKCORE_QUANTUM_DEPTH == 8)
+      else
+        info->type=(cmsUInt32Number) TYPE_Lab_8;
+#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
+      else
+        info->type=(cmsUInt32Number) TYPE_Lab_16;
+#endif
+      break;
+    }
+    case cmsSigRgbData:
+    {
+      info->colorspace=sRGBColorspace;
+      if (highres != MagickFalse)
+        info->type=(cmsUInt32Number) TYPE_RGB_DBL;
+#if (MAGICKCORE_QUANTUM_DEPTH == 8)
+      else
+        info->type=(cmsUInt32Number) TYPE_RGB_8;
+#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
+      else
+        info->type=(cmsUInt32Number) TYPE_RGB_16;
+#endif
+      break;
+    }
+    case cmsSigXYZData:
+    {
+      info->colorspace=XYZColorspace;
+      if (highres != MagickFalse)
+        info->type=(cmsUInt32Number) TYPE_XYZ_DBL;
+#if (MAGICKCORE_QUANTUM_DEPTH == 8)
+      else
+        info->type=(cmsUInt32Number) TYPE_XYZ_8;
+#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
+      else
+        info->type=(cmsUInt32Number) TYPE_XYZ_16;
+#endif
+      break;
+    }
+    default:
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetLCMSInfoFromSignature(LCMSInfo *info,
+  const cmsColorSpaceSignature signature,const MagickBooleanType highres,
+  const LCMSInfoScales *scales)
+{
+  switch (signature)
+  {
+    case cmsSigCmykData:
+    {
+      info->colorspace=CMYKColorspace;
+      info->channels=4;
+      if (highres != MagickFalse)
+        {
+          info->type=(cmsUInt32Number) TYPE_CMYK_DBL;
+          SetLCMSInfoScale(info,scales->cmyk_scale);
+        }
+#if (MAGICKCORE_QUANTUM_DEPTH == 8)
+      else
+        info->type=(cmsUInt32Number) TYPE_CMYK_8;
+#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
+      else
+        info->type=(cmsUInt32Number) TYPE_CMYK_16;
+#endif
+      break;
+    }
+    case cmsSigGrayData:
+    {
+      info->colorspace=GRAYColorspace;
+      info->channels=1;
+      if (highres != MagickFalse)
+        info->type=(cmsUInt32Number) TYPE_GRAY_DBL;
+#if (MAGICKCORE_QUANTUM_DEPTH == 8)
+      else
+        info->type=(cmsUInt32Number) TYPE_GRAY_8;
+#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
+      else
+        info->type=(cmsUInt32Number) TYPE_GRAY_16;
+#endif
+      break;
+    }
+    default:
+      return(SetLCMSInfoFromColorSignature(info,signature,highres,scales));
+  }
+  return(MagickTrue);
+}
+
 static void SetImageTypeFromSignature(Image *image,
   const cmsColorSpaceSignature signature)
 {
@@ -1393,93 +1510,12 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             SetLCMSInfoTranslate(&source_info,0.0);
             source_info.colorspace=sRGBColorspace;
             source_info.channels=3;
-            switch (cmsGetColorSpace(source_info.profile))
             {
-              case cmsSigCmykData:
-              {
-                source_info.colorspace=CMYKColorspace;
-                source_info.channels=4;
-                if (highres != MagickFalse)
-                  {
-                    source_info.type=(cmsUInt32Number) TYPE_CMYK_DBL;
-                    SetLCMSInfoScale(&source_info,100.0);
-                  }
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_CMYK_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_CMYK_16;
-#endif
-                break;
-              }
-              case cmsSigGrayData:
-              {
-                source_info.colorspace=GRAYColorspace;
-                source_info.channels=1;
-                if (highres != MagickFalse)
-                  source_info.type=(cmsUInt32Number) TYPE_GRAY_DBL;
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_GRAY_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_GRAY_16;
-#endif
-                break;
-              }
-              case cmsSigLabData:
-              {
-                source_info.colorspace=LabColorspace;
-                if (highres != MagickFalse)
-                  {
-                    source_info.type=(cmsUInt32Number) TYPE_Lab_DBL;
-                    source_info.scale[0]=100.0;
-                    source_info.scale[1]=255.0;
-                    source_info.scale[2]=255.0;
-#if !defined(MAGICKCORE_HDRI_SUPPORT)
-                    source_info.translate[1]=(-0.5);
-                    source_info.translate[2]=(-0.5);
-#endif
-                  }
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_Lab_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_Lab_16;
-#endif
-                break;
-              }
-              case cmsSigRgbData:
-              {
-                source_info.colorspace=sRGBColorspace;
-                if (highres != MagickFalse)
-                  source_info.type=(cmsUInt32Number) TYPE_RGB_DBL;
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_RGB_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_RGB_16;
-#endif
-                break;
-              }
-              case cmsSigXYZData:
-              {
-                source_info.colorspace=XYZColorspace;
-                if (highres != MagickFalse)
-                  source_info.type=(cmsUInt32Number) TYPE_XYZ_DBL;
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_XYZ_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  source_info.type=(cmsUInt32Number) TYPE_XYZ_16;
-#endif
-                break;
-              }
-              default:
+              const LCMSInfoScales
+                source_scales = { 100.0, 100.0, 255.0, (-0.5) };
+
+              if (SetLCMSInfoFromSignature(&source_info,cmsGetColorSpace(
+                  source_info.profile),highres,&source_scales) == MagickFalse)
                 ThrowProfileException(ImageError,
                   "ColorspaceColorProfileMismatch",name);
             }
@@ -1489,93 +1525,12 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             SetLCMSInfoScale(&target_info,1.0);
             SetLCMSInfoTranslate(&target_info,0.0);
             target_info.channels=3;
-            switch (signature)
             {
-              case cmsSigCmykData:
-              {
-                target_info.colorspace=CMYKColorspace;
-                target_info.channels=4;
-                if (highres != MagickFalse)
-                  {
-                    target_info.type=(cmsUInt32Number) TYPE_CMYK_DBL;
-                    SetLCMSInfoScale(&target_info,0.01);
-                  }
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_CMYK_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_CMYK_16;
-#endif
-                break;
-              }
-              case cmsSigGrayData:
-              {
-                target_info.colorspace=GRAYColorspace;
-                target_info.channels=1;
-                if (highres != MagickFalse)
-                  target_info.type=(cmsUInt32Number) TYPE_GRAY_DBL;
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_GRAY_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_GRAY_16;
-#endif
-                break;
-              }
-              case cmsSigLabData:
-              {
-                target_info.colorspace=LabColorspace;
-                if (highres != MagickFalse)
-                  {
-                    target_info.type=(cmsUInt32Number) TYPE_Lab_DBL;
-                    target_info.scale[0]=0.01;
-                    target_info.scale[1]=1/255.0;
-                    target_info.scale[2]=1/255.0;
-#if !defined(MAGICKCORE_HDRI_SUPPORT)
-                    target_info.translate[1]=0.5;
-                    target_info.translate[2]=0.5;
-#endif
-                  }
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_Lab_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_Lab_16;
-#endif
-                break;
-              }
-              case cmsSigRgbData:
-              {
-                target_info.colorspace=sRGBColorspace;
-                if (highres != MagickFalse)
-                  target_info.type=(cmsUInt32Number) TYPE_RGB_DBL;
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_RGB_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_RGB_16;
-#endif
-                break;
-              }
-              case cmsSigXYZData:
-              {
-                target_info.colorspace=XYZColorspace;
-                if (highres != MagickFalse)
-                  target_info.type=(cmsUInt32Number) TYPE_XYZ_DBL;
-#if (MAGICKCORE_QUANTUM_DEPTH == 8)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_XYZ_8;
-#elif (MAGICKCORE_QUANTUM_DEPTH == 16)
-                else
-                  target_info.type=(cmsUInt32Number) TYPE_XYZ_16;
-#endif
-                break;
-              }
-              default:
+              const LCMSInfoScales
+                target_scales = { 0.01, 0.01, 1/255.0, 0.5 };
+
+              if (SetLCMSInfoFromSignature(&target_info,signature,highres,
+                  &target_scales) == MagickFalse)
                 ThrowProfileException(ImageError,
                   "ColorspaceColorProfileMismatch",name);
             }
