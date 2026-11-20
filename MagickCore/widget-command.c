@@ -371,6 +371,15 @@ static void ClientCommandMessage(Display *display,XWindows *windows,
     windows->command.screen);
 }
 
+static void MoveCommandWindow(XWindows *windows,XEvent *event)
+{
+  if (event->xconfigure.send_event != 0)
+    {
+      windows->command.x=event->xconfigure.x;
+      windows->command.y=event->xconfigure.y;
+    }
+}
+
 static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
   size_t state)
 {
@@ -379,11 +388,7 @@ static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
   */
   if (event->xconfigure.window != windows->command.id)
     return(state);
-  if (event->xconfigure.send_event != 0)
-    {
-      windows->command.x=event->xconfigure.x;
-      windows->command.y=event->xconfigure.y;
-    }
+  MoveCommandWindow(windows,event);
   if ((event->xconfigure.width == (int) windows->command.width) &&
       (event->xconfigure.height == (int) windows->command.height))
     return(state);
@@ -521,18 +526,11 @@ static void HandleCommandEvent(const CommandWidgetEvent *tile,int *id,
 #define tile_width 112
 #define tile_height 70
 
-static void RedrawCommandButtons(Display *display,XWindows *windows,
-  const unsigned int number_selections)
+static void DrawCommandTile(Display *display,XWindows *windows)
 {
-  int
-    i;
-
   Pixmap
     tile_pixmap;
 
-  /*
-    Draw command buttons.
-  */
   tile_pixmap=XCreatePixmapFromBitmapData(display,windows->command.id,
     (char *) tile_bits,tile_width,tile_height,1L,0L,1);
   if (tile_pixmap != (Pixmap) NULL)
@@ -542,6 +540,14 @@ static void RedrawCommandButtons(Display *display,XWindows *windows,
         (int) ((windows->command.width-tile_width) >> 1),10,1L);
       (void) XFreePixmap(display,tile_pixmap);
     }
+}
+
+static void DrawCommandSelections(Display *display,XWindows *windows,
+  const unsigned int number_selections)
+{
+  int
+    i;
+
   for (i=0; i < (int) number_selections; i++)
   {
     XDrawBeveledButton(display,&windows->command,&(*SelectionInfoReference())[i]);
@@ -552,6 +558,16 @@ static void RedrawCommandButtons(Display *display,XWindows *windows,
       (int) ((*ToggleInfoReference()).height >> 1);
     XDrawTriangleEast(display,&windows->command,&(*ToggleInfoReference()));
   }
+}
+
+static void RedrawCommandButtons(Display *display,XWindows *windows,
+  const unsigned int number_selections)
+{
+  /*
+    Draw command buttons.
+  */
+  DrawCommandTile(display,windows);
+  DrawCommandSelections(display,windows,number_selections);
   XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
 }
 
@@ -714,6 +730,14 @@ static unsigned int SizeCommandWindow(const CommandSizing *sizing)
   return(number_selections);
 }
 
+static void AcquireCommandSelections(const unsigned int number_selections)
+{
+  if ((*SelectionInfoReference()) != (XWidgetInfo *) NULL)
+    (*SelectionInfoReference())=(XWidgetInfo *) RelinquishMagickMemory((*SelectionInfoReference()));
+  (*SelectionInfoReference())=(XWidgetInfo *) AcquireQuantumMemory(number_selections,
+    sizeof(*(*SelectionInfoReference())));
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -762,10 +786,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       /*
         Allocate selection info memory.
       */
-      if ((*SelectionInfoReference()) != (XWidgetInfo *) NULL)
-        (*SelectionInfoReference())=(XWidgetInfo *) RelinquishMagickMemory((*SelectionInfoReference()));
-      (*SelectionInfoReference())=(XWidgetInfo *) AcquireQuantumMemory(number_selections,
-        sizeof(*(*SelectionInfoReference())));
+      AcquireCommandSelections(number_selections);
       if ((*SelectionInfoReference()) == (XWidgetInfo *) NULL)
         {
           ThrowXWindowFatalException(ResourceLimitFatalError,

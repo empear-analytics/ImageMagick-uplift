@@ -23576,6 +23576,19 @@ line markers and blank lines dropped; every including object of an OpenMP -O2 tr
 identical to a snapshot of the parent, debug sections stripped; the C++ check runs on the
 MagickCore includers. Step 1's probe applies: the carved header rises and the new header
 scores at least the carved header's score before.
+X11 conditional form (mandate, 2026-11-19; campaign A round 35): Form A also applies to a
+`.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)`,
+whose matching `#endif` is the file's last directive (the `widget-*.c` split products). The
+run begins after that opener and the blank line after it (both stay in the `.c` file). The
+new header holds the run's items verbatim and in their order inside the same conditional,
+`#if defined(MAGICKCORE_X11_DELEGATE)` ... `#endif`, within its include guard, as the widget
+split headers do; the `.c` file names it as the last line of its include block, above the
+opener, so no `#include` stands inside the file's conditional (the open question of
+mid-file includes is not touched). With X11 the translation unit has the same tokens in the
+same order; without it, both are empty. Step 4's proof runs in the wide candidate, the only
+build that compiles the items (`WIDE=1` for `tools/pp_identical.sh` and
+`tools/obj_identical.sh`, both `IDENTICAL`), and `obj_identical.sh` in the narrow build
+prints `NOTHING COMPILED` for the file before and after.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -26372,3 +26385,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | MS | Merge twins differing in one statement run through a selector in a struct: the bodies are equal under role renaming except one run of whole statements (no declaration, no jump); a merged function takes a `{ first parameter, side }` struct in place of the first parameter (at most four parameters) and selects `RA` or `RB` at the run's place; the twins keep names and callers and call it with a constant; proof object identity per includer, else the oracle with both twins reached | `widget-browser-private.h`'s `ReleaseListBrowserAction` and `ReleaseListBrowserCancel` (campaign A, W47 round 34, lane b6): the header's one finding after `27a800815` (9.38); a probe of the merge 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | S | Step 2: a file-scope `static` variable of struct type that both parts name is shared through one pointer accessor `T *NameReference(void)`, on four conditions: one object per variable (`nm`), declaration, storage and initialiser unchanged; every use through `(*NameReference())`, no new copy of the struct; object identity per function with `-fno-inline` apart from the accessor calls and loads; the oracle on each rewritten function | `widget.c`'s `submenu_info` and `toggle_info` (campaign A, W47 round 34, lane b6), named by the Command and Menu families and declared in one group with `monitor_info` and `selection_info`; the main session's extension of the accessor form of the owner's round-23 ruling. A probe of the Command/Menu split with it left widget.c flat at 9.09 (Lines of Code remains), so the split was not taken | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | S | Step 2's struct-typed accessor: a pointer declarator of the same declaration group is shared on the same four conditions through `T **NameReference(void)`, every use written `(*NameReference())` | `widget.c`'s `*selection_info` (campaign A, W47 round 34, lane b6): the heap array of selection buttons that the Command family allocates and indexes and `DestroyXWidget` releases; found when the Command split of the probed chain did not compile without it | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | OH | *X11 conditional form* of Form A: in a `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)` closing at the file's end (the `widget-*.c` split products), the run begins after the opener; the new header wraps the items, verbatim and in order, in the same conditional inside its guard, and the `.c` file names it as the last line of its include block, above the opener (no mid-file include); proof `pp_identical.sh` and `obj_identical.sh` with `WIDE=1` (`pp_identical.sh` gains `WIDE=1`) | `widget-color.c`, `widget-font.c`, `widget-file.c`, `widget-text.c` and `widget-list.c` (campaign A, W48 round 35, lane a), each one family carrying *Lines of Code in a Single File* (one public root each, so Recipe S has nothing to split); probes: color 9.38 to 10.0 with a 10.0 header, font 9.38 to 10.0 with a 10.0 header, file 8.81 to 10.0 with a 9.38 header | mandate (2026-11-19) |
