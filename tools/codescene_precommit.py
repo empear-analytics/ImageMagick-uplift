@@ -14,7 +14,11 @@ Two exceptions, because both move code that was gated before rather than add any
     python3 tools/codescene_precommit.py        # checks what is staged
 
 Only library code is gated: .c and .cpp files in the subsystems that
-tools/codehealth_sweep.py scores. Adapted from the 3SX campaign.
+tools/codehealth_sweep.py scores, and the private headers there (`*-private.h`),
+which hold static and static inline functions (owner, 2026-11-20). A header with no
+function gets no score from CodeScene ("Could not determine Code Health score."):
+it counts as 10.0, nothing in it to fault. Public headers are declarations and are
+not gated. Adapted from the 3SX campaign.
 """
 
 from __future__ import annotations
@@ -34,10 +38,13 @@ from cs_mcp_session import exchange
 REPO = Path(__file__).resolve().parent.parent
 # CodeScene does not return a Code Health score for declaration-only headers.
 # Their implementations remain covered when the corresponding source files are staged.
+# Private headers carry code of their own (split and carve products, inline helpers).
 SUFFIXES = {".c", ".cpp"}
+PRIVATE_HEADER = "-private.h"
 SUBSYSTEMS = ("MagickCore/", "MagickWand/", "coders/", "Magick++/lib/", "filters/", "utilities/")
 EXCLUDED = ()
 SCORE_RE = re.compile(r"Code Health score:\s*([0-9.]+)")
+NO_SCORE = "Could not determine Code Health score."
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -66,8 +73,12 @@ def cli_path() -> str:
     )
 
 
+def gated_kind(path: str) -> bool:
+    return Path(path).suffix.lower() in SUFFIXES or path.endswith(PRIVATE_HEADER)
+
+
 def interesting(path: str) -> bool:
-    if Path(path).suffix.lower() not in SUFFIXES:
+    if not gated_kind(path):
         return False
     return not any(path.startswith(prefix) for prefix in EXCLUDED)
 
@@ -75,7 +86,7 @@ def interesting(path: str) -> bool:
 def is_code_file(path: str) -> bool:
     if not path:
         return False
-    if Path(path).suffix.lower() not in SUFFIXES:
+    if not gated_kind(path):
         return False
     return path.startswith(SUBSYSTEMS) and not path.startswith(EXCLUDED)
 
@@ -155,7 +166,10 @@ def parse_score(stdout: str, path: str) -> float:
 
 
 def score(path: str, exe: str) -> float:
-    return parse_score(run_score_request(exe, path), path)
+    stdout = run_score_request(exe, path)
+    if path.endswith(".h") and NO_SCORE in stdout:
+        return 10.0  # a header with no function in it: nothing to fault
+    return parse_score(stdout, path)
 
 
 def temp_file(content: str, suffix: str) -> str:
