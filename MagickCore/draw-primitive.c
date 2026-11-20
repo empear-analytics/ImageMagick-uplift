@@ -809,6 +809,31 @@ static PathInfo *AcquirePrimitivePathInfo(const PrimitiveInfo *primitive_info,
   return(path_info);
 }
 
+static ssize_t AppendNewSubpathPoint(const NewSubpathPointInput *subpath,
+  PathInfo *path_info,ssize_t n,PointInfo *q)
+{
+  const PathInfoCode
+    code = subpath->code;
+
+  const PrimitiveInfo
+    *const primitive_info = subpath->primitive_info;
+
+  const size_t
+    i = subpath->i;
+
+  if (IsNewSubpathPoint(subpath) != MagickFalse)
+    {
+      /*
+        Eliminate duplicate points.
+      */
+      path_info[n].code=code;
+      path_info[n].point=primitive_info[i].point;
+      *q=primitive_info[i].point;
+      n++;
+    }
+  return(n);
+}
+
 static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
@@ -868,16 +893,7 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
       const NewSubpathPointInput
         subpath = { code, coordinates, q, primitive_info, i };
 
-      if (IsNewSubpathPoint(&subpath) != MagickFalse)
-        {
-          /*
-            Eliminate duplicate points.
-          */
-          path_info[n].code=code;
-          path_info[n].point=primitive_info[i].point;
-          q=primitive_info[i].point;
-          n++;
-        }
+      n=AppendNewSubpathPoint(&subpath,path_info,n,&q);
     }
     if (coordinates > 0)
       continue;  /* next point in current subpath */
