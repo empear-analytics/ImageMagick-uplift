@@ -26570,6 +26570,102 @@ finding on the new functions. Added by Claude Code (Claude Opus 5.5) under the m
 
 ---
 
+## Recipe TG - Guard a Loop's Tail Block with a Continue
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) on a
+function whose loop body ends in `if (c) { S }`, with no `else`, and `S` holds a further
+conditional that makes the bump: `constitute-write.c`'s `WriteImages`, whose write loop
+ends in `if (number_images != 1) { progress++; proceed=SetImageProgress(...); if (proceed
+== MagickFalse) break; }`.
+
+**Not covered by:** Recipe G, whose *Use when* names only *Deep, Nested Complexity* and
+which guards an outermost condition of the function (this one is the loop body's last
+statement, and the target finding is the bump); Recipe CE, which removes a `continue`
+from a handler chain; Recipe TC, which deletes a bare trailing `if (c) continue;`;
+Recipe UX, whose guard holds a clean-up and a retested condition; Recipes E, W, LB and
+BC, which move the block into a helper (here it holds `#pragma` lines, which no
+extraction recipe moves).
+
+**How:**
+
+1. The `if (c)` is the last statement of the body of a `for`, `while` or `do` loop, has no
+   `else`, and its block `S` holds no declaration at its top (or its declarations move
+   with it unchanged into the loop body, where no name of the body's scope clashes) and
+   no label. A `continue` inside `S` that belongs to the loop stays as it is; a `break`
+   or `continue` of a loop or `switch` nested in `S` stays too. `c` has no side effect.
+2. Replace `if (c) { S }` by `if (<inverse of c>) continue;` followed by the statements
+   of `S`, each two columns less indented (preprocessor lines keep column 1; a `#pragma`
+   line keeps its indentation relative to the statement it governs). The inverse follows
+   Recipe G's *Careful* (`a != b` becomes `a == b`; a floating-point comparison becomes
+   `!(...)`).
+3. A `do` loop is refused when `c` would be inverted around its controlling expression's
+   side effects: `continue` in a `do` body jumps to the test, as falling off the end
+   does, so the step is the same for `for`, `while` and `do`, but the loop's own test must
+   not depend on anything `S` was skipping (it does not: the original also reached the
+   test when `c` was false).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert.
+5. When the guard's `continue` raises the function into *Complex Method* (CodeScene counts
+   it as a branch), probe the file with the step that lowers the function's complexity
+   first, and commit that step before this one, so no commit lowers the score.
+
+**Before:**
+
+```c
+    if (write_info->adjoin != MagickFalse)
+      break;
+    if (number_images != 1)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
+        if (proceed == MagickFalse)
+          break;
+      }
+  }
+```
+
+**After:**
+
+```c
+    if (write_info->adjoin != MagickFalse)
+      break;
+    if (number_images == 1)
+      continue;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp atomic
+#endif
+    progress++;
+    proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
+    if (proceed == MagickFalse)
+      break;
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` held, the original ran `S` and fell off the end
+  of the body; the new body tests the inverse, finds it false, and runs the same
+  statements of `S` in the same order. When `c` did not hold, the original skipped `S`
+  and fell off the end, to the loop's increment and test; `continue` goes to the same
+  place (C11 6.8.6.2: `continue` jumps to the end of the loop body). Nothing follows the
+  `if` in the body, so nothing else is skipped or run.
+- Only indentation changes in `S`; its tokens, preprocessor lines included, stay as they
+  were. A `#pragma omp atomic` outside every parallel region governs the same statement.
+- Identical object code under the oracle build's flags proves the step on every input
+  for this build.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`.
+
+**Provenance:** 2026-11-21, from `constitute-write.c`'s `WriteImages` (campaign B, M141):
+its last bump is the progress block's `if (proceed == MagickFalse) break;` nested in `if
+(number_images != 1)`; a probe of the guard after a Recipe E step that takes the monitor
+suspension out, 9.92 to 10.0, object IDENTICAL. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27149,3 +27245,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | B | Step 5, one-line form: the one-line `const` declaration may also be the one declaration of the block form, and in either form it is allowed when the two-line form would carry the file past *Lines of Code in a Single File* enough to lower it, not only when it would make a *Large Method*; tokens, order and evaluation those of the two-line form | `XConfigureImageColormap`'s call in `display-image-annotate-private.h`'s `XColorEditRelease` (campaign A, W50 round 37, lane a): 9.09 -> 8.54 in a probe with the two-line block form, 9.09 with one line | mandate (2026-11-19) |
 | 2026-11-20 | NEW | CM | Name a Clamp Selection: assignments `t=A < 0.0 ? 0.0 : A >= E ? L : A;` with side-effect-free `double` operands become `t=ClampBoundsCoordinate(A,E,L);`, one `static inline` helper; object code identical or differing only in register choice | `draw-primitive.c`'s `ClampPolygonBounds` (cc 9 from four clamps; probe 3.60 to 3.67, out of *Complex Method*); campaign B, M141 | mandate (2026-10-24) |
 | 2026-11-20 | NEW | SL | Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants: two `switch`es whose cases are the same text up to the struct local they fill, the controlling expression and some constants, with the same leaving `default:`, become one `static MagickBooleanType` helper taking `T *info`, the value, the read locals and a `const` struct of role constants (read as `roles->r`), split into a chain when it would be a finding; each `switch` becomes the call with `== MagickFalse` running the original exit | `profile.c`'s `ProfileImage` (campaign B, M141): the source and target colour-space switches; a probe 7.41 to 8.17, cc 49 to 29 | mandate (2026-10-24) |
+| 2026-11-21 | NEW | TG | Guard a Loop's Tail Block with a Continue: a loop body's last statement `if (c) { S }`, no `else`, whose `S` nests the bump, becomes `if (<inverse>) continue;` followed by `S` one level out; `continue` goes where falling off the body went; proof `obj_identical.sh` IDENTICAL; a step lowering the function's cc goes first when the `continue` would raise it into *Complex Method* | `constitute-write.c`'s `WriteImages` (campaign B, M141): the progress block's nested `break`; a probe after a Recipe E step, 9.92 to 10.0 | mandate (2026-10-24) |
