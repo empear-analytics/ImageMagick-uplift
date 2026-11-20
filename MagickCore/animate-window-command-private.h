@@ -332,8 +332,10 @@ static void XInfoHelpCommand(const AnimateCommandTile *tile,
   {
     case InfoCommand:
     {
-      XDisplayImageInfo(display,resource_info,windows,(Image *) NULL,*image,
-        exception);
+      const XDisplayImageInfoTarget
+        target = { display, resource_info, windows };
+
+      XDisplayImageInfo(&target,(Image *) NULL,*image,exception);
       break;
     }
     case HelpCommand:

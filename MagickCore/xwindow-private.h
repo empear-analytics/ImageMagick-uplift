@@ -512,6 +512,18 @@ extern MagickPrivate MagickBooleanType
     unsigned int,ExceptionInfo *),
   XQueryColorCompliance(const char *,XColor *);
 
+typedef struct _XDisplayImageInfoTarget
+{
+  Display
+    *display;
+
+  const XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} XDisplayImageInfoTarget;
+
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
   XBestPixel(Display *,const Colormap,XColor *,unsigned int,XColor *),
@@ -522,7 +534,7 @@ extern MagickPrivate void
     ExceptionInfo *),
   XConstrainWindowPosition(Display *,XWindowInfo *),
   XDelay(Display *,const size_t),
-  XDisplayImageInfo(Display *,const XResourceInfo *,XWindows *,Image *,Image *,
+  XDisplayImageInfo(const XDisplayImageInfoTarget *,Image *,Image *,
     ExceptionInfo *),
   XDestroyWindowColors(Display *,Window),
   XFreeResources(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,

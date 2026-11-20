@@ -879,9 +879,12 @@ static void XShowImageCacheInfo(Display *display,XWindows *windows,
   XResourceInfo *resource_info,Image *undo_image,Image **image,
   ExceptionInfo *exception)
 {
+  const XDisplayImageInfoTarget
+    target = { display, resource_info, windows };
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
+  XDisplayImageInfo(&target,undo_image,*image,exception);
   XSetCursorState(display,windows,MagickFalse);
 }
 
