@@ -497,6 +497,20 @@ static PolygonInfo *ThrowPolygonAllocationFailure(PolygonInfo *polygon_info,
   return(DestroyPolygonInfo(polygon_info));
 }
 
+static MagickBooleanType GrowEdgePoints(PointInfo **points,const ssize_t n,
+  size_t *number_points)
+{
+  if (n == (ssize_t) (*number_points))
+    {
+      (*number_points)<<=1;
+      (*points)=(PointInfo *) ResizeQuantumMemory((*points),(size_t)
+        (*number_points),sizeof(*(*points)));
+      if ((*points) == (PointInfo *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -646,14 +660,8 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
     direction=next_direction;
     if (points == (PointInfo *) NULL)
       continue;
-    if (n == (ssize_t) number_points)
-      {
-        number_points<<=1;
-        points=(PointInfo *) ResizeQuantumMemory(points,(size_t) number_points,
-          sizeof(*points));
-        if (points == (PointInfo *) NULL)
-          return(ThrowPolygonAllocationFailure(polygon_info,exception));
-      }
+    if (GrowEdgePoints(&points,n,&number_points) == MagickFalse)
+      return(ThrowPolygonAllocationFailure(polygon_info,exception));
     point=path_info[i].point;
     points[n]=point;
     WidenEdgeBounds(point,&bounds);
