@@ -3161,16 +3161,14 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
       {
         if (knot_count != 0)
           {
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         /*
           Expected subpath length record.
         */
         knot_count=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-        blob+=22;
-        length=(size_t) ((ssize_t) length-MagickMin(22,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,22);
         break;
       }
       case 1:
@@ -3183,8 +3181,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
             /*
               Unexpected subpath knot.
             */
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         /*
@@ -3221,8 +3218,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
       }
       default:
       {
-        blob+=24;
-        length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,24);
         break;
       }
     }
