@@ -621,8 +621,13 @@ static MagickBooleanType XConfigureImage(Display *display,
   windows->image.x=((int) width*windows->image.x/windows->image.ximage->width);
   windows->image.y=((int) height*windows->image.y/
     windows->image.ximage->height);
-  status=XMakeImage(display,resource_info,&windows->image,image,
-    (unsigned int) width,(unsigned int) height,exception);
+  {
+    const XMakeImageRequest
+      image_request = { &windows->image, image, (unsigned int) width,
+        (unsigned int) height };
+
+    status=XMakeImage(display,resource_info,&image_request,exception);
+  }
   if (status == MagickFalse)
     XNoticeWidget(display,windows,"Unable to configure X image:",
       windows->image.name);

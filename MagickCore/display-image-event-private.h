@@ -367,9 +367,13 @@ static void XRecordMappedWindow(const DisplayEventContext *context,
       taint=(*display_image)->taint;
       XMakeStandardColormap(display,icon_visual,icon_resources,
         (*display_image),icon_map,icon_pixel,exception);
-      (void) XMakeImage(display,icon_resources,&windows->icon,
-        (*display_image),windows->icon.width,windows->icon.height,
-        exception);
+      {
+        const XMakeImageRequest
+          image_request = { &windows->icon, (*display_image),
+            windows->icon.width, windows->icon.height };
+
+        (void) XMakeImage(display,icon_resources,&image_request,exception);
+      }
       (*display_image)->taint=taint;
       (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
         windows->icon.pixmap);
@@ -1579,13 +1583,22 @@ static MagickStatusType XMakeDisplayXImages(const DisplayEventContext *context,
   if ((display_image->columns != width) || (display_image->rows != height))
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       display_image->filename);
-  status=XMakeImage(display,resource_info,&windows->image,display_image,
-    width,height,exception);
+  {
+    const XMakeImageRequest
+      image_request = { &windows->image, display_image, width, height };
+
+    status=XMakeImage(display,resource_info,&image_request,exception);
+  }
   if (status == MagickFalse)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       display_image->filename);
-  status=XMakeImage(display,resource_info,&windows->magnify,(Image *) NULL,
-    windows->magnify.width,windows->magnify.height,exception);
+  {
+    const XMakeImageRequest
+      image_request = { &windows->magnify, (Image *) NULL,
+        windows->magnify.width, windows->magnify.height };
+
+    status=XMakeImage(display,resource_info,&image_request,exception);
+  }
   if (status == MagickFalse)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       display_image->filename);

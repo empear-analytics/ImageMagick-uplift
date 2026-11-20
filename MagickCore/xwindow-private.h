@@ -516,6 +516,19 @@ typedef struct _XImageRenderTarget
     *pixel;
 } XImageRenderTarget;
 
+typedef struct _XMakeImageRequest
+{
+  XWindowInfo
+    *window;
+
+  Image
+    *image;
+
+  unsigned int
+    width,
+    height;
+} XMakeImageRequest;
+
 extern MagickPrivate MagickBooleanType
   XAnnotateImage(const XImageRenderTarget *,XAnnotateInfo *,Image *,
     ExceptionInfo *),
@@ -524,8 +537,8 @@ extern MagickPrivate MagickBooleanType
   XGetWindowColor(Display *,XWindows *,char *,ExceptionInfo *),
   XMagickProgressMonitor(const char *,const MagickOffsetType,
     const MagickSizeType,void *),
-  XMakeImage(Display *,const XResourceInfo *,XWindowInfo *,Image *,unsigned int,
-    unsigned int,ExceptionInfo *),
+  XMakeImage(Display *,const XResourceInfo *,const XMakeImageRequest *,
+    ExceptionInfo *),
   XQueryColorCompliance(const char *,XColor *);
 
 typedef struct _XDisplayImageInfoTarget

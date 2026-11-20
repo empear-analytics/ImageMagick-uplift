@@ -180,8 +180,13 @@ static void XMakePanImage(Display *display,XResourceInfo *resource_info,
   XCheckRefreshWindows(display,windows);
   windows->pan.x=(int) windows->image.x;
   windows->pan.y=(int) windows->image.y;
-  status=XMakeImage(display,resource_info,&windows->pan,image,
-    windows->pan.width,windows->pan.height,exception);
+  {
+    const XMakeImageRequest
+      image_request = { &windows->pan, image, windows->pan.width,
+        windows->pan.height };
+
+    status=XMakeImage(display,resource_info,&image_request,exception);
+  }
   if (status == MagickFalse)
     ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);

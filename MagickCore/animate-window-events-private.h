@@ -287,9 +287,14 @@ static void XHandleMapNotify(const AnimateEventContext *event_context,
         event_context->icon_resources,event_context->display_image,
         event_context->icon_map,event_context->icon_pixel,
         event_context->exception);
-      (void) XMakeImage(display,event_context->icon_resources,&windows->icon,
-        event_context->display_image,windows->icon.width,windows->icon.height,
-        event_context->exception);
+      {
+        const XMakeImageRequest
+          image_request = { &windows->icon, event_context->display_image,
+            windows->icon.width, windows->icon.height };
+
+        (void) XMakeImage(display,event_context->icon_resources,&image_request,
+          event_context->exception);
+      }
       (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
         windows->icon.pixmap);
       (void) XClearWindow(display,windows->icon.id);
@@ -832,8 +837,13 @@ static void XCreateSceneWindows(const AnimateEventContext *event_context,
         (image_list[scene]->rows != rows))
       ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
         image_list[scene]->filename);
-    status=XMakeImage(display,resource_info,&windows->image,image_list[scene],
-      columns,rows,exception) == MagickFalse ? 0 : 1;
+    {
+      const XMakeImageRequest
+        image_request = { &windows->image, image_list[scene], columns, rows };
+
+      status=XMakeImage(display,resource_info,&image_request,
+        exception) == MagickFalse ? 0 : 1;
+    }
     if (status == MagickFalse)
       ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
         images->filename);

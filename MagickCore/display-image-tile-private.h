@@ -2145,8 +2145,14 @@ static void XMakeBackgroundXImage(Display *display,Image *image,
   int
     status;
 
-  status=XMakeImage(display,resources,window_info,image,(*window_info).width,
-    (*window_info).height,exception) == MagickFalse ? 0 : 1;
+  {
+    const XMakeImageRequest
+      image_request = { window_info, image, (*window_info).width,
+        (*window_info).height };
+
+    status=XMakeImage(display,resources,&image_request,
+      exception) == MagickFalse ? 0 : 1;
+  }
   if (status == MagickFalse)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       image->filename);

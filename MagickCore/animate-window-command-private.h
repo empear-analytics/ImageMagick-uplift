@@ -208,8 +208,13 @@ static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
   (*window_info).height=(unsigned int) geometry_info.height;
   (*window_info).x=(int) geometry_info.x;
   (*window_info).y=(int) geometry_info.y;
-  status=XMakeImage(display,resources,window_info,image_list[0],
-    (*window_info).width,(*window_info).height,setup->exception);
+  {
+    const XMakeImageRequest
+      image_request = { window_info, image_list[0], (*window_info).width,
+        (*window_info).height };
+
+    status=XMakeImage(display,resources,&image_request,setup->exception);
+  }
   if (status == MagickFalse)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       setup->images->filename);
@@ -391,8 +396,12 @@ static void XCreateSceneXImage(const AnimateBackgroundSetup *setup,
       (image_list[scene]->rows != rows))
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       image_list[scene]->filename);
-  status=XMakeImage(setup->display,resources,window_info,image_list[scene],
-    columns,rows,setup->exception);
+  {
+    const XMakeImageRequest
+      image_request = { window_info, image_list[scene], columns, rows };
+
+    status=XMakeImage(setup->display,resources,&image_request,setup->exception);
+  }
   if (status == MagickFalse)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       setup->images->filename);

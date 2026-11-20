@@ -313,9 +313,13 @@ static MagickStatusType XConfigureMagnifyWindow(
   if (windows->magnify.mapped != MagickFalse &&
       windows->magnify.stasis != MagickFalse)
     {
-      status=XMakeImage(display,resource_info,&windows->magnify,
-        display_image,windows->magnify.width,windows->magnify.height,
-        exception);
+      {
+        const XMakeImageRequest
+          image_request = { &windows->magnify, display_image,
+            windows->magnify.width, windows->magnify.height };
+
+        status=XMakeImage(display,resource_info,&image_request,exception);
+      }
       XMakeMagnifyImage(display,windows,exception);
     }
   return(status);

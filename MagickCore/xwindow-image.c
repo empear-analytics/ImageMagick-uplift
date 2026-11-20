@@ -1965,9 +1965,16 @@ static void XAssignWindowImage(XWindowInfo *window,Image *image)
 }
 
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
-  const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
-  unsigned int width,unsigned int height,ExceptionInfo *exception)
+  const XResourceInfo *resource_info,const XMakeImageRequest *request,
+  ExceptionInfo *exception)
 {
+  XWindowInfo
+    *const window = request->window;
+
+  unsigned int
+    width = request->width,
+    height = request->height;
+
   int
     depth,
     format;
@@ -1993,12 +2000,12 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   (void) XCheckDefineCursor(display,window->id,window->busy_cursor);
   (void) XFlush(display);
   depth=(int) window->depth;
-  XAssignWindowImage(window,image);
+  XAssignWindowImage(window,request->image);
   if (window->image != (Image *) NULL)
     {
       {
-        const XWindowTransform transform = { display, window, image, width,
-          height, exception };
+        const XWindowTransform transform = { display, window, request->image,
+          width, height, exception };
 
         XTransformWindowImage(&transform);
       }
