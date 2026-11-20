@@ -423,9 +423,21 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyRaiseToImage(Display *display,XWindows *windows,Image **image,
-  char *bevel_width,ExceptionInfo *exception)
+static void XApplyRaiseToImage(const XMagickCommandContext *context,
+  char *bevel_width)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   RectangleInfo
     page_geometry;
 
@@ -472,7 +484,7 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XApplyRaiseToImage(display,windows,image,bevel_width,exception);
+  XApplyRaiseToImage(context,bevel_width);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
