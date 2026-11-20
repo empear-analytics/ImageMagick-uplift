@@ -25325,6 +25325,97 @@ for the owner's confirmation.
 
 ---
 
+## Recipe HM - Move a Family Header's Helpers into the Private Header It Includes
+
+**Use when:** CodeScene reports *Code Duplication* in a family header that a Recipe S split
+wrote (`<stem>-<family>-private.h`, which includes the split's first header
+`<stem>-core-private.h`), between `static inline` helpers that every file including the family
+header also sees through the first header, and moving those helpers into the first header
+clears the finding there while the first header keeps its score: `widget-browser-private.h`'s
+arrow helpers `XDrawTriangleEast`, `XDrawTriangleNorth` and `XDrawTriangleSouth` (near twins,
+three of the header's seven duplicated functions), which `widget-core-private.h` takes at its
+9.68 with no new finding.
+
+**Not covered by:** Recipe S step 2, which places a split's shared helpers when the split moves
+them out of a `.c` file, not afterwards between two headers; Recipe CH, which shares one
+helper defined identically in several headers through a new common header, and whose header
+must be new and 10.0; Recipe OH, which moves items of a `.c` file into a header only that file
+includes; Recipes MT, MV, CF and TI, which merge twins into one function (here the twins'
+texts differ in dozens of coordinate expressions, and they stay as they are).
+
+**How:**
+
+1. The family header `F` includes the first header `C` (its `#include` line stands above
+   its body), and every file that includes `F` therefore sees `C`'s definitions before
+   `F`'s; every item that moves is a `static inline` helper of `F` (with its `%` banner),
+   holding no `static` local and no pragma, standing under the same preprocessor
+   conditional in both headers (`#if defined(MAGICKCORE_X11_DELEGATE)`).
+2. Each moving helper names only library functions, `C`'s macros, types and helpers, and
+   other helpers that move with it (checked by reading); nothing of `F` that stays.
+3. Cut the helpers, in their order in `F`, with one blank line each, and paste them unchanged
+   at the end of `C`'s conditional, after its last helper. Nothing else changes; no `.c`
+   file changes.
+4. Every helper that moves is still used by at least two files (directly; `grep`), as Recipe S
+   asks of a shared header's items; the files that include `C` but not `F` gain unused
+   `static inline` definitions, which emit no code and draw no warning.
+5. Proof (Recipe CH step 5's form): every `.c` file that includes `C` or `F` (`grep -l`),
+   compiled with the build's flags (the wide candidate's for X11 code) at `-g0`, `__LINE__`
+   and `__FILE__` pinned, once against `HEAD`'s two headers and once against the working
+   tree's, gives byte-identical objects (`IDENTICAL` for every file).
+6. Checks: `tools/ci_linux_warnings.sh` on every including file (every configuration),
+   `refactor_guard.py --combined --calls` over both headers (`OK`), and `tools/ch.py` on both
+   headers: `F` rises and `C` does not fall.
+7. One commit for the set of helpers that clears the finding (rule 1's set), the message
+   naming each helper; `Recipe: HM`, `Verified: guard` with step 5's proof quoted (the oracle
+   is not needed when every object is identical; the branch's catalogues cover the step).
+
+**Before:** (`widget-browser-private.h`)
+
+```c
+#include "MagickCore/widget-core-private.h"
+...
+static inline void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  ...
+}
+```
+
+**After:** (the same text at the end of `widget-core-private.h`'s X11 conditional, gone from
+`widget-browser-private.h`)
+
+```c
+static inline size_t ClientWidgetMessage(Display *display,XWindows *windows,
+  ...
+}
+
+static inline void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  ...
+}
+```
+
+**Careful:**
+
+- A `static inline` helper of a header is one internal-linkage definition per translation unit,
+  before and after: a file that included `F` includes `C` through it (or before it), so it
+  compiles the same definition text, only earlier in the unit; step 2 makes every name it uses
+  visible at the new place. Step 5 proves every object unchanged byte for byte, so no
+  behaviour, timing or thread question arises.
+- Moving helpers out of `F` only to place them beside their twins in `C` would move the
+  finding, not clear it: step 6 requires that `C` keeps its score.
+
+**Evidence level:** guard, with object identity of every including file (step 5).
+
+**Provenance:** 2026-11-20, from `widget-browser-private.h` (campaign A, W47 round 34, lane
+b6): after the chain `7f769ef5c`..`0f15f5ac6` it scores 8.81 with *Code Duplication* in seven
+functions; a stub probe gave 9.38 without the four arrow helpers and `widget-core-private.h`
+9.68 with them (unchanged). Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-11-19 ("New recipes are fine"), for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25877,3 +25968,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | S | Step 2: a function-level `static` that a helper moving into the private header writes leaves the function for the original's file scope, renamed with a prefix from the function's name, storage, type, extent and initialiser unchanged, and is shared through one accessor; an array's accessor returns a pointer to the array (`T (*NameReference(void))[N]`), so `sizeof` keeps its value. One object as before, never a copy per including file; object comparison identical but the helper's accessor calls and the renamed `.bss` symbol | `widget.c`'s `ReleaseWidgetKey` (campaign A, W47 round 34, lane b6): its `command[MagickPathExtent]` and `key_symbol` serve the Color, File and Font browsers, which the chain stub-probed at widget.c 8.28 to 9.09 puts in three files; the main session refused per-file copies of writable state | mandate (2026-11-19) |
+| 2026-11-20 | NEW | HM | Move a family header's helpers into the private header it includes: `static inline` helpers of a Recipe S family header that every includer also sees through the first header move, unchanged, to the end of the first header when that clears *Code Duplication* in the family header and the first header keeps its score; proof: every including file's object byte-identical against HEAD's headers | `widget-browser-private.h` (campaign A, W47 round 34, lane b6): 8.81 with *Code Duplication* in seven functions, three of them the arrow helpers `XDrawTriangleEast`/`North`/`South`; a probe 9.38 without the four arrow helpers, `widget-core-private.h` 9.68 with them (unchanged) | mandate (2026-11-19) |
