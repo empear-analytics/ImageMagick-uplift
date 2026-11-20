@@ -35,6 +35,21 @@ typedef struct _XProgressMonitorSpan
     span;
 } XProgressMonitorSpan;
 
+typedef struct _XHelpView
+{
+  Display
+    *display;
+
+  const XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  MagickBooleanType
+    mono;
+} XHelpView;
+
 extern MagickPrivate int
   XCommandWidget(Display *,XWindows *,const char *const *,XEvent *),
   XConfirmWidget(Display *,XWindows *,const char *,const char *),
@@ -55,39 +70,11 @@ extern MagickPrivate void
   XNoticeWidget(Display *,XWindows *,const char *,const char *),
   XProgressMonitorWidget(Display *,XWindows *,const char *,
     const XProgressMonitorSpan *),
-  XTextViewWidget(Display *,const XResourceInfo *,XWindows *,
-    const MagickBooleanType,const char *,const char **);
-
-typedef struct _XHelpView
-{
-  Display
-    *display;
-
-  const XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  MagickBooleanType
-    mono;
-} XHelpView;
+  XTextViewWidget(const XHelpView *,const char *,const char **);
 
 static inline void XTextViewHelp(const XHelpView *view,const char *title,
   const char *help)
 {
-  Display
-    *const display = view->display;
-
-  const XResourceInfo
-    *const resource_info = view->resource_info;
-
-  XWindows
-    *const windows = view->windows;
-
-  const MagickBooleanType
-    mono = view->mono;
-
   char
     **help_list;
 
@@ -97,8 +84,7 @@ static inline void XTextViewHelp(const XHelpView *view,const char *title,
   help_list=StringToList(help);
   if (help_list == (char **) NULL)
     return;
-  XTextViewWidget(display,resource_info,windows,mono,title,(const char **)
-    help_list);
+  XTextViewWidget(view,title,(const char **) help_list);
   for (i=0; help_list[i] != (char *) NULL; i++)
     help_list[i]=DestroyString(help_list[i]);
   help_list=(char **) RelinquishMagickMemory(help_list);

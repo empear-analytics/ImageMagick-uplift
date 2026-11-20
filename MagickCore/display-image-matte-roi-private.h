@@ -1581,10 +1581,12 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
           char
             title[MagickPathExtent];
 
+          const XHelpView
+            view = { display, resource_info, windows, MagickTrue };
+
           (void) FormatLocaleString(title,MagickPathExtent,
             "Unknown format: %s",filename);
-          XTextViewWidget(display,resource_info,windows,MagickTrue,title,
-            (const char **) textlist);
+          XTextViewWidget(&view,title,(const char **) textlist);
           XDestroyTextList(textlist);
         }
       text=DestroyString(text);
