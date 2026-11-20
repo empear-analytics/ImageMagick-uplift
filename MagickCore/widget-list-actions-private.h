@@ -483,6 +483,44 @@ static void ClientListBrowserMessage(const ListBrowserContext *context,
     }
 }
 
+static void ReleaseListBrowserArrows(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,window_info,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,window_info,south_info);
+    }
+}
+
 static void ReleaseListBrowserScroll(const ListBrowserContext *context,
   const XEvent event,const ListBrowserWidgets *widgets)
 {
@@ -507,38 +545,12 @@ static void ReleaseListBrowserScroll(const ListBrowserContext *context,
   XWidgetInfo
     *const cancel_info = widgets->cancel_info;
 
-  XWidgetInfo
-    *const north_info = widgets->north_info;
-
-  XWidgetInfo
-    *const south_info = widgets->south_info;
-
-  size_t
-    *const delay = widgets->delay;
-
   ListBrowserRelease
     release;
 
   if (window_info->mapped == MagickFalse)
     return;
-  if ((*north_info).raised == MagickFalse)
-    {
-      /*
-        User released up button.
-      */
-      (*delay)=SuspendTime << 2;
-      (*north_info).raised=MagickTrue;
-      XDrawTriangleNorth(display,window_info,north_info);
-    }
-  if ((*south_info).raised == MagickFalse)
-    {
-      /*
-        User released down button.
-      */
-      (*delay)=SuspendTime << 2;
-      (*south_info).raised=MagickTrue;
-      XDrawTriangleSouth(display,window_info,south_info);
-    }
+  ReleaseListBrowserArrows(context,widgets);
   if ((*slider_info).active)
     {
       /*
