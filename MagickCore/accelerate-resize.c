@@ -1083,9 +1083,15 @@ static MagickBooleanType gpuSupportedResizeWeighting(
 }
 
 MagickPrivate Image *AccelerateResizeImage(const Image *image,
-  const size_t resizedColumns,const size_t resizedRows,
-  const ResizeFilter *resizeFilter,ExceptionInfo *exception)
+  const AccelerateResizeRequest *resize,ExceptionInfo *exception)
 {
+  const size_t
+    resizedColumns = resize->resizedColumns,
+    resizedRows = resize->resizedRows;
+
+  const ResizeFilter
+    *const resizeFilter = resize->resizeFilter;
+
   Image
     *filteredImage;
 

@@ -45,6 +45,16 @@ typedef struct _AccelerateMotionBlurRequest
     *offset;
 } AccelerateMotionBlurRequest;
 
+typedef struct _AccelerateResizeRequest
+{
+  const size_t
+    resizedColumns,
+    resizedRows;
+
+  const ResizeFilter
+    *resizeFilter;
+} AccelerateResizeRequest;
+
 extern MagickPrivate Image
   *AccelerateBlurImage(const Image *,const double,const double,ExceptionInfo *),
   *AccelerateDespeckleImage(const Image *,ExceptionInfo *),
@@ -52,8 +62,8 @@ extern MagickPrivate Image
     ExceptionInfo *),
   *AccelerateMotionBlurImage(const Image*,const AccelerateMotionBlurRequest*,
     ExceptionInfo*),
-  *AccelerateResizeImage(const Image *,const size_t,const size_t,
-    const ResizeFilter *,ExceptionInfo *),
+  *AccelerateResizeImage(const Image *,const AccelerateResizeRequest *,
+    ExceptionInfo *),
   *AccelerateRotationalBlurImage(const Image *,const double,ExceptionInfo *),
   *AccelerateUnsharpMaskImage(const Image *,const double,const double,
     const double,const double,ExceptionInfo *),
