@@ -540,6 +540,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/widget-browser-private.h \
   MagickCore/widget-color-actions-private.h \
   MagickCore/widget-font-actions-private.h \
+  MagickCore/widget-file-actions-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
   MagickCore/xml-tree-file.c \
@@ -819,6 +820,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/widget-browser-private.h \
   MagickCore/widget-color-actions-private.h \
   MagickCore/widget-font-actions-private.h \
+  MagickCore/widget-file-actions-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-image-private.h \
