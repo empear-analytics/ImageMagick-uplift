@@ -1249,9 +1249,21 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplyCharcoalDrawToImage(Display *display,XWindows *windows,
-  char *radius,Image **image,ExceptionInfo *exception)
+static void XApplyCharcoalDrawToImage(const XMagickCommandContext *context,
+  char *radius)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -1312,7 +1324,7 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XApplyCharcoalDrawToImage(display,windows,radius,image,exception);
+  XApplyCharcoalDrawToImage(context,radius);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
