@@ -409,6 +409,21 @@ static void XCreateSceneXImage(const AnimateBackgroundSetup *setup,
     }
 }
 
+static void XShowScenePixmap(Display *display,XWindowInfo *window_info,
+  unsigned int *width,unsigned int *height)
+{
+  if (((*width) > (*window_info).width) || ((*height) > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(*width),(*height));
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(*window_info).width,
+    (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
+}
+
 static void XCreateScenePixmap(const AnimateBackgroundSetup *setup,
   const AnimateBackgroundTargets *targets,const int scene)
 {
@@ -430,16 +445,7 @@ static void XCreateScenePixmap(const AnimateBackgroundSetup *setup,
   /*
     Display pixmap on the window.
   */
-  if (((*width) > (*window_info).width) || ((*height) > (*window_info).height))
-    (void) XFillRectangle(display,(*window_info).pixmap,
-      (*window_info).annotate_context,0,0,(*width),(*height));
-  (void) XPutImage(display,(*window_info).pixmap,
-    (*window_info).annotate_context,(*window_info).ximage,0,0,
-    (*window_info).x,(*window_info).y,(*window_info).width,
-    (*window_info).height);
-  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
-    (*window_info).pixmap);
-  (void) XClearWindow(display,(*window_info).id);
+  XShowScenePixmap(display,window_info,width,height);
   (*window_info).pixmaps[scene]=(*window_info).pixmap;
   (*window_info).matte_pixmaps[scene]=(*window_info).matte_pixmap;
   if (setup->image_list[scene]->alpha_trait)
