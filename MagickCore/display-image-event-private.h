@@ -365,8 +365,13 @@ static void XRecordMappedWindow(const DisplayEventContext *context,
         Create an icon image.
       */
       taint=(*display_image)->taint;
-      XMakeStandardColormap(display,icon_visual,icon_resources,
-        (*display_image),icon_map,icon_pixel,exception);
+      {
+        const XStandardColormapRequest
+          colormap_request = { icon_visual, icon_resources, (*display_image),
+            icon_map, icon_pixel };
+
+        XMakeStandardColormap(display,&colormap_request,exception);
+      }
       {
         const XMakeImageRequest
           image_request = { &windows->icon, (*display_image),
@@ -2242,10 +2247,13 @@ static void XSetUpDisplay(const DisplaySetUpInput *input,
   time_t
     update_time;
 
+  const XStandardColormapRequest
+    colormap_request = { visual_info, resource_info, display_image, map_info,
+      pixel };
+
   (*nexus)=NewImageList();
   XLogDisplayImage(resource_info,display_image);
-  XMakeStandardColormap(display,visual_info,resource_info,display_image,
-    map_info,pixel,exception);
+  XMakeStandardColormap(display,&colormap_request,exception);
   display_image->taint=MagickFalse;
   /*
     Initialize graphic context.

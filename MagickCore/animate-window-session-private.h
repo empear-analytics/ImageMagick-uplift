@@ -1201,8 +1201,13 @@ static Image *XStartAnimateSession(const AnimateStartInputs *start)
   scene_list.exception=exception;
   display_image=XPrepareSceneImages(&scene_list);
   XLogDisplayImage(resource_info,display_image);
-  XMakeStandardColormap(display,start->visual_info,resource_info,display_image,
-    start->map_info,start->pixel,exception);
+  {
+    const XStandardColormapRequest
+      colormap_request = { start->visual_info, resource_info, display_image,
+        start->map_info, start->pixel };
+
+    XMakeStandardColormap(display,&colormap_request,exception);
+  }
   {
     const AnimateWindowSetup
       setup = { display, resource_info, start->windows, start->visual_info,

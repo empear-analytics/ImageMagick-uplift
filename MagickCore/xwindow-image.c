@@ -512,8 +512,13 @@ MagickPrivate void XConfigureImageColormap(Display *display,
   */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  XMakeStandardColormap(display,windows->visual_info,resource_info,image,
-    windows->map_info,windows->pixel_info,exception);
+  {
+    const XStandardColormapRequest
+      colormap_request = { windows->visual_info, resource_info, image,
+        windows->map_info, windows->pixel_info };
+
+    XMakeStandardColormap(display,&colormap_request,exception);
+  }
   colormap=windows->map_info->colormap;
   (void) XSetWindowColormap(display,windows->image.id,colormap);
   (void) XSetWindowColormap(display,windows->command.id,colormap);
@@ -6915,9 +6920,20 @@ static void XDefineColormapColors(const XColormapContext *context,
 }
 
 MagickPrivate void XMakeStandardColormap(Display *display,
-  XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
-  XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
+  const XStandardColormapRequest *request,ExceptionInfo *exception)
 {
+  XVisualInfo
+    *const visual_info = request->visual_info;
+
+  Image
+    *const image = request->image;
+
+  XStandardColormap
+    *const map_info = request->map_info;
+
+  XPixelInfo
+    *const pixel = request->pixel;
+
   Colormap
     colormap;
 
@@ -6936,25 +6952,25 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   assert(display != (Display *) NULL);
   assert(visual_info != (XVisualInfo *) NULL);
   assert(map_info != (XStandardColormap *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
+  assert(request->resource_info != (XResourceInfo *) NULL);
   assert(pixel != (XPixelInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   context.display=display;
   context.visual_info=visual_info;
-  context.resource_info=resource_info;
+  context.resource_info=request->resource_info;
   context.image=image;
   context.map_info=map_info;
   context.pixel=pixel;
   context.exception=exception;
-  if (resource_info->map_type != (char *) NULL)
+  if (request->resource_info->map_type != (char *) NULL)
     {
       /*
         Standard Colormap is already defined (i.e. xstdcmap).
       */
       {
         const XPixelInfoSource
-          pixel_source = { visual_info, map_info, resource_info };
+          pixel_source = { visual_info, map_info, request->resource_info };
 
         XGetPixelInfo(display,&pixel_source,image,pixel);
       }
@@ -6964,7 +6980,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       LogXStandardColormap(map_info);
       return;
     }
-  XQuantizeToVisual(visual_info,resource_info,image,exception);
+  XQuantizeToVisual(visual_info,request->resource_info,image,exception);
   /*
     Free previous and create new colormap.
   */
@@ -6976,7 +6992,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   XGetMapInfo(visual_info,colormap,map_info);
   {
     const XPixelInfoSource
-      pixel_source = { visual_info, map_info, resource_info };
+      pixel_source = { visual_info, map_info, request->resource_info };
 
     XGetPixelInfo(display,&pixel_source,image,pixel);
   }

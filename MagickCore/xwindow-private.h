@@ -580,6 +580,24 @@ typedef struct _XMakeWindowHints
     *manager_hints;
 } XMakeWindowHints;
 
+typedef struct _XStandardColormapRequest
+{
+  XVisualInfo
+    *visual_info;
+
+  XResourceInfo
+    *resource_info;
+
+  Image
+    *image;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+} XStandardColormapRequest;
+
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
   XBestPixel(Display *,const Colormap,XColor *,unsigned int,XColor *),
@@ -606,8 +624,8 @@ extern MagickPrivate void
   XGetWindowInfo(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,
     XFontStruct *,XResourceInfo *,XWindowInfo *),
   XMakeMagnifyImage(Display *,XWindows *,ExceptionInfo *),
-  XMakeStandardColormap(Display *,XVisualInfo *,XResourceInfo *,Image *,
-    XStandardColormap *,XPixelInfo *,ExceptionInfo *),
+  XMakeStandardColormap(Display *,const XStandardColormapRequest *,
+    ExceptionInfo *),
   XMakeWindow(Display *,Window,const XMakeWindowHints *,XWindowInfo *),
   XQueryPosition(Display *,const Window,int *,int *),
   XRefreshWindow(Display *,const XWindowInfo *,const XEvent *),

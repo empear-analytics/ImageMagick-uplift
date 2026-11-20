@@ -278,10 +278,15 @@ static void XHandleMapNotify(const AnimateEventContext *event_context,
       /*
         Create an icon image.
       */
-      XMakeStandardColormap(display,event_context->icon_visual,
-        event_context->icon_resources,event_context->display_image,
-        event_context->icon_map,event_context->icon_pixel,
-        event_context->exception);
+      {
+        const XStandardColormapRequest
+          colormap_request = { event_context->icon_visual,
+            event_context->icon_resources, event_context->display_image,
+            event_context->icon_map, event_context->icon_pixel };
+
+        XMakeStandardColormap(display,&colormap_request,
+          event_context->exception);
+      }
       {
         const XMakeImageRequest
           image_request = { &windows->icon, event_context->display_image,

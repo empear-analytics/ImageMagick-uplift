@@ -2060,8 +2060,13 @@ static void XInitializeBackgroundColormap(XResourceInfo *resources,
   XStandardColormap **map_info,XPixelInfo *pixel,ExceptionInfo *exception)
 {
   (*resources).colormap=SharedColormap;
-  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
-    pixel,exception);
+  {
+    const XStandardColormapRequest
+      colormap_request = { (*visual_info), resources, image, (*map_info),
+        pixel };
+
+    XMakeStandardColormap(display,&colormap_request,exception);
+  }
 }
 
 static void XInitializeBackgroundContext(XPixelInfo *pixel,Display *display,

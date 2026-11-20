@@ -556,8 +556,13 @@ static void XMakeBackgroundColormap(const AnimateBackgroundSetup *setup,
   if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
     (void) SetImageType(display_image,display_image->alpha_trait !=
       BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-  XMakeStandardColormap(setup->display,visual_info,resources,display_image,
-    setup->map_info,pixel,exception);
+  {
+    const XStandardColormapRequest
+      colormap_request = { visual_info, resources, display_image,
+        setup->map_info, pixel };
+
+    XMakeStandardColormap(setup->display,&colormap_request,exception);
+  }
 }
 
 static void XInitializeBackgroundWindow(const AnimateBackgroundSetup *setup,
