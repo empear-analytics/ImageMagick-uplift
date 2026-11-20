@@ -1202,7 +1202,12 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   /*
     Select a command from the pop-up menu.
   */
-  id=XMenuWidget(display,windows,"Tile Verb",VerbMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { "Tile Verb", VerbMenu, command };
+
+    id=XMenuWidget(display,windows,&menu_request);
+  }
   if (id < 0)
     return((Image *) NULL);
   q=p;

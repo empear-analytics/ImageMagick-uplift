@@ -1701,8 +1701,12 @@ static void XSelectAnnotateFont(const AnnotateMenuInput *menu,
   /*
     Select a font name from the pop-up menu.
   */
-  font_number=XMenuWidget(display,windows,AnnotateMenu[id],
-    (const char **) FontMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { AnnotateMenu[id], (const char **) FontMenu, command };
+
+    font_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (font_number < 0)
     return;
   if (font_number == (MaxNumberFonts-2))
@@ -1795,8 +1799,12 @@ static void XSelectAnnotateFontColor(const AnnotateMenuInput *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { AnnotateMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   (*transparent_pen)=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
@@ -1888,8 +1896,12 @@ static void XSelectAnnotateBoxColor(const AnnotateMenuInput *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { AnnotateMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   (*transparent_box)=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
@@ -1970,8 +1982,12 @@ static void XSelectAnnotateRotation(const AnnotateMenuInput *menu,
   /*
     Select a command from the pop-up menu.
   */
-  entry=XMenuWidget(display,windows,AnnotateMenu[id],RotateMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { AnnotateMenu[id], RotateMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if (entry != 8)
@@ -3976,7 +3992,12 @@ static MagickBooleanType XChopCommand(const ChopEventInput *input,XEvent *event,
           /*
             Select a command from the pop-up menu.
           */
-          id=XMenuWidget(display,windows,ChopMenu[id],Directions,command);
+          {
+            const XMenuRequest
+              menu_request = { ChopMenu[id], Directions, command };
+
+            id=XMenuWidget(display,windows,&menu_request);
+          }
           (*direction)=XSelectChopDirection(id,DirectionCommands,(*direction));
           break;
         }

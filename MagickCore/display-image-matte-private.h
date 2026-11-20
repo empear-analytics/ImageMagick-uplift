@@ -347,8 +347,12 @@ static void XSelectRotatePenColor(const RotatePenMenu *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,RotateMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { RotateMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   if (pen_number == (MaxNumberPens-2))
@@ -426,8 +430,12 @@ static void XSelectRotateDirection(const RotateCommandInput *input,int id,
   /*
     Select a command from the pop-up menu.
   */
-  id=XMenuWidget(display,windows,RotateMenu[id],
-    Directions,input->command);
+  {
+    const XMenuRequest
+      menu_request = { RotateMenu[id], Directions, input->command };
+
+    id=XMenuWidget(display,windows,&menu_request);
+  }
   *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
 }
 

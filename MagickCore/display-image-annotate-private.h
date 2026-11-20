@@ -333,8 +333,12 @@ static void XSelectColorBorder(const EditMenuInput *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { ColorEditMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   if (pen_number == (MaxNumberPens-2))
@@ -409,8 +413,12 @@ static void XSelectPenColor(const EditMenuInput *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { ColorEditMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   if (pen_number == (MaxNumberPens-2))

@@ -291,8 +291,12 @@ static void XSelectPaintMethod(const EditMenuInput *menu,
   methods=GetCommandOptions(MagickMethodOptions);
   if (methods == (char **) NULL)
     return;
-  entry=XMenuWidget(display,windows,MatteEditMenu[id],
-    (const char **) methods,command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], (const char **) methods, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry >= 0)
     (*method)=(PaintMethod) ParseCommandOption(MagickMethodOptions,
       MagickFalse,methods[entry]);
@@ -323,8 +327,12 @@ static void XSelectFuzzFactor(const EditMenuInput *menu,
   /*
     Select a command from the pop-up menu.
   */
-  entry=XMenuWidget(display,windows,MatteEditMenu[id],FuzzMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], FuzzMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if (entry != 5)
@@ -629,8 +637,12 @@ static void XSelectBorderColor(const EditMenuInput *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,MatteEditMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   if (pen_number == (MaxNumberPens-2))
@@ -677,8 +689,12 @@ static void XSelectMatteValue(const EditMenuInput *menu,
   /*
     Select a command from the pop-up menu.
   */
-  entry=XMenuWidget(display,windows,MatteEditMenu[id],MatteMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], MatteMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if (entry != 2)
@@ -1870,8 +1886,12 @@ static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
   operators=GetCommandOptions(MagickComposeOptions);
   if (operators == (char **) NULL)
     return(compose);
-  entry=XMenuWidget(display,windows,PasteMenu[id],
-    (const char **) operators,command);
+  {
+    const XMenuRequest
+      menu_request = { PasteMenu[id], (const char **) operators, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry >= 0)
     compose=(CompositeOperator) ParseCommandOption(
       MagickComposeOptions,MagickFalse,operators[entry]);
@@ -3225,8 +3245,12 @@ static void XSelectROIPopupEntry(const ROICommandInput *command_input,
   /*
     Select a command from a pop-up menu.
   */
-  entry=XMenuWidget(display,windows,ApplyMenu[id],
-    (const char **) Menus[id],command);
+  {
+    const XMenuRequest
+      menu_request = { ApplyMenu[id], (const char **) Menus[id], command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   menu_entry.Menus=Menus;
   menu_entry.Commands=Commands;
   menu_entry.id=id;
