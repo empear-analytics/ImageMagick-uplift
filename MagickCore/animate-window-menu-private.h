@@ -432,6 +432,19 @@ static void XSpeedDirectionCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XNoticeSaveFailure(Display *display,XWindows *windows,
+  ExceptionInfo *exception)
+{
+  char
+    message[MagickPathExtent];
+
+  (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
+    exception->reason != (char *) NULL ? exception->reason : "",
+    exception->description != (char *) NULL ? exception->description :
+    "");
+  XNoticeWidget(display,windows,"Unable to save file:",message);
+}
+
 static void XRepeatSaveCommand(const AnimateCommandTile *tile,
   const AnimateCommand animate_command)
 {
@@ -480,14 +493,7 @@ static void XRepeatSaveCommand(const AnimateCommandTile *tile,
       status=XSaveImage(display,resource_info,windows,*image,exception);
       if (status == MagickFalse)
         {
-          char
-            message[MagickPathExtent];
-
-          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
-            exception->reason != (char *) NULL ? exception->reason : "",
-            exception->description != (char *) NULL ? exception->description :
-            "");
-          XNoticeWidget(display,windows,"Unable to save file:",message);
+          XNoticeSaveFailure(display,windows,exception);
           break;
         }
       break;
