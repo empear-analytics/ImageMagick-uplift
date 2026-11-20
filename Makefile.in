@@ -422,7 +422,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/MagickCore.h MagickCore/accelerate.c MagickCore/accelerate-point.c MagickCore/accelerate-local-contrast.c MagickCore/accelerate-motion-blur.c MagickCore/accelerate-blur.c MagickCore/accelerate-rotational-blur.c MagickCore/accelerate-unsharp.c MagickCore/accelerate-denoise.c MagickCore/accelerate-despeckle.c MagickCore/accelerate-histogram.c MagickCore/accelerate-contrast-stretch.c MagickCore/accelerate-resize.c \
 	MagickCore/accelerate-private.h \
 	MagickCore/accelerate-kernels-private.h MagickCore/accelerate-blur-private.h MagickCore/accelerate-core-private.h MagickCore/accelerate-histogram-private.h MagickCore/animate.c MagickCore/animate-window.c \
-	MagickCore/animate.h MagickCore/animate-private.h \
+	MagickCore/animate.h MagickCore/animate-private.h MagickCore/animate-window-command-private.h \
 	MagickCore/annotate.c MagickCore/annotate-metrics.c MagickCore/annotate.h \
 	MagickCore/artifact.c MagickCore/artifact.h \
 	MagickCore/attribute.c MagickCore/attribute-hull.c MagickCore/attribute-bounds.c MagickCore/attribute-depth.c MagickCore/attribute-depth-measure.c MagickCore/attribute.h \
@@ -5727,6 +5727,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/animate-window.c \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
+  MagickCore/animate-window-command-private.h \
   MagickCore/annotate.c \
   MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
@@ -6337,6 +6338,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
+  MagickCore/animate-window-command-private.h \
   MagickCore/annotate-private.h \
   MagickCore/blob-private.h \
   MagickCore/cache-private.h \
