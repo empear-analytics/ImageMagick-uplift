@@ -2,7 +2,8 @@
 """Which oracle cases execute which functions.
 
     tools/oracle/casemap.py            build build-oracle/work/casemap.json
-    tools/oracle/casemap.py --update   add new catalogue cases only (drop removed ones)
+    tools/oracle/casemap.py --update [RE]  add new catalogue cases only (drop removed ones),
+                                       and profile again the known cases matching RE
     tools/oracle/casemap.py FUNCTION   list the cases that execute FUNCTION
 
 Runs every case once with the coverage build (tools/oracle/build.sh cov), keeps
@@ -85,26 +86,31 @@ def merged_unmapped(m, ids, per_case):
     return sorted(ids.intersection(m["unmapped"])) + sorted(lost)
 
 
-def update_map():
+def update_map(pattern=None):
     """Add the cases the catalogue gained since the map was built, and drop the ones it lost,
     without rerunning the rest (cases added for unreached code, owner 2026-11-20). The new
     cases are profiled with today's coverage build, whose names may include helpers the map's
-    own build did not have; the old entries keep theirs."""
+    own build did not have; the old entries keep theirs. PATTERN (a regex on case id or label)
+    profiles the matching known cases again too, their old entries replaced: a map built
+    before a function was split shows its new helpers only for the cases profiled since."""
     cov_bin = oracle.build("cov")
     manifest, cases = oracle.load_cases(oracle.build("base", "origin/main"))
     with open(MAP) as f:
         m = json.load(f)
     ids = {c["id"] for c in cases}
     known = set(m["unmapped"]).union(*m["functions"].values())
-    new = [c for c in cases if c["id"] not in known]
+    redo = {c["id"] for c in oracle.select(cases, pattern)} if pattern else set()
+    new = [c for c in cases if c["id"] not in known or c["id"] in redo]
     per_case = oracle.parallel(lambda c: profile_case(cov_bin, manifest, c, 600), new,
                                min(4, oracle.default_jobs()), "casemap update")
-    m.update(catalogue=catalogue_digest(cases), functions=merged_functions(m, ids, per_case),
-             unmapped=merged_unmapped(m, ids, per_case),
+    kept = ids - redo
+    m.update(catalogue=catalogue_digest(cases), functions=merged_functions(m, kept, per_case),
+             unmapped=merged_unmapped(m, kept, per_case),
              updated_with=m.get("updated_with", []) + [oracle.file_sha(cov_bin)])
     with open(MAP, "w") as f:
         json.dump(m, f)
-    print("casemap: %d cases added, %d dropped" % (len(new), len(known - ids)))
+    print("casemap: %d cases profiled (%d asked for again), %d dropped"
+          % (len(new), len(redo), len(known - ids)))
     for c in new:
         print("  %s  %s: %d functions" % (c["id"], c["label"], len(per_case[c["id"]] or [])))
 
@@ -163,8 +169,8 @@ def cases_for(function, fmap):
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         build_map()
-    elif sys.argv[1:] == ["--update"]:
-        update_map()
+    elif sys.argv[1] == "--update":
+        update_map(sys.argv[2] if len(sys.argv) > 2 else None)
     else:
         ids = cases_for(sys.argv[1], load_map())
         print("%d cases execute %s" % (len(ids), sys.argv[1]))
