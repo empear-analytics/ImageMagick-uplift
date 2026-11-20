@@ -500,11 +500,20 @@ extern MagickPrivate Cursor
 extern MagickPrivate int
   XCheckDefineCursor(Display *,Window,Cursor);
 
+typedef struct _XImageRenderTarget
+{
+  Display
+    *display;
+
+  const XPixelInfo
+    *pixel;
+} XImageRenderTarget;
+
 extern MagickPrivate MagickBooleanType
   XAnnotateImage(Display *,const XPixelInfo *,XAnnotateInfo *,Image *,
     ExceptionInfo *),
   XComponentGenesis(void),
-  XDrawImage(Display *,const XPixelInfo *,XDrawInfo *,Image *,ExceptionInfo *),
+  XDrawImage(const XImageRenderTarget *,XDrawInfo *,Image *,ExceptionInfo *),
   XGetWindowColor(Display *,XWindows *,char *,ExceptionInfo *),
   XMagickProgressMonitor(const char *,const MagickOffsetType,
     const MagickSizeType,void *),

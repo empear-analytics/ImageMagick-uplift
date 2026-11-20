@@ -193,7 +193,12 @@ static MagickStatusType XDrawElementImage(const DrawEditContext *context,
 
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  status=XDrawImage(display,windows->pixel_info,draw_info,*image,exception);
+  {
+    const XImageRenderTarget
+      target = { display, windows->pixel_info };
+
+    status=XDrawImage(&target,draw_info,*image,exception);
+  }
   XSetCursorState(display,windows,MagickFalse);
   /*
     Update image colormap and return to image drawing.

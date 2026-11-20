@@ -1036,10 +1036,15 @@ static Pixmap XCreateDrawPixmap(Display *display,const Window root_window,
     draw_info->height,depth));
 }
 
-MagickPrivate MagickBooleanType XDrawImage(Display *display,
-  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
-  ExceptionInfo *exception)
+MagickPrivate MagickBooleanType XDrawImage(const XImageRenderTarget *target,
+  XDrawInfo *draw_info,Image *image,ExceptionInfo *exception)
 {
+  Display
+    *const display = target->display;
+
+  const XPixelInfo
+    *const pixel = target->pixel;
+
   GC
     draw_context;
 
