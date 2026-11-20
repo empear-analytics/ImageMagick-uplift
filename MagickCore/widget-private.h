@@ -26,6 +26,15 @@ extern "C" {
 #endif
 
 #if defined(MAGICKCORE_X11_DELEGATE)
+typedef struct _XProgressMonitorSpan
+{
+  const MagickOffsetType
+    offset;
+
+  const MagickSizeType
+    span;
+} XProgressMonitorSpan;
+
 extern MagickPrivate int
   XCommandWidget(Display *,XWindows *,const char *const *,XEvent *),
   XConfirmWidget(Display *,XWindows *,const char *,const char *),
@@ -45,7 +54,7 @@ extern MagickPrivate void
     const char *,const char *,char *),
   XNoticeWidget(Display *,XWindows *,const char *,const char *),
   XProgressMonitorWidget(Display *,XWindows *,const char *,
-    const MagickOffsetType,const MagickSizeType),
+    const XProgressMonitorSpan *),
   XTextViewWidget(Display *,const XResourceInfo *,XWindows *,
     const MagickBooleanType,const char *,const char **);
 

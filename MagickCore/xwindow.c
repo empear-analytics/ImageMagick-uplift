@@ -1411,8 +1411,13 @@ MagickPrivate MagickBooleanType XMagickProgressMonitor(const char *tag,
   if (windows == (XWindows *) NULL)
     return(MagickTrue);
   if (windows->info.mapped != MagickFalse)
-    XProgressMonitorWidget(windows->display,windows,
-      GetLocaleMonitorMessage(tag),quantum,span);
+    {
+      const XProgressMonitorSpan
+        progress = { quantum, span };
+
+      XProgressMonitorWidget(windows->display,windows,
+        GetLocaleMonitorMessage(tag),&progress);
+    }
   return(MagickTrue);
 }
 
