@@ -83,8 +83,8 @@
 %
 %  The format of the XDialogWidget method is:
 %
-%      int XDialogWidget(Display *display,XWindows *windows,const char *action,
-%        const char *query,char *reply)
+%      int XDialogWidget(Display *display,XWindows *windows,
+%        const XDialogRequest *request)
 %
 %  A description of each parameter follows:
 %
@@ -93,11 +93,13 @@
 %
 %    o window: Specifies a pointer to a XWindows structure.
 %
-%    o action: Specifies a pointer to the action of this widget.
+%    o request: the dialog, in these members:
 %
-%    o query: Specifies a pointer to the query to present to the user.
+%      o action: Specifies a pointer to the action of this widget.
 %
-%    o reply: the response from the user is returned in this parameter.
+%      o query: Specifies a pointer to the query to present to the user.
+%
+%      o reply: the response from the user is returned in this parameter.
 %
 */
 

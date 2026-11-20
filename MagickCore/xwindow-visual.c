@@ -658,18 +658,19 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 %
 %  The format of the XDisplayImageInfo method is:
 %
-%      void XDisplayImageInfo(Display *display,
-%        const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
-%        Image *image,ExceptionInfo *exception)
+%      void XDisplayImageInfo(const XDisplayImageInfoTarget *target,
+%        Image *undo_image,Image *image,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
+%    o target: where the information is displayed, in these members:
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o display: Specifies a connection to an X server;  returned from
+%        XOpenDisplay.
 %
-%    o windows: Specifies a pointer to a XWindows structure.
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%
+%      o windows: Specifies a pointer to a XWindows structure.
 %
 %    o undo_image: the undo image.
 %
