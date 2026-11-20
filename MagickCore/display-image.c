@@ -245,6 +245,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   return((MagickBooleanType) (window_info.id == root_window));
 }
 
+#include "MagickCore/display-image-window-setup-private.h"
 #include "MagickCore/display-image-window-private.h"
 
 static DisplayCommand
