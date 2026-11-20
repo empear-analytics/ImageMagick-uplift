@@ -554,6 +554,9 @@ static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
   ExceptionInfo
     *const exception = request->exception;
 
+  const XImageRenderTarget
+    target = { display, pixel };
+
   MagickBooleanType
     status;
 
@@ -584,7 +587,7 @@ static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
     ClampToQuantum(draw_info->fill.green));
   (*pixel).pen_color.blue=ScaleQuantumToShort(
     ClampToQuantum(draw_info->fill.blue));
-  status=XAnnotateImage(display,pixel,annotate_info,image,exception);
+  status=XAnnotateImage(&target,annotate_info,image,exception);
   if (status == 0)
     {
       ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",

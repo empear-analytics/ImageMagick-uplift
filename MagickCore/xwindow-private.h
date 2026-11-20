@@ -510,7 +510,7 @@ typedef struct _XImageRenderTarget
 } XImageRenderTarget;
 
 extern MagickPrivate MagickBooleanType
-  XAnnotateImage(Display *,const XPixelInfo *,XAnnotateInfo *,Image *,
+  XAnnotateImage(const XImageRenderTarget *,XAnnotateInfo *,Image *,
     ExceptionInfo *),
   XComponentGenesis(void),
   XDrawImage(const XImageRenderTarget *,XDrawInfo *,Image *,ExceptionInfo *),
