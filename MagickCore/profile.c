@@ -1354,6 +1354,14 @@ static MagickBooleanType TransformProfileImage(Image *image,
   return(status);
 }
 
+static cmsHTRANSFORM *DestroyProfileTransform(LCMSInfo *source_info,
+  LCMSInfo *target_info,cmsHTRANSFORM *transform)
+{
+  target_info->pixels=DestroyPixelTLS(target_info->pixels);
+  source_info->pixels=DestroyPixelTLS(source_info->pixels);
+  return(DestroyTransformTLS(transform));
+}
+
 static void SetCMYKTargetColorspace(Image *image,const LCMSInfo *target_info,
   ExceptionInfo *exception)
 {
@@ -1555,17 +1563,15 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             if ((source_info.pixels == (void **) NULL) ||
                 (target_info.pixels == (void **) NULL))
               {
-                target_info.pixels=DestroyPixelTLS(target_info.pixels);
-                source_info.pixels=DestroyPixelTLS(source_info.pixels);
-                transform=DestroyTransformTLS(transform);
+                transform=DestroyProfileTransform(&source_info,&target_info,
+                  transform);
                 ThrowProfileException(ResourceLimitError,
                   "MemoryAllocationFailed",image->filename);
               }
             if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
               {
-                target_info.pixels=DestroyPixelTLS(target_info.pixels);
-                source_info.pixels=DestroyPixelTLS(source_info.pixels);
-                transform=DestroyTransformTLS(transform);
+                transform=DestroyProfileTransform(&source_info,&target_info,
+                  transform);
                 CloseLCMSProfiles(&source_info,&target_info);
                 return(MagickFalse);
               }
@@ -1579,9 +1585,8 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
               status=MagickFalse;
             (void) SetImageColorspace(image,target_info.colorspace,exception);
             SetImageTypeFromSignature(image,signature);
-            target_info.pixels=DestroyPixelTLS(target_info.pixels);
-            source_info.pixels=DestroyPixelTLS(source_info.pixels);
-            transform=DestroyTransformTLS(transform);
+            transform=DestroyProfileTransform(&source_info,&target_info,
+              transform);
             if ((status != MagickFalse) &&
                 (cmsGetDeviceClass(source_info.profile) != cmsSigLinkClass))
               status=SetImageProfilePrivate(image,profile,exception);
