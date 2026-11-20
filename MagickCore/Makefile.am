@@ -219,6 +219,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image.c \
   MagickCore/display.h \
   MagickCore/display-private.h \
+  MagickCore/display-image-annotate-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -763,6 +764,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
+  MagickCore/display-image-annotate-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
