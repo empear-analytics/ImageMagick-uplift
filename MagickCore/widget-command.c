@@ -542,16 +542,12 @@ static void DrawCommandTile(Display *display,XWindows *windows)
     }
 }
 
-static void RedrawCommandButtons(Display *display,XWindows *windows,
+static void DrawCommandSelections(Display *display,XWindows *windows,
   const unsigned int number_selections)
 {
   int
     i;
 
-  /*
-    Draw command buttons.
-  */
-  DrawCommandTile(display,windows);
   for (i=0; i < (int) number_selections; i++)
   {
     XDrawBeveledButton(display,&windows->command,&(*SelectionInfoReference())[i]);
@@ -562,6 +558,16 @@ static void RedrawCommandButtons(Display *display,XWindows *windows,
       (int) ((*ToggleInfoReference()).height >> 1);
     XDrawTriangleEast(display,&windows->command,&(*ToggleInfoReference()));
   }
+}
+
+static void RedrawCommandButtons(Display *display,XWindows *windows,
+  const unsigned int number_selections)
+{
+  /*
+    Draw command buttons.
+  */
+  DrawCommandTile(display,windows);
+  DrawCommandSelections(display,windows,number_selections);
   XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
 }
 
