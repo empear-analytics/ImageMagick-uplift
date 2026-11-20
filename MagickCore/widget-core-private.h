@@ -1286,6 +1286,363 @@ static inline size_t ClientWidgetMessage(Display *display,XWindows *windows,
   return(state);
 }
 
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   X D r a w T r i a n g l e E a s t                                         %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  XDrawTriangleEast() draws a triangle with a highlighted left bevel and a
+%  shadowed right and lower bevel.  The highlighted and shadowed bevels create
+%  a 3-D effect.
+%
+%  The format of the XDrawTriangleEast function is:
+%
+%      XDrawTriangleEast(display,window_info,triangle_info)
+%
+%  A description of each parameter follows:
+%
+%    o display: Specifies a pointer to the Display structure;  returned from
+%      XOpenDisplay.
+%
+%    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
+%
+%    o triangle_info: Specifies a pointer to a XWidgetInfo structure.  It
+%      contains the extents of the triangle.
+%
+*/
+static inline void XDrawTriangleEastLabel(Display *display,
+  const XWindowInfo *window_info,const XWidgetInfo *triangle_info)
+{
+  int
+    x1,
+    y1;
+
+  XFontStruct
+    *font_info;
+
+  font_info=window_info->font_info;
+  XSetTextColor(display,window_info,MagickTrue);
+  x1=triangle_info->x+(int) triangle_info->width+(int)
+    triangle_info->bevel_width+(QuantumMargin >> 1);
+  y1=triangle_info->y+(((int) triangle_info->height-(int)
+    (font_info->ascent+font_info->descent)) >> 1)+(int) font_info->ascent;
+  (void) XDrawString(display,window_info->id,window_info->widget_context,x1,y1,
+    triangle_info->text,Extent(triangle_info->text));
+}
+
+static inline void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  int
+    x1,
+    x2,
+    x3,
+    y1,
+    y2,
+    y3;
+
+  unsigned int
+    bevel_width;
+
+  XPoint
+    points[4];
+
+  /*
+    Draw triangle matte.
+  */
+  x1=triangle_info->x;
+  y1=triangle_info->y;
+  x2=triangle_info->x+(int) triangle_info->width;
+  y2=triangle_info->y+(int) (triangle_info->height >> 1);
+  x3=triangle_info->x;
+  y3=triangle_info->y+(int) triangle_info->height;
+  bevel_width=triangle_info->bevel_width;
+  points[0].x=x1;
+  points[0].y=y1;
+  points[1].x=x2;
+  points[1].y=y2;
+  points[2].x=x3;
+  points[2].y=y3;
+  XSetMatteColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,3,Complex,CoordModeOrigin);
+  /*
+    Draw bottom bevel.
+  */
+  points[0].x=x2;
+  points[0].y=y2;
+  points[1].x=x3;
+  points[1].y=y3;
+  points[2].x=x3-(int) bevel_width;
+  points[2].y=y3+(int) bevel_width;
+  points[3].x=x2+(int) bevel_width;
+  points[3].y=y2;
+  XSetBevelColor(display,window_info,!triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  /*
+    Draw Left bevel.
+  */
+  points[0].x=x3;
+  points[0].y=y3;
+  points[1].x=x1;
+  points[1].y=y1;
+  points[2].x=x1-(int) bevel_width+1;
+  points[2].y=y1-(int) bevel_width;
+  points[3].x=x3-(int) bevel_width+1;
+  points[3].y=y3+(int) bevel_width;
+  XSetBevelColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  /*
+    Draw top bevel.
+  */
+  points[0].x=x1;
+  points[0].y=y1;
+  points[1].x=x2;
+  points[1].y=y2;
+  points[2].x=x2+(int) bevel_width;
+  points[2].y=y2;
+  points[3].x=x1-(int) bevel_width;
+  points[3].y=y1-(int) bevel_width;
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  (void) XSetFillStyle(display,window_info->widget_context,FillSolid);
+  if (triangle_info->text == (char *) NULL)
+    return;
+  /*
+    Write label to right of triangle.
+  */
+  XDrawTriangleEastLabel(display,window_info,triangle_info);
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   X D r a w T r i a n g l e N o r t h                                       %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  XDrawTriangleNorth() draws a triangle with a highlighted left bevel and a
+%  shadowed right and lower bevel.  The highlighted and shadowed bevels create
+%  a 3-D effect.
+%
+%  The format of the XDrawTriangleNorth function is:
+%
+%      XDrawTriangleNorth(display,window_info,triangle_info)
+%
+%  A description of each parameter follows:
+%
+%    o display: Specifies a pointer to the Display structure;  returned from
+%      XOpenDisplay.
+%
+%    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
+%
+%    o triangle_info: Specifies a pointer to a XWidgetInfo structure.  It
+%      contains the extents of the triangle.
+%
+*/
+static inline void XDrawTriangleNorth(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  int
+    x1,
+    x2,
+    x3,
+    y1,
+    y2,
+    y3;
+
+  unsigned int
+    bevel_width;
+
+  XPoint
+    points[4];
+
+  /*
+    Draw triangle matte.
+  */
+  x1=triangle_info->x;
+  y1=triangle_info->y+(int) triangle_info->height;
+  x2=triangle_info->x+(int) (triangle_info->width >> 1);
+  y2=triangle_info->y;
+  x3=triangle_info->x+(int) triangle_info->width;
+  y3=triangle_info->y+(int) triangle_info->height;
+  bevel_width=triangle_info->bevel_width;
+  points[0].x=x1;
+  points[0].y=y1;
+  points[1].x=x2;
+  points[1].y=y2;
+  points[2].x=x3;
+  points[2].y=y3;
+  XSetMatteColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,3,Complex,CoordModeOrigin);
+  /*
+    Draw left bevel.
+  */
+  points[0].x=x1;
+  points[0].y=y1;
+  points[1].x=x2;
+  points[1].y=y2;
+  points[2].x=x2;
+  points[2].y=y2-(int) bevel_width-2;
+  points[3].x=x1-(int) bevel_width-1;
+  points[3].y=y1+(int) bevel_width;
+  XSetBevelColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  /*
+    Draw right bevel.
+  */
+  points[0].x=x2;
+  points[0].y=y2;
+  points[1].x=x3;
+  points[1].y=y3;
+  points[2].x=x3+(int) bevel_width;
+  points[2].y=y3+(int) bevel_width;
+  points[3].x=x2;
+  points[3].y=y2-(int) bevel_width;
+  XSetBevelColor(display,window_info,!triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  /*
+    Draw lower bevel.
+  */
+  points[0].x=x3;
+  points[0].y=y3;
+  points[1].x=x1;
+  points[1].y=y1;
+  points[2].x=x1-(int) bevel_width;
+  points[2].y=y1+(int) bevel_width;
+  points[3].x=x3+(int) bevel_width;
+  points[3].y=y3+(int) bevel_width;
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  (void) XSetFillStyle(display,window_info->widget_context,FillSolid);
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   X D r a w T r i a n g l e S o u t h                                       %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  XDrawTriangleSouth() draws a border with a highlighted left and right bevel
+%  and a shadowed lower bevel.  The highlighted and shadowed bevels create a
+%  3-D effect.
+%
+%  The format of the XDrawTriangleSouth function is:
+%
+%      XDrawTriangleSouth(display,window_info,triangle_info)
+%
+%  A description of each parameter follows:
+%
+%    o display: Specifies a pointer to the Display structure;  returned from
+%      XOpenDisplay.
+%
+%    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
+%
+%    o triangle_info: Specifies a pointer to a XWidgetInfo structure.  It
+%      contains the extents of the triangle.
+%
+*/
+static inline void XDrawTriangleSouth(Display *display,const XWindowInfo *window_info,
+  const XWidgetInfo *triangle_info)
+{
+  int
+    x1,
+    x2,
+    x3,
+    y1,
+    y2,
+    y3;
+
+  unsigned int
+    bevel_width;
+
+  XPoint
+    points[4];
+
+  /*
+    Draw triangle matte.
+  */
+  x1=triangle_info->x;
+  y1=triangle_info->y;
+  x2=triangle_info->x+(int) (triangle_info->width >> 1);
+  y2=triangle_info->y+(int) triangle_info->height;
+  x3=triangle_info->x+(int) triangle_info->width;
+  y3=triangle_info->y;
+  bevel_width=triangle_info->bevel_width;
+  points[0].x=x1;
+  points[0].y=y1;
+  points[1].x=x2;
+  points[1].y=y2;
+  points[2].x=x3;
+  points[2].y=y3;
+  XSetMatteColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,3,Complex,CoordModeOrigin);
+  /*
+    Draw top bevel.
+  */
+  points[0].x=x3;
+  points[0].y=y3;
+  points[1].x=x1;
+  points[1].y=y1;
+  points[2].x=x1-(int) bevel_width;
+  points[2].y=y1-(int) bevel_width;
+  points[3].x=x3+(int) bevel_width;
+  points[3].y=y3-(int) bevel_width;
+  XSetBevelColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  /*
+    Draw right bevel.
+  */
+  points[0].x=x2;
+  points[0].y=y2;
+  points[1].x=x3+1;
+  points[1].y=y3-(int) bevel_width;
+  points[2].x=x3+(int) bevel_width;
+  points[2].y=y3-(int) bevel_width;
+  points[3].x=x2;
+  points[3].y=y2+(int) bevel_width;
+  XSetBevelColor(display,window_info,!triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  /*
+    Draw left bevel.
+  */
+  points[0].x=x1;
+  points[0].y=y1;
+  points[1].x=x2;
+  points[1].y=y2;
+  points[2].x=x2;
+  points[2].y=y2+(int) bevel_width;
+  points[3].x=x1-(int) bevel_width;
+  points[3].y=y1-(int) bevel_width;
+  XSetBevelColor(display,window_info,triangle_info->raised);
+  (void) XFillPolygon(display,window_info->id,window_info->widget_context,
+    points,4,Complex,CoordModeOrigin);
+  (void) XSetFillStyle(display,window_info->widget_context,FillSolid);
+}
+
 #endif
 
 #if defined(__cplusplus) || defined(c_plusplus)
