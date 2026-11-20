@@ -431,6 +431,28 @@ typedef struct _XRenderTargets
     **display;
 } XRenderTargets;
 
+static void XInitializeRenderColormap(Display *display,
+  const XRenderTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = targets->resource_info;
+
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
+    (*map_info));
+  XGetPixelInfo(display,(*visual_info),(*map_info),resource_info,(Image *) NULL,
+    pixel);
+  (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
+}
+
 static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
   const Image *image,Display *display,const XRenderTargets *targets)
 {
@@ -497,11 +519,7 @@ static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
   /*
     Initialize Standard Colormap info.
   */
-  XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
-    (*map_info));
-  XGetPixelInfo(display,(*visual_info),(*map_info),resource_info,(Image *) NULL,
-    pixel);
-  (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
+  XInitializeRenderColormap(display,targets);
   /*
     Initialize font info.
   */
