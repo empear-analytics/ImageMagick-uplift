@@ -988,10 +988,21 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyHueToImage(Display *display,XWindows *windows,
-  char *modulate_factors,char *hue_percent,Image **image,
-  ExceptionInfo *exception)
+static void XApplyHueToImage(const XMagickCommandContext *context,
+  char *modulate_factors,char *hue_percent)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) CopyMagickString(modulate_factors,"100.0/100.0/",MagickPathExtent);
@@ -1038,8 +1049,7 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   /*
     Vary the image hue.
   */
-  XApplyHueToImage(display,windows,modulate_factors,hue_percent,image,
-    exception);
+  XApplyHueToImage(context,modulate_factors,hue_percent);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
