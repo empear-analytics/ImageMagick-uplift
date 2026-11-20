@@ -5645,7 +5645,9 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     beta,
     delta,
     factor,
-    theta;
+    theta,
+    cosine,
+    sine;
 
   MagickStatusType
     status;
@@ -5655,14 +5657,8 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     points[3],
     radii;
 
-  double
-    cosine,
-    sine;
-
   PrimitiveInfo
-    *primitive_info;
-
-  PrimitiveInfo
+    *primitive_info,
     *p;
 
   size_t
