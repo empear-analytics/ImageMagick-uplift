@@ -730,6 +730,14 @@ static unsigned int SizeCommandWindow(const CommandSizing *sizing)
   return(number_selections);
 }
 
+static void AcquireCommandSelections(const unsigned int number_selections)
+{
+  if ((*SelectionInfoReference()) != (XWidgetInfo *) NULL)
+    (*SelectionInfoReference())=(XWidgetInfo *) RelinquishMagickMemory((*SelectionInfoReference()));
+  (*SelectionInfoReference())=(XWidgetInfo *) AcquireQuantumMemory(number_selections,
+    sizeof(*(*SelectionInfoReference())));
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -778,10 +786,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       /*
         Allocate selection info memory.
       */
-      if ((*SelectionInfoReference()) != (XWidgetInfo *) NULL)
-        (*SelectionInfoReference())=(XWidgetInfo *) RelinquishMagickMemory((*SelectionInfoReference()));
-      (*SelectionInfoReference())=(XWidgetInfo *) AcquireQuantumMemory(number_selections,
-        sizeof(*(*SelectionInfoReference())));
+      AcquireCommandSelections(number_selections);
       if ((*SelectionInfoReference()) == (XWidgetInfo *) NULL)
         {
           ThrowXWindowFatalException(ResourceLimitFatalError,
