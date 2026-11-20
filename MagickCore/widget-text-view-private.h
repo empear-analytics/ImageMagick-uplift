@@ -656,6 +656,30 @@ static void PressTextViewSlider(const TextViewContext *context,
   PressTextViewScroll(context,event,targets,widgets);
 }
 
+static void SendTextViewSelection(const XSelectionRequestEvent *request,
+  char *primary_selection)
+{
+  XSelectionEvent
+    notify;
+
+  (void) XChangeProperty(request->display,request->requestor,
+    request->property,request->target,8,PropModeReplace,
+    (unsigned char *) primary_selection,Extent(primary_selection));
+  notify.type=SelectionNotify;
+  notify.send_event=MagickTrue;
+  notify.display=request->display;
+  notify.requestor=request->requestor;
+  notify.selection=request->selection;
+  notify.target=request->target;
+  notify.time=request->time;
+  if (request->property == None)
+    notify.property=request->target;
+  else
+    notify.property=request->property;
+  (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
+    (XEvent *) &notify);
+}
+
 static void HandleTextViewSelectionEvent(const TextViewContext *context,
   XEvent event,const TextViewWidgets *widgets)
 {
@@ -687,9 +711,6 @@ static void HandleTextViewSelectionEvent(const TextViewContext *context,
     }
     case SelectionRequest:
     {
-      XSelectionEvent
-        notify;
-
       XSelectionRequestEvent
         *request;
 
@@ -699,22 +720,7 @@ static void HandleTextViewSelectionEvent(const TextViewContext *context,
         Set primary selection.
       */
       request=(&(event.xselectionrequest));
-      (void) XChangeProperty(request->display,request->requestor,
-        request->property,request->target,8,PropModeReplace,
-        (unsigned char *) primary_selection,Extent(primary_selection));
-      notify.type=SelectionNotify;
-      notify.send_event=MagickTrue;
-      notify.display=request->display;
-      notify.requestor=request->requestor;
-      notify.selection=request->selection;
-      notify.target=request->target;
-      notify.time=request->time;
-      if (request->property == None)
-        notify.property=request->target;
-      else
-        notify.property=request->property;
-      (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
-        (XEvent *) &notify);
+      SendTextViewSelection(request,primary_selection);
     }
     default:
       break;
