@@ -1078,6 +1078,87 @@ static MagickBooleanType AcquireEqualizeHistogram(cl_uint4 **histogram)
   return(MagickTrue);
 }
 
+typedef struct _EqualizeHistogramStageInput
+{
+  Image
+    *image;
+
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+
+  cl_uint4
+    *histogram;
+
+  cl_command_queue
+    queue;
+} EqualizeHistogramStageInput;
+
+typedef struct _EqualizeHistogramStageTargets
+{
+  CacheView
+    **image_view;
+
+  void
+    **inputPixels;
+
+  cl_mem
+    *imageBuffer,
+    *histogramBuffer;
+} EqualizeHistogramStageTargets;
+
+static MagickBooleanType RunEqualizeHistogramStage(
+  const EqualizeHistogramStageInput *stage,ExceptionInfo *exception,
+  const EqualizeHistogramStageTargets *targets)
+{
+  Image
+    *const image = stage->image;
+
+  const MagickCLDevice
+    device = stage->device;
+
+  const MagickCLEnv
+    clEnv = stage->clEnv;
+
+  cl_uint4
+    *const histogram = stage->histogram;
+
+  const cl_command_queue
+    queue = stage->queue;
+
+  CacheView
+    **const image_view = targets->image_view;
+
+  void
+    **const inputPixels = targets->inputPixels;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer,
+    *const histogramBuffer = targets->histogramBuffer;
+
+  {
+    const EqualizeInputSource
+      source = { image, device, clEnv };
+
+    const EqualizeInputTargets
+      inputTargets = { image_view, inputPixels, imageBuffer };
+
+    if (AcquireEqualizeInput(&source,exception,&inputTargets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const HistogramPassInput
+      pass = { clEnv, device, histogram, queue, *imageBuffer, image };
+
+    if (RunHistogramPass(&pass,histogramBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1144,21 +1225,14 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
       ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
 
   {
-    const EqualizeInputSource
-      source = { image, device, clEnv };
+    const EqualizeHistogramStageInput
+      stage = { image, device, clEnv, histogram, queue };
 
-    const EqualizeInputTargets
-      inputTargets = { &image_view, &inputPixels, &imageBuffer };
+    const EqualizeHistogramStageTargets
+      stageTargets = { &image_view, &inputPixels, &imageBuffer,
+        &histogramBuffer };
 
-    if (AcquireEqualizeInput(&source,exception,&inputTargets) == MagickFalse)
-      goto cleanup;
-  }
-
-  {
-    const HistogramPassInput
-      pass = { clEnv, device, histogram, queue, imageBuffer, image };
-
-    if (RunHistogramPass(&pass,&histogramBuffer,exception) == MagickFalse)
+    if (RunEqualizeHistogramStage(&stage,exception,&stageTargets) == MagickFalse)
       goto cleanup;
   }
 
