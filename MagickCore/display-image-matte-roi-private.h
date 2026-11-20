@@ -3037,12 +3037,10 @@ static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
   (*crop_info).x+=x;
   (*crop_info).x=(ssize_t) (scale_factor*(*crop_info).x+0.5);
   (*crop_info).width=(unsigned int) (scale_factor*(*crop_info).width+0.5);
-  scale_factor=(double)
-    height/windows->image.ximage->height;
+  scale_factor=(double) height/windows->image.ximage->height;
   (*crop_info).y+=y;
   (*crop_info).y=(ssize_t) (scale_factor*(*crop_info).y+0.5);
-  (*crop_info).height=(unsigned int)
-    (scale_factor*(*crop_info).height+0.5);
+  (*crop_info).height=(unsigned int) (scale_factor*(*crop_info).height+0.5);
   roi_image=CropImage(*image,crop_info,exception);
   (void) SetImageProgressMonitor(*image,progress_monitor,
     (*image)->client_data);
