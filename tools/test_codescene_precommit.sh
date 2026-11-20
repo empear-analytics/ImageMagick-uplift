@@ -55,6 +55,7 @@ bad='static int Bad(int a,int b,int c,int d,int e,int f)
 printf '%s' "$good" > "$repo/MagickCore/x-private.h"
 printf '%s' "$good" > "$repo/MagickCore/x.h"
 printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/y.c"
+printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/z-private.h"
 git -C "$repo" init -q && git -C "$repo" add -A &&
   git -C "$repo" -c user.name=t -c user.email=t@t commit -qm base || exit 2
 
@@ -78,5 +79,16 @@ expect "new private header below 10.0" 1 "n-private.h: new code must score 10.0"
 printf '%s' "$good" > "$repo/MagickCore/y.c"
 printf '%s' "$bad" > "$repo/MagickCore/y-bad-private.h"; git -C "$repo" add -A
 expect "header carved off a shrinking .c (split bar)" 0 "gate passed"
+# A new .c file is not held to a shrinking header's low score (review of 4e40bdec0).
+printf '%s' "$good" > "$repo/MagickCore/z-private.h"
+printf '%s' "$bad" > "$repo/MagickCore/w.c"; git -C "$repo" add -A
+expect "new .c beside a shrinking low header" 1 "w.c: new code must score 10.0"
+# cs-mcp gives no score for a header it cannot parse, as for one with no function: a header
+# with function text and no score is refused, not counted as 10.0 (review of 4e40bdec0).
+printf '}}} @@ static ((( \n%s\n' "$bad" > "$repo/MagickCore/x-private.h"; git -C "$repo" add -A
+expect "private header made unparseable" 1 "x-private.h: No Code Health score returned"
+printf '#ifdef NEVER\n  if (r != 0)\n  {\n    r=1;\n  }\n#endif\n' > "$repo/MagickCore/frag2-private.h"
+git -C "$repo" add -A
+expect "new fragment with an if block, no function" 0 "gate passed"
 [ $fail -eq 0 ] && echo "test_codescene_precommit: all passed"
 exit $fail

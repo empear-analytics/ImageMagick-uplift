@@ -7,7 +7,8 @@ Two exceptions, because both move code that was gated before rather than add any
 
 - A split (Recipe S): a new file staged together with an existing file that shrinks
   holds code moved out of it, so it must score at least what the shrinking file
-  scored before (the lowest, if several shrink), not 10.0.
+  scored before (the lowest, if several shrink), not 10.0. A new .c/.cpp file is held
+  to the shrinking .c/.cpp files only; a new private header to every shrinking file.
 - A merge: a file whose staged content is exactly the merged branch's version came in
   unchanged and was gated on that branch, so it is skipped.
 
@@ -17,8 +18,10 @@ Only library code is gated: .c and .cpp files in the subsystems that
 tools/codehealth_sweep.py scores, and the private headers there (`*-private.h`),
 which hold static and static inline functions (owner, 2026-11-20). A header with no
 function gets no score from CodeScene ("Could not determine Code Health score."):
-it counts as 10.0, nothing in it to fault. Public headers are declarations and are
-not gated. Adapted from the 3SX campaign.
+it counts as 10.0, nothing in it to fault, when its text (comments and preprocessor
+lines stripped) has no ')' followed by '{' outside an if/for/while/switch head; the
+same message for a header that has function text means CodeScene could not parse it,
+and the header is refused. Public headers are declarations and are not gated. Adapted from the 3SX campaign.
 """
 
 from __future__ import annotations
@@ -45,6 +48,10 @@ SUBSYSTEMS = ("MagickCore/", "MagickWand/", "coders/", "Magick++/lib/", "filters
 EXCLUDED = ()
 SCORE_RE = re.compile(r"Code Health score:\s*([0-9.]+)")
 NO_SCORE = "Could not determine Code Health score."
+NOISE_RE = re.compile(r"/\*.*?\*/|//[^\n]*|^[ \t]*#[^\n]*(?:\\\n[^\n]*)*", re.S | re.M)
+FUNCTION_LIKE_RE = re.compile(r"\)\s*\{")
+WORD_BEFORE_RE = re.compile(r"(\w+)\s*\Z")
+CONTROL_WORDS = {"if", "for", "while", "switch"}
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -165,10 +172,35 @@ def parse_score(stdout: str, path: str) -> float:
     return float(match.group(1))
 
 
+def opener_word(text: str, close: int) -> str:
+    """The word before the '(' that the ')' at text[close] closes ('' if none)."""
+    depth = 0
+    for k in range(close, -1, -1):
+        depth += (text[k] == ")") - (text[k] == "(")
+        if depth == 0:
+            match = WORD_BEFORE_RE.search(text, 0, k)
+            return match.group(1) if match else ""
+    return ""
+
+
+def has_function_text(path: str) -> bool:
+    """True when the file, comments and preprocessor lines stripped, has a ')' followed by
+    '{' that does not close an if, for, while or switch head: a function definition."""
+    text = NOISE_RE.sub(" ", Path(path).read_text(encoding="utf-8", errors="replace"))
+    return any(opener_word(text, m.start()) not in CONTROL_WORDS
+               for m in FUNCTION_LIKE_RE.finditer(text))
+
+
+def scoreless_header(path: str, stdout: str) -> bool:
+    return path.endswith(".h") and NO_SCORE in stdout
+
+
 def score(path: str, exe: str) -> float:
     stdout = run_score_request(exe, path)
-    if path.endswith(".h") and NO_SCORE in stdout:
-        return 10.0  # a header with no function in it: nothing to fault
+    # cs-mcp says NO_SCORE both for a header with no function and for one it cannot parse:
+    # only the first counts as 10.0, nothing to fault; the second is refused below.
+    if scoreless_header(path, stdout) and not has_function_text(path):
+        return 10.0
     return parse_score(stdout, path)
 
 
@@ -227,9 +259,16 @@ def merge_head() -> str | None:
 @dataclass(frozen=True)
 class GateContext:
     """What every staged file is judged against: the merged branch, if any, and the
-    score a split-off file must reach (None: new code must score 10.0)."""
+    score a split-off file must reach (None: new code must score 10.0). A new .c or .cpp
+    file is held to the shrinking .c/.cpp files only (bar); a new private header to every
+    shrinking file, headers included (header_bar), since a carve may move code from a
+    .c file or from another header into it."""
     merged: str | None
     bar: float | None
+    header_bar: float | None
+
+    def bar_for(self, path: str) -> float | None:
+        return self.header_bar if path.endswith(".h") else self.bar
 
 
 def shrunk_previous(path: str, previous_path: str | None) -> str | None:
@@ -243,19 +282,29 @@ def shrunk_previous(path: str, previous_path: str | None) -> str | None:
     return previous if staged.count("\n") < previous.count("\n") else None
 
 
-def split_bar(paths: list[tuple[str, str | None]], exe: str) -> float | None:
-    """The lowest HEAD score among staged existing files that shrink, or None."""
-    bars: list[float] = []
+def shrunk_scores(paths: list[tuple[str, str | None]], exe: str) -> list[tuple[str, float]]:
+    """(path, HEAD score) of every staged existing file that shrinks."""
+    scores: list[tuple[str, float]] = []
     for path, previous_path in paths:
         previous = shrunk_previous(path, previous_path)
         if previous is None:
             continue
         old_file = temp_file(previous, Path(path).suffix)
         try:
-            bars.append(score(old_file, exe))
+            scores.append((path, score(old_file, exe)))
         finally:
             cleanup_temp_files((old_file,))
-    return min(bars) if bars else None
+    return scores
+
+
+def lowest(scores: list[float]) -> float | None:
+    return min(scores) if scores else None
+
+
+def gate_context(paths: list[tuple[str, str | None]], exe: str) -> GateContext:
+    shrunk = shrunk_scores(paths, exe)
+    code = [s for path, s in shrunk if not path.endswith(".h")]
+    return GateContext(merge_head(), lowest(code), lowest([s for _, s in shrunk]))
 
 
 def came_unchanged(path: str, staged: str, merged: str | None) -> bool:
@@ -277,13 +326,13 @@ def check(path: str, exe: str, previous_path: str | None,
     baseline_path = previous_path if previous_path is not None else path
     previous_exists, previous = show("HEAD", baseline_path)
     if not previous_exists:
-        return check_new_file(path, exe, staged, context.bar)
+        return check_new_file(path, exe, staged, context.bar_for(path))
     return check_revised_file(path, exe, previous, staged)
 
 
 def collect_failures(paths: list[tuple[str, str | None]], exe: str) -> list[str]:
     failures: list[str] = []
-    context = GateContext(merge_head(), split_bar(paths, exe))
+    context = gate_context(paths, exe)
     for path, previous_path in paths:
         try:
             reason = check(path, exe, previous_path, context)
