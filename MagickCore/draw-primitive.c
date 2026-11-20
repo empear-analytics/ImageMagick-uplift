@@ -497,6 +497,15 @@ static PolygonInfo *ThrowPolygonAllocationFailure(PolygonInfo *polygon_info,
   return(DestroyPolygonInfo(polygon_info));
 }
 
+static PolygonInfo *ThrowPolygonPointsFailure(PolygonInfo *polygon_info,
+  PointInfo *points,ExceptionInfo *exception)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+  points=(PointInfo *) RelinquishMagickMemory(points);
+  return(DestroyPolygonInfo(polygon_info));
+}
+
 static MagickBooleanType GrowEdgePoints(PointInfo **points,const ssize_t n,
   size_t *number_points)
 {
@@ -604,12 +613,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         input.direction=direction;
         input.bounds=bounds;
         if (FlushSubpathEdge(polygon_info,&input,&targets) == MagickFalse)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            points=(PointInfo *) RelinquishMagickMemory(points);
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonPointsFailure(polygon_info,points,exception));
         if (AcquireEdgePoints(&points,&number_points) == MagickFalse)
           return(ThrowPolygonAllocationFailure(polygon_info,exception));
         ghostline=path_info[i].code == GhostlineCode ? MagickTrue : MagickFalse;
@@ -634,12 +638,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         */
         point=points[n-1];
         if (GrowPolygonEdges(polygon_info,edge,&number_edges) == MagickFalse)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            points=(PointInfo *) RelinquishMagickMemory(points);
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonPointsFailure(polygon_info,points,exception));
         polygon_info->edges[edge].number_points=(size_t) n;
         polygon_info->edges[edge].scanline=(-1.0);
         polygon_info->edges[edge].highwater=0;
