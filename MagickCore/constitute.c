@@ -166,9 +166,27 @@ MagickExport Image *PingImage(const ImageInfo *image_info,
   return(image);
 }
 
-static Image *PingSceneImages(const ImageInfo *image_info,
-  ImageInfo *read_info,char *ping_filename,ExceptionInfo *exception)
+typedef Image
+  *(*LoadSceneImageMethod)(const ImageInfo *,ExceptionInfo *);
+
+typedef struct _SceneImageLoader
 {
+  const ImageInfo
+    *image_info;
+
+  LoadSceneImageMethod
+    method;
+} SceneImageLoader;
+
+static inline Image *LoadSceneImages(const SceneImageLoader *loader,
+  ImageInfo *read_info,char *scene_filename,ExceptionInfo *exception)
+{
+  const ImageInfo
+    *const image_info = loader->image_info;
+
+  const LoadSceneImageMethod
+    method = loader->method;
+
   Image
     *image,
     *images;
@@ -177,20 +195,29 @@ static Image *PingSceneImages(const ImageInfo *image_info,
     extent,
     scene;
 
-  (void) CopyMagickString(ping_filename,read_info->filename,
+  (void) CopyMagickString(scene_filename,read_info->filename,
     MagickPathExtent);
   images=NewImageList();
   extent=(ssize_t) (read_info->scene+read_info->number_scenes);
   for (scene=(ssize_t) read_info->scene; scene < (ssize_t) extent; scene++)
   {
-    (void) InterpretImageFilename(image_info,(Image *) NULL,ping_filename,
+    (void) InterpretImageFilename(image_info,(Image *) NULL,scene_filename,
       (int) scene,read_info->filename,exception);
-    image=PingImage(read_info,exception);
+    image=method(read_info,exception);
     if (image == (Image *) NULL)
       continue;
     AppendImageToList(&images,image);
   }
   return(images);
+}
+
+static Image *PingSceneImages(const ImageInfo *image_info,
+  ImageInfo *read_info,char *ping_filename,ExceptionInfo *exception)
+{
+  const SceneImageLoader
+    loader = { image_info, PingImage };
+
+  return(LoadSceneImages(&loader,read_info,ping_filename,exception));
 }
 
 /*
@@ -273,29 +300,10 @@ MagickExport Image *PingImages(ImageInfo *image_info,const char *filename,
 static Image *ReadSceneImages(const ImageInfo *image_info,
   ImageInfo *read_info,char *read_filename,ExceptionInfo *exception)
 {
-  Image
-    *image,
-    *images;
+  const SceneImageLoader
+    loader = { image_info, ReadImage };
 
-  ssize_t
-    extent,
-    scene;
-
-  (void) CopyMagickString(read_filename,read_info->filename,
-    MagickPathExtent);
-  images=NewImageList();
-  extent=(ssize_t) (read_info->scene+read_info->number_scenes);
-  scene=(ssize_t) read_info->scene;
-  for ( ; scene < (ssize_t) extent; scene++)
-  {
-    (void) InterpretImageFilename(image_info,(Image *) NULL,
-      read_filename,(int) scene,read_info->filename,exception);
-    image=ReadImage(read_info,exception);
-    if (image == (Image *) NULL)
-      continue;
-    AppendImageToList(&images,image);
-  }
-  return(images);
+  return(LoadSceneImages(&loader,read_info,read_filename,exception));
 }
 
 /*
