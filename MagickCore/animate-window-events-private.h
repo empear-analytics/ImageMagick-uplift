@@ -260,16 +260,11 @@ static void XHandleMapNotify(const AnimateEventContext *event_context,
     }
   if (event.xmap.window == windows->image.id)
     {
-      AnimateImageWindow
-        image_window;
+      const AnimateImageWindow
+        image_window = { display, resource_info, windows,
+          event_context->map_info, event_context->image_list,
+          event_context->display_image, event_context->exception };
 
-      image_window.display=display;
-      image_window.resource_info=resource_info;
-      image_window.windows=windows;
-      image_window.map_info=event_context->map_info;
-      image_window.image_list=event_context->image_list;
-      image_window.display_image=event_context->display_image;
-      image_window.exception=event_context->exception;
       XMapAnimateImageWindow(&image_window,nexus,image,state);
       return;
     }
