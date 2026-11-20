@@ -251,6 +251,7 @@ $call Make vision.c
 $call Make vision-components.c
 $call Make vms.c
 $call Make widget.c
+$call Make widget-text.c
 $call Make widget-command.c
 $call Make widget-menu.c
 $call Make widget-list.c
