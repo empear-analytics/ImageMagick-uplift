@@ -104,6 +104,9 @@ extern MagickPrivate XWidgetInfo
   *SubmenuInfoReference(void),
   *ToggleInfoReference(void);
 
+extern MagickPrivate XWidgetInfo
+  **SelectionInfoReference(void);
+
 /*
   Method prototypes.
 */
