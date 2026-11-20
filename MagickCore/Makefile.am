@@ -97,6 +97,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/animate-private.h \
   MagickCore/animate-window-command-private.h \
   MagickCore/animate-window-scene-private.h \
+  MagickCore/animate-window-events-private.h \
   MagickCore/annotate.c \
   MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
@@ -714,6 +715,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/animate-private.h \
   MagickCore/animate-window-command-private.h \
   MagickCore/animate-window-scene-private.h \
+  MagickCore/animate-window-events-private.h \
   MagickCore/annotate-private.h \
   MagickCore/blob-private.h \
   MagickCore/cache-private.h \
