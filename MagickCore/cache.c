@@ -1930,9 +1930,6 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   void
     *magick_restrict virtual_metacontent;
 
-  VirtualPixelRows
-    virtual_rows;
-
   /*
     Acquire pixels.
   */
@@ -2053,18 +2050,14 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
     default:
       break;
   }
-  virtual_rows.image=image;
-  virtual_rows.virtual_pixel_method=virtual_pixel_method;
-  virtual_rows.x=x;
-  virtual_rows.y=y;
-  virtual_rows.columns=columns;
-  virtual_rows.rows=rows;
-  virtual_rows.cache_info=cache_info;
-  virtual_rows.virtual_nexus=virtual_nexus;
-  virtual_rows.virtual_pixel=virtual_pixel;
-  virtual_rows.virtual_metacontent=virtual_metacontent;
-  virtual_rows.exception=exception;
-  v=GetVirtualPixelRows(&virtual_rows,q,s);
+  {
+    const VirtualPixelRows
+      virtual_rows = { image, virtual_pixel_method, x, y, columns, rows,
+        cache_info, virtual_nexus, virtual_pixel, virtual_metacontent,
+        exception };
+
+    v=GetVirtualPixelRows(&virtual_rows,q,s);
+  }
   /*
     Free resources.
   */
