@@ -515,10 +515,16 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/vision-components-object-private.h \
   MagickCore/vision-components-label-private.h \
   MagickCore/widget.c \
+  MagickCore/widget-list.c \
+  MagickCore/widget-font.c \
+  MagickCore/widget-file.c \
+  MagickCore/widget-color.c \
+  MagickCore/widget-prefs.c \
   MagickCore/widget-confirm.c \
   MagickCore/widget-dialog.c \
   MagickCore/widget.h \
   MagickCore/widget-core-private.h \
+  MagickCore/widget-browser-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
   MagickCore/xml-tree-file.c \
@@ -785,6 +791,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/vision-components-label-private.h \
   MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/widget-core-private.h \
+  MagickCore/widget-browser-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-image-private.h \

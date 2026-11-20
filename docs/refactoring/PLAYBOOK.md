@@ -1313,6 +1313,31 @@ is worth it.
    shared variable only through its accessor, `(*NameReference())`, as the other file
    does (the accessor is declared in the same header, before the helpers); this is still
    one accessor per variable, its only new external name.
+   A function-level `static` variable that a moving helper writes (`widget.c`'s
+   `ReleaseWidgetKey`, whose `static char command[MagickPathExtent]` and `static KeySym
+   key_symbol` serve the calls of the Color, File and Font browsers) does not move into the
+   header inside the helper: each including file would then hold its own copy, and calls
+   from different files would no longer share its state (mandate (2026-11-19); the main
+   session's reading of round 34: one copy, never per-file copies of writable state). Its
+   declaration instead leaves the function for the original's *Variable declarations*
+   block, verbatim but for the name, which takes a prefix from the function's name
+   (`release_key_command`, `release_key_symbol`) so that no local of the file shadows it,
+   checked by grep; the declaration keeps `static`, its type, extent and initialiser (none
+   here). It is then shared through one accessor as above, defined directly after it:
+   `MagickPrivate T *NameReference(void)` for an arithmetic type and, for an array,
+   `MagickPrivate T (*NameReference(void))[N]` returning `&name`, its extent written as the
+   declaration writes it, so that `(*NameReference())` designates the array itself, decays
+   to the pointer the call took before, and `sizeof` of it is the array's size (the operand
+   of `sizeof` is not evaluated, C11 6.5.3.4p2). The helper's uses are written through the
+   accessor, nothing else on the line changing. A block-scope and a file-scope `static`
+   object both have static storage duration and are initialised once before the program
+   starts, to zero when the declaration has no initialiser (C11 6.2.4p3, 6.7.9p10), so the
+   one object keeps its storage, type, size and initial bytes, and every call from every file
+   reads and writes it as the calls did before; only its name and scope change. The proof is
+   the object comparison (`tools/split_branch_check.py` in a build that compiles the helper):
+   every function identical but the helper, whose only differences are the accessor calls
+   and the `.bss` symbol now named by the new name, of the same size; and the oracle on the
+   cases that reach the helper.
    A file-scope variable of the original with external linkage (defined without `static` and
    declared in no header, as `opencl.c`'s `MagickLibrary *openCL_library;`) that both parts
    name is declared rather than shared through an accessor (owner, 2026-11-16, AGENTS.md,
@@ -26064,3 +26089,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | XE | Unwrap the Else of an If That Leaves: `if (C) X else { S }`, `X` leaving on every path (`break`/`continue` of the enclosing loop or `switch`, `return`, `goto`), `S` declaring nothing at its top level and holding no label, becomes `if (C) X` followed by `S`'s statements one indent level less; proof `tools/obj_identical.sh` `IDENTICAL` | `accelerate-resize.c`'s `RunResizeFilterPass` (campaign A, W47 round 34, lane c; OpenCL host code, wide build): *Large Method* 72 lines, held since round 33; a probe 69 lines, the file 9.30 to 9.68, `IDENTICAL` | mandate (2026-11-19) |
 | 2026-11-19 | NEW | EL | Write an Equality-Chain Predicate as a Label Set: a `static` predicate whose body is `if (C) return(MagickTrue); return(MagickFalse);` (or the `?:` form), `C` a chain of `n == Li` over distinct enumeration constants, becomes `switch (n)` with the constants as labels in order, `return(MagickTrue);`, `default: break;`, `return(MagickFalse);` (Recipe LP step 2's shape); for a header, every including object compared with a snapshot and the changed functions' self Ir measured on their per-pixel users | `colorspace-private.h` (campaign A, W47 round 34, lane a): seven *Complex Conditional* findings in its `Is...Colorspace` predicates; the label-set probe 3.69 -> 4.89 (`IssRGBCompatibleColorspace` alone 3.99, its changed callers at equal or lower self Ir) | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | OH | Upstream shared form of Form A: an upstream private header that many files include gives its run after the include block (`#define`s, `static const` tables, `static inline` functions; the `extern "C"` opener between tables and functions stays) to a new header that only it includes, named last in its include block, the functions in an `extern "C"` pair of their own; proof: every including source preprocessed identical (C) and every including object of an OpenMP -O2 tree identical to a snapshot, C++ check on the MagickCore includers; both headers at least the carved header's score before | `colorspace-private.h` (campaign A, W47 round 34, lane a, reading 4): 4.32 after four EL steps, its 72 converters (Excess Arguments, Code Duplication, Complex and Large Method) per pixel in every colourspace transform; the carve gives 7.43 and the new `colorspace-conversions-private.h` 5.18, with no instruction changed in any includer | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | S | Step 2: a function-level `static` that a helper moving into the private header writes leaves the function for the original's file scope, renamed with a prefix from the function's name, storage, type, extent and initialiser unchanged, and is shared through one accessor; an array's accessor returns a pointer to the array (`T (*NameReference(void))[N]`), so `sizeof` keeps its value. One object as before, never a copy per including file; object comparison identical but the helper's accessor calls and the renamed `.bss` symbol | `widget.c`'s `ReleaseWidgetKey` (campaign A, W47 round 34, lane b6): its `command[MagickPathExtent]` and `key_symbol` serve the Color, File and Font browsers, which the chain stub-probed at widget.c 8.28 to 9.09 puts in three files; the main session refused per-file copies of writable state | mandate (2026-11-19) |
