@@ -17890,7 +17890,10 @@ functions of the file are twins in which one computes, from one of its parameter
 value the other takes as a parameter: `xml-tree.c`'s `ExtendXMLBuffer(source,length,
 extent,text)`, whose body is `ExtendXMLBufferBy(source,length,extent,size)`'s with
 `strlen(text)` at each place the twin has `size`. Removing the first function frees a
-place for the helper.
+place for the helper. Or (step 6's wrapper form) CodeScene reports *Code Duplication*
+between the two twins: `widget-browser-private.h`'s `TrackListBrowserSlider(slider_info,
+event,entries)`, whose body is `TrackFontBrowserSlider(slider_info,event,fonts)`'s with
+`(int) entries` in place of `fonts`.
 
 **Not covered by:** Recipe D, which needs blocks that are the same text once variables
 are renamed (here one has a call where the other has a parameter) and leaves both
@@ -17916,6 +17919,15 @@ parameter instead of a function.
    access or an array element of identifiers), as it is evaluated in the same order
    relative to the other arguments as C's unspecified argument order already allowed.
 5. Delete `F`. Build: a call left behind does not compile.
+6. *Wrapper form* (2026-11-20, mandate (2026-11-19)): when CodeScene reports *Code
+   Duplication* between `F` and `G` (rather than *Number of Functions*), and a caller of `F`
+   is not reached by any case or stands in another file (`F` and `G` `static inline` in one
+   private header, their callers in the files that include it), `F` stays, with its name,
+   parameters and callers, and its whole body becomes `return(G(p1,...,pn,E(t)));` (steps 1
+   to 3 hold as written). Steps 4 and 5 are not taken. Each call of `F` then evaluates
+   `E(t)` once, as step 2 allows, and runs `G`'s body, which is `F`'s old body with the
+   value in place of each `E(t)`. The evidence is the oracle on the cases that execute `F`
+   itself (`casemap.py F`), since only `F`'s text changes; no caller changes.
 
 **Before:**
 
@@ -25969,3 +25981,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | S | Step 2: a function-level `static` that a helper moving into the private header writes leaves the function for the original's file scope, renamed with a prefix from the function's name, storage, type, extent and initialiser unchanged, and is shared through one accessor; an array's accessor returns a pointer to the array (`T (*NameReference(void))[N]`), so `sizeof` keeps its value. One object as before, never a copy per including file; object comparison identical but the helper's accessor calls and the renamed `.bss` symbol | `widget.c`'s `ReleaseWidgetKey` (campaign A, W47 round 34, lane b6): its `command[MagickPathExtent]` and `key_symbol` serve the Color, File and Font browsers, which the chain stub-probed at widget.c 8.28 to 9.09 puts in three files; the main session refused per-file copies of writable state | mandate (2026-11-19) |
 | 2026-11-20 | NEW | HM | Move a family header's helpers into the private header it includes: `static inline` helpers of a Recipe S family header that every includer also sees through the first header move, unchanged, to the end of the first header when that clears *Code Duplication* in the family header and the first header keeps its score; proof: every including file's object byte-identical against HEAD's headers | `widget-browser-private.h` (campaign A, W47 round 34, lane b6): 8.81 with *Code Duplication* in seven functions, three of them the arrow helpers `XDrawTriangleEast`/`North`/`South`; a probe 9.38 without the four arrow helpers, `widget-core-private.h` 9.68 with them (unchanged) | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | FG | Step 6, *wrapper form*: for *Code Duplication* between the twins, when a caller of `F` is unreached or in another file (both `static inline` in one private header), `F` keeps its name, parameters and callers and its body becomes `return(G(...,E(t)));`; evidence the oracle on the cases that execute `F` | `widget-browser-private.h`'s `TrackListBrowserSlider` and `TrackFontBrowserSlider` (campaign A, W47 round 34, lane b6): two of the header's four duplicated functions after `a1492c8ff`; `TrackListBrowserSlider`'s callers are `widget-list.c`'s `MoveListBrowserPointer` (1 case) and `widget.c`'s `MoveTextViewPointer` (0 cases), so step 4 could not rewrite every call under the oracle | mandate (2026-11-19) |
