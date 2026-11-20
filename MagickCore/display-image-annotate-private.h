@@ -261,20 +261,17 @@ static MagickBooleanType XColorEditPixels(
       PixelInfo
         target;
 
-      XReplaceColorInput
-        replace;
-
       /*
         Update color information using replace algorithm.
       */
       (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
         x_offset,(ssize_t) y_offset,&target,exception);
-      replace.image=image;
-      replace.image_view=image_view;
-      replace.target=target;
-      replace.color=color;
-      replace.exception=exception;
-      XReplaceImageColor(&replace);
+      {
+        const XReplaceColorInput replace = { image, image_view, target, color,
+          exception };
+
+        XReplaceImageColor(&replace);
+      }
       break;
     }
     case FloodfillMethod:
