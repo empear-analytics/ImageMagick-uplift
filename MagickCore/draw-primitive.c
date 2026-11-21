@@ -94,6 +94,7 @@
 #include "MagickCore/transform-private.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/draw-core-private.h"
+#include "MagickCore/draw-primitive-convert-private.h"
 #include "MagickCore/draw-primitive-path-private.h"
 #include "MagickCore/draw-primitive-fill-private.h"
 #include "MagickCore/draw-primitive-render-private.h"
