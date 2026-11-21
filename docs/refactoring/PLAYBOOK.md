@@ -11199,6 +11199,14 @@ recipe turns control flow into data.
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
    alone, and `n` is a parameter of an integer type no wider than `size_t`.
    No `#if` line stands inside the `switch`.
+   *Break membership form* (2026-11-21): the group's body is `break;` alone and the
+   `default:` group is `return(MagickFalse);`, and `d` is `MagickTrue`: the labels return
+   `MagickTrue` by leaving the `switch`, every other value returns `MagickFalse`, which
+   is the membership form with the two bodies exchanged. Step 4's loop returns
+   `MagickTrue` at a match, as in the membership form, and the closing `return(d);`
+   becomes `return(MagickFalse);`. The function may also begin with one test `if (c)
+   return(MagickTrue);` whose condition reads only the parameter (a digit range); it
+   stays before the loop, as it stood before the `switch`.
 2. The function is not called per pixel or per channel (check its callers by reading);
    otherwise time the step against the baseline as Recipe CF step 7 says (a slowdown
    over 3% stops the step). Index form with string literals: every caller only reads
@@ -27354,3 +27362,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | SL | Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants: two `switch`es whose cases are the same text up to the struct local they fill, the controlling expression and some constants, with the same leaving `default:`, become one `static MagickBooleanType` helper taking `T *info`, the value, the read locals and a `const` struct of role constants (read as `roles->r`), split into a chain when it would be a finding; each `switch` becomes the call with `== MagickFalse` running the original exit | `profile.c`'s `ProfileImage` (campaign B, M141): the source and target colour-space switches; a probe 7.41 to 8.17, cc 49 to 29 | mandate (2026-10-24) |
 | 2026-11-21 | NEW | TG | Guard a Loop's Tail Block with a Continue: a loop body's last statement `if (c) { S }`, no `else`, whose `S` nests the bump, becomes `if (<inverse>) continue;` followed by `S` one level out; `continue` goes where falling off the body went; proof `obj_identical.sh` IDENTICAL; a step lowering the function's cc goes first when the `continue` would raise it into *Complex Method* | `constitute-write.c`'s `WriteImages` (campaign B, M141): the progress block's nested `break`; a probe after a Recipe E step, 9.92 to 10.0 | mandate (2026-10-24) |
 | 2026-11-21 | NEW | DB | Merge Declaration Blocks of One Type: a later declaration block whose type line equals an earlier one's in the same declaration list (no initialisers, or only constant ones, and no name between them that refers to its declarators) is deleted and its declarators appended to the earlier block; proof `obj_identical.sh` IDENTICAL | `draw.c`'s `TraceArcPath` (campaign B, M141): two second blocks (`double`, `PrimitiveInfo *`) left by earlier extractions, four lines of a Large Method | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | TB | Step 1, break membership form: the label group's body may be `break;` with `default: return(MagickFalse);` and `return(MagickTrue);` after the `switch`; the loop returns `MagickTrue` at a match and the function ends `return(MagickFalse);`; a leading `if (c) return(MagickTrue);` on the parameter alone stays before the loop | `draw.c`'s `IsValidListChar` (campaign B, M141): a digit range, then eight separator labels that break to `return(MagickTrue);`; probe 6.42 to 6.63 | mandate (2026-10-24) |
