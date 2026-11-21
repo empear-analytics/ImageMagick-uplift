@@ -2660,13 +2660,9 @@ MagickExport void *ImagesToBlob(const ImageInfo *image_info,Image *images,
           blob_info->file=fdopen(file,"wb");
           if (blob_info->file != (FILE *) NULL)
             {
-              TemporaryBlobWrite
-                temporary;
+              const TemporaryBlobWrite
+                temporary = { blob_info, images, length, exception };
 
-              temporary.blob_info=blob_info;
-              temporary.images=images;
-              temporary.length=length;
-              temporary.exception=exception;
               blob=WriteImagesBlobFile(&temporary,unique,blob);
             }
           (void) RelinquishUniqueFileResource(unique);

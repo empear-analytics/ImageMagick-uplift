@@ -11199,6 +11199,14 @@ recipe turns control flow into data.
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
    alone, and `n` is a parameter of an integer type no wider than `size_t`.
    No `#if` line stands inside the `switch`.
+   *Break membership form* (2026-11-21): the group's body is `break;` alone and the
+   `default:` group is `return(MagickFalse);`, and `d` is `MagickTrue`: the labels return
+   `MagickTrue` by leaving the `switch`, every other value returns `MagickFalse`, which
+   is the membership form with the two bodies exchanged. Step 4's loop returns
+   `MagickTrue` at a match, as in the membership form, and the closing `return(d);`
+   becomes `return(MagickFalse);`. The function may also begin with one test `if (c)
+   return(MagickTrue);` whose condition reads only the parameter (a digit range); it
+   stays before the loop, as it stood before the `switch`.
 2. The function is not called per pixel or per channel (check its callers by reading);
    otherwise time the step against the baseline as Recipe CF step 7 says (a slowdown
    over 3% stops the step). Index form with string literals: every caller only reads
@@ -11774,9 +11782,18 @@ recipe turns an expression into data.
    another parameter with a constant (no call, no assignment, no increment); (c) `chain
    || (r)`, where `r` is a last parenthesised operand with no call, assignment or
    increment. No `#if` line stands inside the function.
+   *Ladder form* (2026-11-21): the body is, apart from comments, a run of statements
+   `if (Ci) return(MagickTrue);` followed by `return(MagickFalse);`, where every `Ci`
+   reads only `n`, an `int` parameter, and holds no call, assignment or increment; at
+   least two of them are `n == Li` (`code == 0x0020`), each `Li` an integer literal or a
+   character constant, all distinct. Those equality tests are the chain, in the
+   ladder's order; the other tests (a range, `(n >= a) && (n <= b)`) stay. The function
+   may be a `static inline` function of a private header, the table directly above it
+   in the header, as Recipe TB step 1 allows.
 2. Directly above the function write a `static const` array with no size, of the
    declared type of `n` (`FunctionE`, `int`), named for what it holds, whose elements are
-   `L1 ... Lk` in the chain's order, its line breaks where the chain's were.
+   `L1 ... Lk` in the chain's order, its line breaks where the chain's were (in the
+   ladder form, one element per line).
 3. Declare `size_t i;` at the top of the function and replace the `return` with the
    lookup `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` / `if (T[i] == n)` /
    `return(MagickTrue);`, then: in form (a) `return(MagickFalse);`; in form (b) the
@@ -11784,6 +11801,12 @@ recipe turns an expression into data.
    `return(MagickFalse);`; in form (c) the lookup is followed by
    `return((r) ? MagickTrue : MagickFalse);`, `r`'s text unchanged. The function's
    name, parameters, return type and comments stay.
+   Ladder form: the equality tests leave and the lookup, ending in its
+   `return(MagickTrue);`, stands where the first of them stood; the other `if`
+   statements keep their text and their order around it, and `return(MagickFalse);`
+   closes the function as before. Check by a harness that calls both versions for
+   every `int` value from the smallest constant minus one to the largest plus one, and
+   for `INT_MIN`, `-1` and `INT_MAX`, and finds every result equal.
 4. Check by script that the table holds exactly the constants of the chain, each once
    and in its order, that `a` or `r` reappears unchanged, and that nothing else in the
    file changed.
@@ -11840,6 +11863,13 @@ static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
 - The table is new data the function only reads: `static`, `const`, not visible outside
   the file; no existing table changes (*Absolutely forbidden*). Every constant of the
   chain is still written once, in the table. No literal is changed; the loop adds `0`.
+- Ladder form. Every statement but the last returns `MagickTrue` when its test holds, and
+  no test has a side effect, so the function returns `MagickTrue` exactly when one of the
+  tests holds and `MagickFalse` otherwise: the order in which the tests run cannot be
+  observed. The lookup holds when `n` equals one of the `Li`, which is when one of the
+  equality tests held, and the tests that stay are the same text; so the set of values
+  for which the function returns `MagickTrue` is unchanged. The harness checks that
+  for every value the tests can tell apart.
 - Only the number of comparisons and a loop counter change, which is speed (step 1).
 
 **Evidence level:** oracle (the cases that reach the predicate's callers), with step 4's
@@ -12744,6 +12774,19 @@ block with a `return` that is not a throw macro's; Recipe D, whose copies are mo
 6. When `Z` is empty, `Q` ends in `T` and no function is needed: the selection becomes
    `if (C) P0 else Q0` followed by `T`; check it by reading, both branches ending in the
    same text.
+   *Call form* (2026-11-21): when `Z` is empty and each branch ends instead in
+   `if (G == F) return(F);`, where `G` is a call of a function returning
+   `MagickBooleanType` (a different call in each branch, `G1` in `P` and `G2` in `Q`) and
+   `F` is one constant written the same way in both, declare a new local
+   `MagickBooleanType V;` (a name the function does not use) among the function's
+   declarations, in their order; replace each branch's test by `V=G1;` and `V=G2;`
+   (the calls copied character for character, each branch keeping its braces and its
+   declarations), and write `if (V == F) return(F);` once directly after the selection.
+   No other statement reads or writes `V`. Check by reading: each branch evaluates its
+   call at the place it did, after the same statements, and the test after the selection
+   compares the value that call returned with `F`, so the function returns `F` exactly
+   where it did and goes on otherwise. Step 7's script does not apply; `--calls` shows
+   no call added or removed.
 7. Run `tools/tail_hoist_check.py <file> <Caller> <Helper>`: it must print
    `IDENTICAL-MODULO-HOIST`. The checks it makes: before the step, the caller held
    `if (C) { P0 T } else { Q }` where after it holds the new selection and `T`; `Q` is the
@@ -18164,6 +18207,13 @@ variables or one that leaves the loop.
    `if (s == MagickFalse) break;` (or `== 0`) (form B). In form A the segment may also
    be a run of statements nested inside the body (in a `switch` group, an `if` block or
    an inner loop's body), when no `break`, `continue` or `return` in it leaves it.
+   *Outside-loop form* (2026-11-18): in form A the segment may also be a run of whole
+   statements of the caller's own body outside every loop (before its loop or after
+   it), with no `break`, `continue`, `goto` or `return` in it but those of loops or
+   `switch`es nested inside it, when the caller already declares the state struct of
+   step 3 as its last declaration. The rest of the recipe holds as written: the copies
+   in read the values the locals hold at that point, a segment outside the loop runs
+   once, and the copy out writes the values back before the caller's next statement.
 2. Variables as Recipe CK step 2: locals, parameters, arrays; temporaries (written
    before read on every path through the segment, read by nothing after it before being
    written again) are declared in the helper, and leave the caller when nothing else
@@ -18638,6 +18688,20 @@ selector.
    between the two points.
 4. Build: a call left behind does not compile. Run `refactor_guard.py --calls` with
    `--renamed F=H --renamed G=H`.
+5. *Several members* (2026-11-21). `F` may read several members `s->m1 ... s->mk` where
+   `G` reads `s->n1 ... s->nk` (`targets->stroke_q` and `targets->q` against
+   `targets->stroke_p` and `targets->p`), each once, in a binding at the top of the body
+   (`PointInfo **const stroke_q = targets->stroke_q;`), `mi` and `ni` of one type `Ti`
+   for each `i`, and `s` used nowhere else. `H` takes, in place of `s`, one parameter per
+   binding, of the binding's declared type with its top-level `const` (`PointInfo
+   **const stroke`), in the bindings' order and named for the role (`stroke`,
+   `offset`); the bindings go and each use of a bound local
+   is written with its parameter's name, nothing else changed (the renaming of step 1).
+   `H` keeps at most four parameters. Each call `F(e,x)` becomes `H(x,e->m1,...,e->mk)`
+   (for `e` written `&t`, `t.m1`, the same member), and `G`'s calls take `n1 ... nk`.
+   The binding read each member once, at the top of the body, before any statement ran;
+   the call reads it once, just before the body runs, and nothing runs between the two
+   points, so each parameter holds the value its binding held.
 
 **Before:**
 
@@ -26328,6 +26392,444 @@ mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
+## Recipe CM - Name a Clamp Selection
+
+**Use when:** CodeScene reports *Complex Method* (or *Overall Code Complexity*) on a
+function whose decisions are mostly nested conditional expressions that clamp a value to a
+range, `v=v < 0.0 ? 0.0 : v >= e ? l : v;`, repeated for several values: `draw-primitive.c`'s
+`ClampPolygonBounds`, twelve lines and cc 9, four such statements and nothing else.
+
+**Not covered by:** Recipe NS, whose selection is one `?:` between two constants or two
+plain variables; here there are two nested `?:` and the operands are the clamped value
+itself and expressions of the caller (`(double) image->columns-1.0`). Recipe P, which names
+a boolean condition and leaves the `?:` in place. Recipe D, which merges copies of
+statements, not of an expression with different operands. Recipes E and SV, which move
+statements: each helper would carry the same decisions.
+
+**How:**
+
+1. Each site is the whole right-hand side of an assignment statement, `t=A < 0.0 ? 0.0 : A
+   >= E ? L : A;`, where `A` is the same text at its three places, `t` is `A` or another
+   lvalue, and `A`, `E` and `L` are free of calls, assignments, increments and
+   decrements (identifiers, member accesses, casts, literals and arithmetic on them). The
+   literals `0.0` are exactly those; `A`, `E` and `L` all have type `double` (a cast or a
+   `double` operand makes them so; check by reading). No site lies in a `#pragma omp`
+   region or a preprocessor branch the build does not compile.
+2. Directly above the first function that uses it, write `static inline double
+   ClampBoundsCoordinate(const double value,const double edge,const double limit)` (or a
+   name for the range at hand) whose body is `return(value < 0.0 ? 0.0 : value >= edge ?
+   limit : value);`.
+3. Replace each site's right-hand side by `ClampBoundsCoordinate(A,E,L)`, with `A`, `E` and
+   `L` as written. When `E` and `L` are the same text, both arguments are that text.
+   Check by script that each replaced right-hand side equals the helper's body with the
+   arguments substituted, character for character.
+4. One function's sites per commit.
+5. Run `sh tools/obj_identical.sh <file>`. If it prints `DIFFERENT`, run `sh
+   tools/obj_modulo.sh <file> <function> ClampBoundsCoordinate`: every difference it
+   reports must be a renaming of registers within an otherwise identical instruction
+   sequence (no instruction added, removed or reordered), in the function or in a
+   caller it is inlined into; quote the differing lines in the commit. Otherwise revert.
+6. The function is oracle-reached (`casemap.py`); run the oracle for it and, for a file
+   with OpenMP regions, the timing the owner's ruling of 2026-11-17 asks for.
+
+**Before:**
+
+```c
+static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
+{
+  bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
+    (double) image->columns-1.0 : bounds.x1;
+  ...
+```
+
+**After:**
+
+```c
+static inline double ClampBoundsCoordinate(const double value,
+  const double edge,const double limit)
+{
+  return(value < 0.0 ? 0.0 : value >= edge ? limit : value);
+}
+
+static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
+{
+  bounds.x1=ClampBoundsCoordinate(bounds.x1,(double) image->columns-1.0,
+    (double) image->columns-1.0);
+  ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `?:` is right-associative and binds looser than `-` and
+  `>=`, so the site reads `A < 0.0 ? 0.0 : (A >= (E) ? (L) : A)`, which is the helper's
+  body. The arguments are evaluated once each before the call, where the site evaluated
+  `A` up to three times and `E` and `L` at most once each: none has a side effect (step
+  1), and each has type `double`, so passing it converts nothing and the selected value
+  reaches `t` unchanged. Evaluating `L` when the site would not have is an extra
+  side-effect-free floating-point operation whose result is discarded.
+- The comparisons keep their operators and operand order; a NaN `A` fails both tests and
+  is returned unchanged, as before.
+- `E` and `L` stay separate parameters: `GetPolygonBounds` tests against `(double)
+  image->columns` and returns `(double) image->columns-1`, a different pair.
+
+**Evidence level:** oracle, with the object comparison of step 5.
+
+**Provenance:** 2026-11-20, from `draw-primitive.c`'s `ClampPolygonBounds` (campaign B,
+M141): a probe took it out of *Complex Method*, 3.60 to 3.67, with object code differing
+only in one register choice inside `DrawPolygonPrimitive`, into which it is inlined.
+`GetPolygonBounds` has the same clamps but no oracle case reaches it. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe SL - Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function that holds two `switch` statements filling two struct locals of one type, case by
+case the same text except for the local's name, the controlling expression and some
+constants, each with the same leaving `default:`: `profile.c`'s `ProfileImage`, whose
+source and target colour-space switches set `source_info` and `target_info` (an
+`LCMSInfo`) from an ICC signature, differing in the CMYK and Lab scales and the Lab
+translation, and whose `default:` throws `ThrowProfileException`.
+
+**Not covered by:** Recipe SC, whose copies may differ only in constants (here they write
+two different locals and switch on different expressions) and may not leave the function;
+Recipe D, which renames variables but allows a single differing value; Recipe SV, one
+value; Recipe W, whose block is one copy and returns success for a single exit but passes
+no constants; Recipe SD and SW, which split one selection rather than merge two.
+
+**How:**
+
+1. The two `switch` statements lie in one function, outside every OpenMP region, with no
+   `#pragma` line. Their controlling expressions have no side effect, or are one call
+   whose value is the only thing the switch reads of it. Every case group ends in
+   `break;` and holds no other `break`, `continue`, `goto`, `return` or label. Both
+   `default:` groups are the same statement `X` that leaves the function (a `return`, or a
+   throw macro that returns), and `X` reads nothing the cases write.
+2. Each switch writes members of one struct local `a` (`b` for the other) of one
+   `typedef struct` type `T`, as `a.m` and `&a` passed to callees that take `T *`, and
+   reads only `a`'s members, parameters and locals no case writes. Checked by script: with
+   `&a`/`&b` replaced by `info` and `a.`/`b.` by `info->`, and each differing constant by
+   its role name (Recipe SC step 2: a role at several positions has the same constant at
+   each in each copy), the two case lists are the same token sequence, preprocessor lines
+   included.
+3. Write a `typedef struct` of the roles directly above the new function (Recipe SC step 3:
+   one member per role, in order of first use, of the type of the object the constant is
+   assigned to or passed to).
+4. The new function is `static MagickBooleanType`, directly above the caller, taking
+   `T *info`, the controlling value (`const` of the type the cases are labels of), the
+   locals the cases read, and `const Roles *roles`, at most four parameters. Its body is
+   `switch` on the controlling parameter with one copy's cases, each role constant written
+   `roles->r` (a member read, not a bound local, so that a role used only inside an `#if`
+   leaves no unused local in the builds that skip it), `default:` written
+   `return(MagickFalse);`, and `return(MagickTrue);` after the `switch`.
+5. *Chain.* When the new function would itself be a *Complex Method* or *Large Method*,
+   split it at a case boundary in the same commit (the gate takes new code only at 10.0):
+   the first function keeps the first groups and its `default:` becomes
+   `return(<Second>(info,value,...,roles));`; the second, written directly above it with
+   the same parameters, holds the remaining groups and the `default: return(MagickFalse);`.
+   Each label stands in exactly one of them, in the original order.
+6. Replace each `switch` by a block `{ const Roles r = { c1, ... }; if (<First>(&a,<expr>,
+   ...,&r) == MagickFalse) X }`, the copy's constants in member order (Recipe FI's
+   initialiser) and its own controlling expression as the argument.
+7. Check by script that each copy equals the merged cases with its constants substituted
+   (step 2), and each initialiser lists that copy's constants in member order.
+8. Run the build, `ci_warnings.sh`, `cxx_warnings.sh`, `refactor_guard.py --calls` and the
+   oracle for the caller. One commit holds both copies, the helper and its chain.
+
+**Before:**
+
+```c
+            switch (cmsGetColorSpace(source_info.profile))
+            {
+              case cmsSigCmykData:
+              {
+                source_info.colorspace=CMYKColorspace;
+                source_info.channels=4;
+                if (highres != MagickFalse)
+                  {
+                    source_info.type=(cmsUInt32Number) TYPE_CMYK_DBL;
+                    SetLCMSInfoScale(&source_info,100.0);
+                  }
+                ...
+              default:
+                ThrowProfileException(ImageError,
+                  "ColorspaceColorProfileMismatch",name);
+            }
+            ...
+            switch (signature)
+            {
+              case cmsSigCmykData:
+              {
+                target_info.colorspace=CMYKColorspace;
+                ...
+                    SetLCMSInfoScale(&target_info,0.01);
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetLCMSInfoFromSignature(LCMSInfo *info,
+  const cmsColorSpaceSignature signature,const MagickBooleanType highres,
+  const LCMSInfoScales *scales)
+{
+  switch (signature)
+  {
+    case cmsSigCmykData:
+    {
+      info->colorspace=CMYKColorspace;
+      ...
+          SetLCMSInfoScale(info,scales->cmyk_scale);
+    ...
+    default:
+      return(SetLCMSInfoFromColorSignature(info,signature,highres,scales));
+  }
+  return(MagickTrue);
+}
+...
+            {
+              const LCMSInfoScales
+                source_scales = { 100.0, 100.0, 255.0, (-0.5) };
+
+              if (SetLCMSInfoFromSignature(&source_info,cmsGetColorSpace(
+                  source_info.profile),highres,&source_scales) == MagickFalse)
+                ThrowProfileException(ImageError,
+                  "ColorspaceColorProfileMismatch",name);
+            }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Each switch evaluated its controlling expression once and
+  ran the matching group, whose writes went to `a`'s members; the call evaluates the same
+  expression once, as an argument, at the point where the `switch` stood (step 1: nothing
+  else is evaluated between), and the helper runs the same group with `info` pointing at
+  `a`, so every write lands in the same member in the same order. A constant reaches its
+  object through a `const` member of its own declared type, so it converts as the
+  original assignment or argument did (a constant expression such as `1/255.0` is the
+  same `double` in an initialiser as in an assignment).
+- An unmatched value made the original run `X`; the helper returns `MagickFalse` without
+  writing anything, and the caller runs the same `X` at the same point, with `a` as the
+  default path left it (no case had run).
+- The chain (step 5) tests the labels of the first function, then those of the second:
+  every label stands once, so each value selects the same group as before.
+- The two copies' preprocessor lines are the same (step 2), so every configuration
+  compiles the same cases in both; the helper holds them verbatim.
+
+**Evidence level:** oracle for the caller, with steps 2 and 7 checked by script and
+`refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-20, from `profile.c`'s `ProfileImage` (campaign B, M141): the
+source and target colour-space switches, about 150 lines; a probe of the merge with a
+two-function chain, 7.41 to 8.17, `ProfileImage` cc 49 to 29 and 354 to 190 lines, no
+finding on the new functions. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+
+---
+
+## Recipe TG - Guard a Loop's Tail Block with a Continue
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) on a
+function whose loop body ends in `if (c) { S }`, with no `else`, and `S` holds a further
+conditional that makes the bump: `constitute-write.c`'s `WriteImages`, whose write loop
+ends in `if (number_images != 1) { progress++; proceed=SetImageProgress(...); if (proceed
+== MagickFalse) break; }`.
+
+**Not covered by:** Recipe G, whose *Use when* names only *Deep, Nested Complexity* and
+which guards an outermost condition of the function (this one is the loop body's last
+statement, and the target finding is the bump); Recipe CE, which removes a `continue`
+from a handler chain; Recipe TC, which deletes a bare trailing `if (c) continue;`;
+Recipe UX, whose guard holds a clean-up and a retested condition; Recipes E, W, LB and
+BC, which move the block into a helper (here it holds `#pragma` lines, which no
+extraction recipe moves).
+
+**How:**
+
+1. The `if (c)` is the last statement of the body of a `for`, `while` or `do` loop, has no
+   `else`, and its block `S` holds no declaration at its top (or its declarations move
+   with it unchanged into the loop body, where no name of the body's scope clashes) and
+   no label. A `continue` inside `S` that belongs to the loop stays as it is; a `break`
+   or `continue` of a loop or `switch` nested in `S` stays too. `c` has no side effect.
+2. Replace `if (c) { S }` by `if (<inverse of c>) continue;` followed by the statements
+   of `S`, each two columns less indented (preprocessor lines keep column 1; a `#pragma`
+   line keeps its indentation relative to the statement it governs). The inverse follows
+   Recipe G's *Careful* (`a != b` becomes `a == b`; a floating-point comparison becomes
+   `!(...)`).
+3. A `do` loop is refused when `c` would be inverted around its controlling expression's
+   side effects: `continue` in a `do` body jumps to the test, as falling off the end
+   does, so the step is the same for `for`, `while` and `do`, but the loop's own test must
+   not depend on anything `S` was skipping (it does not: the original also reached the
+   test when `c` was false).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert.
+5. When the guard's `continue` raises the function into *Complex Method* (CodeScene counts
+   it as a branch), probe the file with the step that lowers the function's complexity
+   first, and commit that step before this one, so no commit lowers the score.
+
+**Before:**
+
+```c
+    if (write_info->adjoin != MagickFalse)
+      break;
+    if (number_images != 1)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
+        if (proceed == MagickFalse)
+          break;
+      }
+  }
+```
+
+**After:**
+
+```c
+    if (write_info->adjoin != MagickFalse)
+      break;
+    if (number_images == 1)
+      continue;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp atomic
+#endif
+    progress++;
+    proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
+    if (proceed == MagickFalse)
+      break;
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` held, the original ran `S` and fell off the end
+  of the body; the new body tests the inverse, finds it false, and runs the same
+  statements of `S` in the same order. When `c` did not hold, the original skipped `S`
+  and fell off the end, to the loop's increment and test; `continue` goes to the same
+  place (C11 6.8.6.2: `continue` jumps to the end of the loop body). Nothing follows the
+  `if` in the body, so nothing else is skipped or run.
+- Only indentation changes in `S`; its tokens, preprocessor lines included, stay as they
+  were. A `#pragma omp atomic` outside every parallel region governs the same statement.
+- Identical object code under the oracle build's flags proves the step on every input
+  for this build.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`.
+
+**Provenance:** 2026-11-21, from `constitute-write.c`'s `WriteImages` (campaign B, M141):
+its last bump is the progress block's `if (proceed == MagickFalse) break;` nested in `if
+(number_images != 1)`; a probe of the guard after a Recipe E step that takes the monitor
+suspension out, 9.92 to 10.0, object IDENTICAL. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+
+---
+
+## Recipe DB - Merge Declaration Blocks of One Type
+
+**Use when:** CodeScene reports *Large Method* (or *Lines of Code in a Single File*), and
+the function's declarations hold two or more blocks with the same type line, each a type
+line followed by its declarators: `draw.c`'s `TraceArcPath`, whose earlier extractions
+left `double alpha, ..., theta;` and, further down, `double cosine, sine;`, and
+`PrimitiveInfo *primitive_info;` directly followed by `PrimitiveInfo *p;`. Each extra
+block costs its type line and the blank line after it.
+
+**Not covered by:** Recipes FI and FB, which turn a fill into an initialiser and move no
+other declaration; Recipe IC, which inlines a cast-only local; Recipe L, which hoists
+types, not variables. Nothing else in the catalogue edits a declaration list without
+moving code.
+
+**How:**
+
+1. The blocks stand in one declaration list (the declarations at the top of one compound
+   statement, before its first statement), and their type lines are the same text, token
+   for token (qualifiers and `magick_restrict` included; `const double` and `double` are
+   different types). A declarator's pointer stars stay on the declarator.
+2. No declarator of the later block has an initialiser, or every initialiser in both
+   blocks and between them is a constant expression: moving the later block's
+   declarators then changes no order of evaluation (C11 6.7.9p23: an automatic
+   object's initialiser runs when its declaration is reached, in order).
+3. No declaration between the two blocks names a declarator of the later block (in a
+   `sizeof`, an initialiser or an array bound), and no declarator of the later block has
+   the name of one between them (none can: they share one scope).
+4. Delete the later block (its type line, its declarators and the blank line after it) and
+   append its declarators, in their order and with their pointer stars, to the end of the
+   earlier block's declarator list, the earlier block's `;` becoming `,`.
+5. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert.
+6. All merges of one function go in one commit.
+
+**Before:**
+
+```c
+  double
+    alpha,
+    beta,
+    delta,
+    factor,
+    theta;
+
+  MagickStatusType
+    status;
+
+  PointInfo
+    center,
+    points[3],
+    radii;
+
+  double
+    cosine,
+    sine;
+
+  PrimitiveInfo
+    *primitive_info;
+
+  PrimitiveInfo
+    *p;
+```
+
+**After:**
+
+```c
+  double
+    alpha,
+    beta,
+    delta,
+    factor,
+    theta,
+    cosine,
+    sine;
+
+  MagickStatusType
+    status;
+
+  PointInfo
+    center,
+    points[3],
+    radii;
+
+  PrimitiveInfo
+    *primitive_info,
+    *p;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A declaration without an initialiser creates an object of
+  automatic storage duration whose lifetime is the whole block (C11 6.2.4p6), wherever in
+  the block's declaration list it stands, and it has no value until assigned; with only
+  constant initialisers nothing is evaluated in a different order. The names, types and
+  scope of every object are the same.
+- Identical object code under the oracle build's flags proves the step for this build.
+- The style rule of the file (one block per type, type line then indented declarators)
+  is kept; the merged block is ordered as the two blocks were read top to bottom.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`.
+
+**Provenance:** 2026-11-21, from `draw.c`'s `TraceArcPath` (campaign B, M141): after
+Recipes E and N took its radii scaling and segment loop, the function stood at 77 lines,
+four of them the type and blank lines of two second blocks. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26847,6 +27349,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | NEW | TT | Merge Twin Helpers Differing in an Element Type and a Constant Through a Source Struct: two one-caller `static` helpers that are one token sequence once variables are renamed, `sizeof(T)` and the type argument of a macro using it only as `sizeof` become roles, and at most two constant expressions become roles, merge into one function taking a `const` source struct (common members, the host pointer as `void *`, `aligned` evaluated by the caller from the verbatim macro call, the constants, `element_size`); each caller's FB-form fill supplies its values; a script checks that substituting them gives each copy's tokens. *Careful* gives the argument (a pure macro evaluated from the same pointer just before the call, the same `size_t` constant, the same flags and pointer) | `accelerate-histogram.c`'s `CreateHistogramBuffer` and `CreateEqualizeMapBuffer` (campaign A, W44 round 31 third batch, lane c): *Code Duplication* of the round-fourteen helper twins, differing in `cl_uint4`/`PixelPacket` and `CL_MEM_READ_WRITE`/`CL_MEM_READ_ONLY`, which Recipe D (one value) refuses; probe 7.73 to 8.22, the merged helper finding-free | mandate (2026-10-24) |
 | 2026-11-18 | NEW | GP | Move a Run of Guards Sharing One Exit into a Predicate: consecutive `if (Ai) X` with the same `X` (an exit) and side-effect-free conditions become `if (Pred(...) != MagickFalse) X`, the predicate returning `MagickTrue` at the first condition that holds, in order | `draw.c`'s `TraceMVGPrimitive` (round-rectangle and ellipse point checks, each `{ status=MagickFalse; break; }` out of a `switch`, which LB and V do not take); campaign B, M140 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | KG | Replace a Character-Keyed Switch of Checked Calls by a Table of Calls: groups `if (F(args) == c) return(c); break;` over functions of a base signature and up to two sided signatures (one trailing enumeration constant) become a `static const` table of `{key, f, f1, f2, s1, s2}`, a lookup and a dispatch; the throwing `default:` stays, its macro's `break` leaving the loop only where the loop would end at once (step 6) | `draw.c`'s `TracePath` (twenty labels, three tracer signatures, `ThrowPointExpectedException` default); designed at the owner's request, campaign B, M140 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | CS | Step 1, outside-loop form: in form A the segment may be a run of the caller's own body outside every loop, with no exit of its own, when the caller already declares the state struct | `draw.c`'s `RenderMVGContent` (6c5c0be35, merged in #127, labelled CS form A before this text existed: the first graphic context's setup and the release after the loop); campaign B, M141 | mandate (2026-10-24) |
 | 2026-11-19 | NEW | IP | Pass the Input Struct in Place of Primitive Parameters Bound from It: a `static` function's primitive parameters that every call fills from the members of one struct (a helper's `const` locals bound from `name->member`, or a local struct whose members the caller assigned from the passed identifiers) become one `const Name *name` parameter; the callee binds locals of the old names and types from the members | `distort-map-private.h` (campaign A, W45 round 32, lane c): *Primitive Obsession* (52 %) held by `DistortImage`'s verbose FX printers, which take `coeff`, `image_gen` and `lookup` from callers binding them from a `DistortVerboseFX`; Recipe B names only argument counts. A stub probe of eleven steps: 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-19 | AMEND | OH | Form A also carves a header that Recipe OH produced and that one `.c` file includes: its leading run after the `extern "C"` opener moves into a new header, which the `.c` file's include block names directly above the old header (no `#include` outside an include block); the translation unit keeps its tokens and order | `composite-channel-private.h` (5.65; *Lines of Code in a Single File*, 1068 lines, and the `GetSoftBurnBlend`/`GetSoftDodgeBlend` duplication): a probe moving `GetColorDodgeBlend` to `GetPegtopLightBlend` gives 6.17 and a new header at 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | AMEND | OH | On a split or OH-product header, Form A also takes *Overall Code Complexity* when the carve's probe leaves both headers at 10.0 (or at least the header's score, with a stub-probed chain ending at 10.0); a split header with its own include block names the new header as that block's last line; a `static` function's banner that stands in the run moves to stay above its function | `composite-image-coverage-private.h` (9.38, a two-carve chain to three headers at 10.0, `2ce6e70d4` and `f1ec40d41`, taken under the composite-channel amendment of the same day: written down after the fact) and `layer-frames-private.h` (9.38; a probe of the carve through `IsOverlayPixelChanged`: both 10.0) (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
@@ -26904,3 +27407,11 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | WORDING | JN | Step 1: the closing braces between the statement and `L:` exclude the closing brace of a `for`, `while` or `do` body, which returns to the loop head, so the test still decides something | Review of W50 lane c batch 1 (main session): the first wording let a jump out of a loop body's last statement count as a jump to the next point of execution; `835880ade` (no loop around it) is unaffected | mandate (2026-11-19) |
 | 2026-11-20 | NEW | DC | Run Twin Dialog Commands Through One Runner Taking a Command Struct: `static` dialog commands that differ only in the dialog's title and prompt literals, the `static char` reply buffer each owns and the function applied to the reply keep their buffers and pass a `const` struct `{ { title, prompt, buffer }, callee }` to one runner, which calls the callee through a method of the callees' exact type | `display-image-apply-effects-private.h` (7.32; campaign A, W50 round 37, lane b): about twenty `XApply*Command` copies of one dialog-apply-refresh body; CF refuses the differing literals and buffers. First use, the eight `flags` commands: 2249 to 2079 lines, score flat, the callees left with one type for a one-commit Recipe B through the method table | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | B | Step 5, one-line form: the one-line `const` declaration may also be the one declaration of the block form, and in either form it is allowed when the two-line form would carry the file past *Lines of Code in a Single File* enough to lower it, not only when it would make a *Large Method*; tokens, order and evaluation those of the two-line form | `XConfigureImageColormap`'s call in `display-image-annotate-private.h`'s `XColorEditRelease` (campaign A, W50 round 37, lane a): 9.09 -> 8.54 in a probe with the two-line block form, 9.09 with one line | mandate (2026-11-19) |
+| 2026-11-20 | NEW | CM | Name a Clamp Selection: assignments `t=A < 0.0 ? 0.0 : A >= E ? L : A;` with side-effect-free `double` operands become `t=ClampBoundsCoordinate(A,E,L);`, one `static inline` helper; object code identical or differing only in register choice | `draw-primitive.c`'s `ClampPolygonBounds` (cc 9 from four clamps; probe 3.60 to 3.67, out of *Complex Method*); campaign B, M141 | mandate (2026-10-24) |
+| 2026-11-20 | NEW | SL | Merge Twin Switches Filling Two Struct Locals Through a Pointer and a Struct of Constants: two `switch`es whose cases are the same text up to the struct local they fill, the controlling expression and some constants, with the same leaving `default:`, become one `static MagickBooleanType` helper taking `T *info`, the value, the read locals and a `const` struct of role constants (read as `roles->r`), split into a chain when it would be a finding; each `switch` becomes the call with `== MagickFalse` running the original exit | `profile.c`'s `ProfileImage` (campaign B, M141): the source and target colour-space switches; a probe 7.41 to 8.17, cc 49 to 29 | mandate (2026-10-24) |
+| 2026-11-21 | NEW | TG | Guard a Loop's Tail Block with a Continue: a loop body's last statement `if (c) { S }`, no `else`, whose `S` nests the bump, becomes `if (<inverse>) continue;` followed by `S` one level out; `continue` goes where falling off the body went; proof `obj_identical.sh` IDENTICAL; a step lowering the function's cc goes first when the `continue` would raise it into *Complex Method* | `constitute-write.c`'s `WriteImages` (campaign B, M141): the progress block's nested `break`; a probe after a Recipe E step, 9.92 to 10.0 | mandate (2026-10-24) |
+| 2026-11-21 | NEW | DB | Merge Declaration Blocks of One Type: a later declaration block whose type line equals an earlier one's in the same declaration list (no initialisers, or only constant ones, and no name between them that refers to its declarators) is deleted and its declarators appended to the earlier block; proof `obj_identical.sh` IDENTICAL | `draw.c`'s `TraceArcPath` (campaign B, M141): two second blocks (`double`, `PrimitiveInfo *`) left by earlier extractions, four lines of a Large Method | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | TB | Step 1, break membership form: the label group's body may be `break;` with `default: return(MagickFalse);` and `return(MagickTrue);` after the `switch`; the loop returns `MagickTrue` at a match and the function ends `return(MagickFalse);`; a leading `if (c) return(MagickTrue);` on the parameter alone stays before the loop | `draw.c`'s `IsValidListChar` (campaign B, M141): a digit range, then eight separator labels that break to `return(MagickTrue);`; probe 6.42 to 6.63 | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | EM | Step 1, ladder form: a run of `if (Ci) return(MagickTrue);` ending in `return(MagickFalse);`, every `Ci` reading only an `int` parameter with no side effect; its equality tests against literals go into the table, the lookup stands where the first stood, and the other tests (ranges) keep their place; a harness over every value the constants bound checks the two versions agree | `token-private.h`'s `IsUTFSpace` (campaign B, M141): two ranges and ten single code points, cc 15; probe 8.74 to 9.09 | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | HT | Step 6, call form: when each branch ends in `if (G == F) return(F);` with a different call `G` in each and nothing after it, a new local `V` takes each call's result in its branch and one `if (V == F) return(F);` follows the selection | `xml-tree.c`'s `ParseXMLTreeTags` (campaign B, M141): the start-tag and markup arms each end in their own exit test, its two bumps; probe 9.02 to 9.09, adding no function in a file at the function-count limit | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | FM | Step 5, several members: twins that bind several members of one struct parameter at the top of their bodies (`targets->stroke_q` and `targets->q` against `targets->stroke_p` and `targets->p`) fold into one function taking one value per binding, the bindings replaced by the parameters | `draw-primitive.c`'s `TraceArcPointsP` and `TraceArcPointsQ` (campaign B, M141): the two arc loops of `TraceStrokePolygon`, a *Code Duplication* pair; probe 7.22 to 7.44 | mandate (2026-10-24) |

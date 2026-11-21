@@ -3175,6 +3175,9 @@ static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
   int
     c;
 
+  MagickBooleanType
+    status;
+
   size_t
     ignore_depth;
 
@@ -3194,15 +3197,10 @@ static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
         const XMLStartTagTargets
           start_targets = { &attribute, &attributes, &p, &l, &ignore_depth };
 
-        XMLStartTagInput
-          start_input;
+        const XMLStartTagInput
+          start_input = { root, tag, terminal, exception };
 
-        start_input.root=root;
-        start_input.tag=tag;
-        start_input.terminal=terminal;
-        start_input.exception=exception;
-        if (ParseXMLStartTag(&start_input,&start_targets) == MagickFalse)
-          return(MagickFalse);
+        status=ParseXMLStartTag(&start_input,&start_targets);
       }
     else
       {
@@ -3213,9 +3211,10 @@ static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
         markup.tag=(&tag);
         markup.l=(&l);
         markup.ignore_depth=(&ignore_depth);
-        if (ParseMarkup(root,terminal,exception,&markup) == MagickFalse)
-          return(MagickFalse);
+        status=ParseMarkup(root,terminal,exception,&markup);
       }
+    if (status == MagickFalse)
+      return(MagickFalse);
     if (ParseXMLTreeContent(root,ignore_depth,&p) == MagickFalse)
       break;
   }

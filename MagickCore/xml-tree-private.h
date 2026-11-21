@@ -28,6 +28,80 @@
 extern "C" {
 #endif
 
+static inline MagickBooleanType ExtendXMLContent(char **canonical_content,
+  const ssize_t i,size_t *extent)
+{
+  if ((i+MagickPathExtent) > (ssize_t) (*extent))
+    {
+      (*extent)+=MagickPathExtent;
+      (*canonical_content)=(char *) ResizeQuantumMemory((*canonical_content),
+        (*extent),sizeof(*(*canonical_content)));
+      if ((*canonical_content) == (char *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _XMLContentTarget
+{
+  char
+    *canonical_content;
+
+  size_t
+    extent;
+
+  MagickBooleanType
+    pedantic;
+} XMLContentTarget;
+
+static inline ssize_t AppendXMLWhitespace(const XMLContentTarget *target,
+  ssize_t i,const char *p)
+{
+  char
+    *const canonical_content = target->canonical_content;
+
+  const size_t
+    extent = target->extent;
+
+  const MagickBooleanType
+    pedantic = target->pedantic;
+
+  switch (*p)
+  {
+    case '\n':
+    {
+      if (pedantic == MagickFalse)
+        {
+          canonical_content[i++]=(char) (*p);
+          break;
+        }
+      i+=FormatLocaleString(canonical_content+i,extent,"&#xA;");
+      break;
+    }
+    case '\t':
+    {
+      if (pedantic == MagickFalse)
+        {
+          canonical_content[i++]=(char) (*p);
+          break;
+        }
+      i+=FormatLocaleString(canonical_content+i,extent,"&#x9;");
+      break;
+    }
+    case '\r':
+    {
+      i+=FormatLocaleString(canonical_content+i,extent,"&#xD;");
+      break;
+    }
+    default:
+    {
+      canonical_content[i++]=(char) (*p);
+      break;
+    }
+  }
+  return(i);
+}
+
 static inline char *SubstituteXMLEntities(const char *content,
   const MagickBooleanType pedantic)
 {
@@ -51,14 +125,8 @@ static inline char *SubstituteXMLEntities(const char *content,
   extent=MagickPathExtent;
   for (p=content; *p != '\0'; p++)
   {
-    if ((i+MagickPathExtent) > (ssize_t) extent)
-      {
-        extent+=MagickPathExtent;
-        canonical_content=(char *) ResizeQuantumMemory(canonical_content,extent,
-          sizeof(*canonical_content));
-        if (canonical_content == (char *) NULL)
-          return(canonical_content);
-      }
+    if (ExtendXMLContent(&canonical_content,i,&extent) == MagickFalse)
+      return(canonical_content);
     switch (*p)
     {
       case '&':
@@ -81,34 +149,12 @@ static inline char *SubstituteXMLEntities(const char *content,
         i+=FormatLocaleString(canonical_content+i,extent,"&quot;");
         break;
       }
-      case '\n':
-      {
-        if (pedantic == MagickFalse)
-          {
-            canonical_content[i++]=(char) (*p);
-            break;
-          }
-        i+=FormatLocaleString(canonical_content+i,extent,"&#xA;");
-        break;
-      }
-      case '\t':
-      {
-        if (pedantic == MagickFalse)
-          {
-            canonical_content[i++]=(char) (*p);
-            break;
-          }
-        i+=FormatLocaleString(canonical_content+i,extent,"&#x9;");
-        break;
-      }
-      case '\r':
-      {
-        i+=FormatLocaleString(canonical_content+i,extent,"&#xD;");
-        break;
-      }
       default:
       {
-        canonical_content[i++]=(char) (*p);
+        const XMLContentTarget
+          target = { canonical_content, extent, pedantic };
+
+        i=AppendXMLWhitespace(&target,i,p);
         break;
       }
     }

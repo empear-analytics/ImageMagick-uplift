@@ -2851,6 +2851,13 @@ static void StartPSClippathSubpath(char *message,PointInfo *first,
   }
 }
 
+static inline void SkipClippathBytes(const unsigned char **blob,
+  size_t *length,const ssize_t count)
+{
+  (*blob)+=count;
+  (*length)=(size_t) ((ssize_t) (*length)-MagickMin(count,(ssize_t) (*length)));
+}
+
 typedef struct _PSClippathState
 {
   const unsigned char
@@ -3011,16 +3018,14 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
       {
         if (knot_count != 0)
           {
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         /*
           Expected subpath length record.
         */
         knot_count=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-        blob+=22;
-        length=(size_t) ((ssize_t) length-MagickMin(22,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,22);
         break;
       }
       case 1:
@@ -3033,8 +3038,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
             /*
               Unexpected subpath knot
             */
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         AddPSClippathKnot(&state);
@@ -3042,8 +3046,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
       }
       default:
       {
-        blob+=24;
-        length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,24);
         break;
       }
     }
@@ -3158,16 +3161,14 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
       {
         if (knot_count != 0)
           {
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         /*
           Expected subpath length record.
         */
         knot_count=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-        blob+=22;
-        length=(size_t) ((ssize_t) length-MagickMin(22,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,22);
         break;
       }
       case 1:
@@ -3180,8 +3181,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
             /*
               Unexpected subpath knot.
             */
-            blob+=24;
-            length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+            SkipClippathBytes(&blob,&length,24);
             break;
           }
         /*
@@ -3218,8 +3218,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
       }
       default:
       {
-        blob+=24;
-        length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
+        SkipClippathBytes(&blob,&length,24);
         break;
       }
     }
@@ -6363,19 +6362,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     return(handler(image,value,exception));
   switch (*property)
   {
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-    case '8':
-    {
-      if (LocaleNCompare("8bim:",property,5) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break;
-    }
-#endif
+#include "MagickCore/property-set-8bim-private.h"
     case 'B':
     case 'b':
     {
@@ -6388,73 +6375,20 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
         }
       break; /* not an attribute, add as a property */
     }
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-    case 'E':
-    case 'e':
-    {
-      if (LocaleNCompare("exif:",property,5) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break; /* not an attribute, add as a property */
-    }
-    case 'F':
-    case 'f':
-    {
-      if (LocaleNCompare("fx:",property,3) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break; /* not an attribute, add as a property */
-    }
-#endif
+#include "MagickCore/property-set-exif-fx-private.h"
     case 'I':
     case 'i':
     {
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-      if (LocaleNCompare("iptc:",property,5) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-#endif
+#include "MagickCore/property-set-iptc-private.h"
       break; /* not an attribute, add as a property */
     }
     case 'P':
     case 'p':
     {
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-      if (LocaleNCompare("pixel:",property,6) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-#endif
+#include "MagickCore/property-set-pixel-private.h"
       break; /* not an attribute, add as a property */
     }
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-    case 'X':
-    case 'x':
-    {
-      if (LocaleNCompare("xmp:",property,4) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break; /* not an attribute, add as a property */
-    }
-#endif
+#include "MagickCore/property-set-xmp-private.h"
   }
   /* Default: not an attribute, add as a property */
   status=AddValueToSplayTree((SplayTreeInfo *) image->properties,

@@ -180,6 +180,15 @@ static void SyncWriteBlobStream(ImageInfo *write_info,Image *p,
     SyncBlobStream(write_info,p,images);
 }
 
+static MagickProgressMonitor SuspendWriteProgressMonitor(Image *p,
+  const MagickSizeType number_images,MagickProgressMonitor progress_monitor)
+{
+  if (number_images != 1)
+    progress_monitor=SetImageProgressMonitor(p,(MagickProgressMonitor) NULL,
+      p->client_data);
+  return(progress_monitor);
+}
+
 static void RestoreWriteProgressMonitor(Image *p,
   const MagickSizeType number_images,MagickProgressMonitor progress_monitor)
 {
@@ -235,24 +244,22 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
   number_images=GetImageListLength(images);
   for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
   {
-    if (number_images != 1)
-      progress_monitor=SetImageProgressMonitor(p,(MagickProgressMonitor) NULL,
-        p->client_data);
+    progress_monitor=SuspendWriteProgressMonitor(p,number_images,
+      progress_monitor);
     status&=(MagickStatusType) WriteImage(write_info,p,exception);
     SyncWriteBlobStream(write_info,p,images);
     RestoreWriteProgressMonitor(p,number_images,progress_monitor);
     if (write_info->adjoin != MagickFalse)
       break;
-    if (number_images != 1)
-      {
+    if (number_images == 1)
+      continue;
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
+    #pragma omp atomic
 #endif
-        progress++;
-        proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
-        if (proceed == MagickFalse)
-          break;
-      }
+    progress++;
+    proceed=SetImageProgress(p,WriteImageTag,progress,number_images);
+    if (proceed == MagickFalse)
+      break;
   }
   write_info=DestroyImageInfo(write_info);
   return((MagickBooleanType) (status != 0));

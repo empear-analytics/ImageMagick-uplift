@@ -213,6 +213,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/constitute-write.c \
   MagickCore/constitute-pixels.c \
   MagickCore/constitute.h \
+  MagickCore/constitute-pixels-private.h \
   MagickCore/decorate.c \
   MagickCore/decorate-raise.c \
   MagickCore/decorate.h \
@@ -220,6 +221,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/delegate-invoke.c \
   MagickCore/delegate.h \
   MagickCore/delegate-private.h \
+  MagickCore/delegate-invoke-private.h \
+  MagickCore/delegate-property-private.h \
   MagickCore/deprecate.c \
   MagickCore/deprecate.h \
   MagickCore/display.c \
@@ -260,6 +263,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw.h \
   MagickCore/draw-private.h \
   MagickCore/draw-core-private.h \
+  MagickCore/draw-primitive-path-private.h \
+  MagickCore/draw-primitive-convert-private.h \
+  MagickCore/draw-primitive-fill-private.h \
+  MagickCore/draw-primitive-alpha-private.h \
+  MagickCore/draw-primitive-render-private.h \
+  MagickCore/draw-primitive-log-private.h \
+  MagickCore/draw-gradient-private.h \
   MagickCore/effect.c \
   MagickCore/effect-filter.c \
   MagickCore/effect-despeckle.c \
@@ -320,6 +330,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/geometry-parse.c \
   MagickCore/geometry.h \
   MagickCore/geometry-private.h \
+  MagickCore/geometry-meta-private.h \
+  MagickCore/geometry-parse-debug-private.h \
+  MagickCore/property-set-8bim-private.h \
+  MagickCore/property-set-exif-fx-private.h \
+  MagickCore/property-set-iptc-private.h \
+  MagickCore/property-set-pixel-private.h \
+  MagickCore/property-set-xmp-private.h \
   MagickCore/histogram.c \
   MagickCore/histogram.h \
   MagickCore/identify.c \
@@ -333,6 +350,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-filename.c \
   MagickCore/image.h \
   MagickCore/image-private.h \
+  MagickCore/image-filename-private.h \
   MagickCore/image-view.c \
   MagickCore/image-view.h \
   MagickCore/layer.c \
@@ -423,6 +441,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-export-private.h \
+  MagickCore/pixel-import-private.h \
   MagickCore/policy.c \
   MagickCore/policy-path.c \
   MagickCore/policy.h \
@@ -435,6 +455,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile-sync.c \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-sync-private.h \
   MagickCore/quantize.c \
   MagickCore/quantize-remap.c \
   MagickCore/quantize-kmeans.c \
@@ -450,6 +471,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/quantum-export.c \
   MagickCore/quantum-import.c \
   MagickCore/quantum-private.h \
+  MagickCore/quantum-export-private.h \
+  MagickCore/quantum-import-private.h \
   MagickCore/random.c \
   MagickCore/random_.h \
   MagickCore/random-private.h \
@@ -500,6 +523,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/stream-read.c \
   MagickCore/stream.h \
   MagickCore/stream-private.h \
+  MagickCore/stream-read-private.h \
   MagickCore/string.c \
   MagickCore/string-copy.c \
   MagickCore/string-info.c \
@@ -790,7 +814,10 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \
+  MagickCore/constitute-pixels-private.h \
   MagickCore/delegate-private.h \
+  MagickCore/delegate-invoke-private.h \
+  MagickCore/delegate-property-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
@@ -814,6 +841,13 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
   MagickCore/draw-core-private.h \
+  MagickCore/draw-primitive-path-private.h \
+  MagickCore/draw-primitive-convert-private.h \
+  MagickCore/draw-primitive-fill-private.h \
+  MagickCore/draw-primitive-alpha-private.h \
+  MagickCore/draw-primitive-render-private.h \
+  MagickCore/draw-primitive-log-private.h \
+  MagickCore/draw-gradient-private.h \
   MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
   MagickCore/effect-common-private.h \
@@ -833,7 +867,15 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/fx-translate-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
+  MagickCore/geometry-meta-private.h \
+  MagickCore/geometry-parse-debug-private.h \
+  MagickCore/property-set-8bim-private.h \
+  MagickCore/property-set-exif-fx-private.h \
+  MagickCore/property-set-iptc-private.h \
+  MagickCore/property-set-pixel-private.h \
+  MagickCore/property-set-xmp-private.h \
   MagickCore/image-private.h \
+  MagickCore/image-filename-private.h \
   MagickCore/layer-frames-bounds-private.h \
   MagickCore/layer-frames-private.h \
   MagickCore/linked-list-private.h \
@@ -865,11 +907,16 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-export-private.h \
+  MagickCore/pixel-import-private.h \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-sync-private.h \
   MagickCore/quantize-private.h \
   MagickCore/quantize-assign-private.h \
   MagickCore/quantum-private.h \
+  MagickCore/quantum-export-private.h \
+  MagickCore/quantum-import-private.h \
   MagickCore/random-private.h \
   MagickCore/registry-private.h \
   MagickCore/resample-private.h \
@@ -883,6 +930,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/statistic-evaluate-private.h \
   MagickCore/statistic-private.h \
   MagickCore/stream-private.h \
+  MagickCore/stream-read-private.h \
   MagickCore/string-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \

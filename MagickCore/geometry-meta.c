@@ -55,6 +55,7 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/string-private.h"
 #include "MagickCore/token.h"
+#include "MagickCore/geometry-meta-private.h"
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -99,102 +100,114 @@
 %      the given geometry specification.
 %
 */
-static inline MagickBooleanType IsMetaGeometryAspectKept(
-  const MagickStatusType flags,const size_t *width,const size_t *height,
-  const size_t stasis_width,const size_t stasis_height)
+static void ScaleMetaGeometryByPercent(const MetaGeometryInput *input,
+  GeometryInfo *geometry_info,size_t *width,size_t *height)
 {
-  return((((flags & AspectValue) != 0) || ((*width == stasis_width) &&
-    (*height == stasis_height))) ? MagickTrue : MagickFalse);
-}
+  const char
+    *const geometry = input->geometry;
 
-static void ShrinkGeometryToSize(size_t *width,size_t *height,
-  const size_t stasis_width,const size_t stasis_height)
-{
-  if (stasis_width < *width)
-    *width=stasis_width;
-  if (stasis_height < *height)
-    *height=stasis_height;
-}
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
 
-static void EnlargeGeometryToSize(size_t *width,size_t *height,
-  const size_t stasis_width,const size_t stasis_height)
-{
-  if (stasis_width > *width)
-    *width=stasis_width;
-  if (stasis_height > *height)
-    *height=stasis_height;
-}
-
-static double GetAspectScaleFactor(const MagickStatusType flags,
-  const size_t *width,const size_t *height,const size_t stasis_width,
-  const size_t stasis_height)
-{
-  double
-    scale_factor;
-
-  if ((stasis_width == 0) || (stasis_height == 0))
-    scale_factor=1.0;
-  else
-    if (((flags & RhoValue) != 0) && (flags & SigmaValue) != 0)
-      {
-        scale_factor=(double) *width/(double) stasis_width;
-        if ((flags & MinimumValue) == 0)
-          {
-            if (scale_factor > ((double) *height/(double) stasis_height))
-              scale_factor=(double) *height/(double) stasis_height;
-          }
-        else
-          if (scale_factor < ((double) *height/(double) stasis_height))
-            scale_factor=(double) *height/(double) stasis_height;
-      }
-    else
-      if ((flags & RhoValue) != 0)
-        {
-          scale_factor=(double) *width/(double) stasis_width;
-          if (((flags & MinimumValue) != 0) &&
-              (scale_factor < ((double) *width/(double) stasis_height)))
-            scale_factor=(double) *width/(double) stasis_height;
-        }
-      else
-        {
-          scale_factor=(double) *height/(double) stasis_height;
-          if (((flags & MinimumValue) != 0) &&
-              (scale_factor < ((double) *height/(double) stasis_width)))
-            scale_factor=(double) *height/(double) stasis_width;
-        }
-  return(scale_factor);
-}
-
-static void LimitGeometryArea(const char *geometry,size_t *width,
-  size_t *height,const size_t stasis_width,const size_t stasis_height)
-{
-  GeometryInfo
-    geometry_info;
-
-  double
-    area,
-    distance;
+  MagickStatusType
+    percent_flags;
 
   PointInfo
     scale;
 
   /*
-    Geometry is a maximum area in pixels.
+    Geometry is a percentage of the image size.
   */
-  (void) ParseGeometry(geometry,&geometry_info);
-  area=geometry_info.rho+sqrt(MagickEpsilon);
-  distance=sqrt((double) stasis_width*stasis_height);
-  scale.x=(double) stasis_width*MagickSafeReciprocal(distance*
-    MagickSafeReciprocal(sqrt(area)));
-  scale.y=(double) stasis_height*MagickSafeReciprocal(distance*
-    MagickSafeReciprocal(sqrt(area)));
-  if ((scale.x < (double) *width) || (scale.y < (double) *height))
+  percent_flags=ParseGeometry(geometry,geometry_info);
+  scale.x=geometry_info->rho;
+  if ((percent_flags & RhoValue) == 0)
+    scale.x=100.0;
+  scale.y=geometry_info->sigma;
+  if ((percent_flags & SigmaValue) == 0)
+    scale.y=scale.x;
+  *width=CastDoubleToSizeT(scale.x*stasis_width/100.0+0.5);
+  *height=CastDoubleToSizeT(scale.y*stasis_height/100.0+0.5);
+}
+
+static void ScaleMetaGeometryByAspect(const MetaGeometryInput *input,
+  GeometryInfo *geometry_info,size_t *width,size_t *height)
+{
+  const char
+    *const geometry = input->geometry;
+
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
+  double
+    geometry_ratio,
+    image_ratio;
+
+  /*
+    Geometry is a relative to image size and aspect ratio.
+  */
+  (void) ParseGeometry(geometry,geometry_info);
+  geometry_ratio=geometry_info->rho;
+  image_ratio=(double) stasis_width*MagickSafeReciprocal((double)
+    stasis_height);
+  if (geometry_ratio >= image_ratio)
     {
-      *width=CastDoubleToSizeT((double) stasis_width*MagickSafeReciprocal(
-        distance*MagickSafeReciprocal(sqrt(area)))+0.5);
-      *height=CastDoubleToSizeT((double) stasis_height*MagickSafeReciprocal(
-        distance*MagickSafeReciprocal(sqrt(area)))+0.5);
+      *width=stasis_width;
+      *height=CastDoubleToSizeT((double) (MagickSafeReciprocal(
+        geometry_ratio)*stasis_height*image_ratio)+0.5);
     }
+  else
+    {
+      *width=CastDoubleToSizeT(MagickSafeReciprocal(image_ratio)*
+        stasis_width*geometry_ratio+0.5);
+      *height=stasis_height;
+    }
+}
+
+static void SetMetaGeometrySize(const MetaGeometryInput *input,
+  const MagickStatusType flags,size_t *width,size_t *height)
+{
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
+  if (IsMetaGeometryAspectKept(flags,width,height,input) != MagickFalse)
+    {
+      if ((flags & RhoValue) == 0)
+        *width=stasis_width;
+      if ((flags & SigmaValue) == 0)
+        *height=stasis_height;
+    }
+  else
+    {
+      double
+        scale_factor;
+
+      /*
+        Respect aspect ratio of the image.
+      */
+      scale_factor=GetAspectScaleFactor(flags,width,height,input);
+      *width=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_width+0.5),
+        1.0));
+      *height=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_height+0.5),
+        1.0));
+    }
+}
+
+static void LimitMetaGeometrySize(const MetaGeometryInput *input,
+  const MagickStatusType flags,size_t *width,size_t *height)
+{
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
+  if ((flags & GreaterValue) != 0)
+    ShrinkGeometryToSize(width,height,stasis_width,stasis_height);
+  if ((flags & LessValue) != 0)
+    EnlargeGeometryToSize(width,height,stasis_width,stasis_height);
+  if ((flags & AreaValue) != 0)
+    LimitGeometryArea(input,width,height);
 }
 
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
@@ -230,83 +243,28 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   flags=GetGeometry(geometry,x,y,width,height);
   if ((flags & PercentValue) != 0)
     {
-      MagickStatusType
-        percent_flags;
+      const MetaGeometryInput
+        input = { geometry, stasis_width, stasis_height };
 
-      PointInfo
-        scale;
-
-      /*
-        Geometry is a percentage of the image size.
-      */
-      percent_flags=ParseGeometry(geometry,&geometry_info);
-      scale.x=geometry_info.rho;
-      if ((percent_flags & RhoValue) == 0)
-        scale.x=100.0;
-      scale.y=geometry_info.sigma;
-      if ((percent_flags & SigmaValue) == 0)
-        scale.y=scale.x;
-      *width=CastDoubleToSizeT(scale.x*stasis_width/100.0+0.5);
-      *height=CastDoubleToSizeT(scale.y*stasis_height/100.0+0.5);
+      ScaleMetaGeometryByPercent(&input,&geometry_info,width,height);
       stasis_width=(*width);
       stasis_height=(*height);
     }
   if ((flags & AspectRatioValue) != 0)
     {
-      double
-        geometry_ratio,
-        image_ratio;
+      const MetaGeometryInput
+        input = { geometry, stasis_width, stasis_height };
 
-      /*
-        Geometry is a relative to image size and aspect ratio.
-      */
-      (void) ParseGeometry(geometry,&geometry_info);
-      geometry_ratio=geometry_info.rho;
-      image_ratio=(double) stasis_width*MagickSafeReciprocal((double)
-        stasis_height);
-      if (geometry_ratio >= image_ratio)
-        {
-          *width=stasis_width;
-          *height=CastDoubleToSizeT((double) (MagickSafeReciprocal(
-            geometry_ratio)*stasis_height*image_ratio)+0.5);
-        }
-      else
-        {
-          *width=CastDoubleToSizeT(MagickSafeReciprocal(image_ratio)*
-            stasis_width*geometry_ratio+0.5);
-          *height=stasis_height;
-        }
+      ScaleMetaGeometryByAspect(&input,&geometry_info,width,height);
       stasis_width=(*width);
       stasis_height=(*height);
     }
-  if (IsMetaGeometryAspectKept(flags,width,height,stasis_width,
-        stasis_height) != MagickFalse)
-    {
-      if ((flags & RhoValue) == 0)
-        *width=stasis_width;
-      if ((flags & SigmaValue) == 0)
-        *height=stasis_height;
-    }
-  else
-    {
-      double
-        scale_factor;
+  {
+    const MetaGeometryInput
+      input = { geometry, stasis_width, stasis_height };
 
-      /*
-        Respect aspect ratio of the image.
-      */
-      scale_factor=GetAspectScaleFactor(flags,width,height,stasis_width,
-        stasis_height);
-      *width=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_width+0.5),
-        1.0));
-      *height=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_height+0.5),
-        1.0));
-    }
-  if ((flags & GreaterValue) != 0)
-    ShrinkGeometryToSize(width,height,stasis_width,stasis_height);
-  if ((flags & LessValue) != 0)
-    EnlargeGeometryToSize(width,height,stasis_width,stasis_height);
-  if ((flags & AreaValue) != 0)
-    LimitGeometryArea(geometry,width,height,stasis_width,stasis_height);
+    SetMetaGeometrySize(&input,flags,width,height);
+    LimitMetaGeometrySize(&input,flags,width,height);
+  }
   return(flags);
 }

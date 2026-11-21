@@ -753,25 +753,31 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   return(macros);
 }
 
+static const int
+  ListSeparatorCharacters[] =
+  {
+    '.',
+    '+',
+    '-',
+    ',',
+    ' ',
+    '\t',
+    '\r',
+    '\n'
+  };
+
 static inline MagickBooleanType IsValidListChar(int c)
 {
+  size_t
+    i;
+
   if ((c >= '0') && (c <= '9'))
     return(MagickTrue);
-  switch (c)
-  {
-    case '.':
-    case '+':
-    case '-':
-    case ',':
-    case ' ':
-    case '\t':
-    case '\r':
-    case '\n':
-      break;
-    default:
-      return(MagickFalse);
-  }
-  return(MagickTrue);
+  for (i=0; i < (sizeof(ListSeparatorCharacters)/
+       sizeof(*ListSeparatorCharacters)); i++)
+    if (ListSeparatorCharacters[i] == c)
+      return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsValidPoint(const char *point)
@@ -2499,6 +2505,39 @@ static MagickBooleanType ParseMVGBorderColor(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static char *InjectMVGClassElements(char *primitive,const char *p,
+  const char *mvg_class,const char **q)
+{
+  char
+    *elements;
+
+  ssize_t
+    offset;
+
+  offset=(ssize_t) (p-primitive);
+  elements=AcquireString(primitive);
+  elements[offset]='\0';
+  (void) ConcatenateString(&elements,mvg_class);
+  (void) ConcatenateString(&elements,"\n");
+  (void) ConcatenateString(&elements,(*q));
+  primitive=DestroyString(primitive);
+  primitive=elements;
+  (*q)=primitive+offset;
+  return(primitive);
+}
+
+static MagickBooleanType IsNewGraphicContextId(DrawInfo **graphic_context,
+  const ssize_t n,const char *token)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= n; i++)
+    if (LocaleCompare(token,graphic_context[i]->id) == 0)
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
 {
   char
@@ -2526,16 +2565,12 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
 
   ssize_t
     classDepth = (*state->classDepth),
-    i,
     n = (*state->n);
 
   do
   {
     const char
       *mvg_class;
-
-    RenderableClassInput
-      renderable;
 
     (void) GetNextToken(q,&q,extent,token);
     if ((*token == '\0') || (*token == ';'))
@@ -2546,10 +2581,7 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
     /*
       Identify recursion.
     */
-    for (i=0; i <= n; i++)
-      if (LocaleCompare(token,graphic_context[i]->id) == 0)
-        break;
-    if (i <= n)
+    if (IsNewGraphicContextId(graphic_context,n,token) == MagickFalse)
       break;
     if (classDepth++ >= MagickMaxRecursionDepth)
       {
@@ -2559,33 +2591,19 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
         break;
       }
     mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-    renderable.graphic_context=graphic_context;
-    renderable.n=n;
-    renderable.mvg_class=mvg_class;
-    renderable.p=p;
-    renderable.primitive=primitive;
-    if (IsRenderableClass(&renderable) != MagickFalse)
-      {
-        char
-          *elements;
+    {
+      const RenderableClassInput
+        renderable = { graphic_context, n, mvg_class, p, primitive };
 
-        ssize_t
-          offset;
-
-        /*
-          Inject class elements in stream.
-        */
-        (void) CloneString(&graphic_context[n]->id,token);
-        offset=(ssize_t) (p-primitive);
-        elements=AcquireString(primitive);
-        elements[offset]='\0';
-        (void) ConcatenateString(&elements,mvg_class);
-        (void) ConcatenateString(&elements,"\n");
-        (void) ConcatenateString(&elements,q);
-        primitive=DestroyString(primitive);
-        primitive=elements;
-        q=primitive+offset;
-      }
+      if (IsRenderableClass(&renderable) != MagickFalse)
+        {
+          /*
+            Inject class elements in stream.
+          */
+          (void) CloneString(&graphic_context[n]->id,token);
+          primitive=InjectMVGClassElements(primitive,p,mvg_class,&q);
+        }
+    }
     break;
   } while (0);
   (*state->primitive)=primitive;
@@ -4934,6 +4952,67 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static inline MagickBooleanType IsMVGRenderStopped(
+  const MagickBooleanType proceed,const MagickStatusType status)
+{
+  if (proceed == MagickFalse)
+    return(MagickTrue);
+  if (status == 0)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGDebugSpan(const DrawInfo *draw_info,
+  const char *p,const char *q)
+{
+  return(((draw_info->debug != MagickFalse) && (q > p)) ? MagickTrue :
+    MagickFalse);
+}
+
+static MagickBooleanType FinishMVGRender(const MagickStatusType status,
+  const char *keyword,ExceptionInfo *exception)
+{
+  if ((status == MagickFalse) && (exception->severity < ErrorException))
+    ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
+      keyword);
+  return(status != 0 ? MagickTrue : MagickFalse);
+}
+
+static char *AcquireMVGPrimitive(const DrawInfo *draw_info,const size_t depth,
+  ExceptionInfo *exception)
+{
+  char
+    *primitive;
+
+  if (IsMVGFileReference(draw_info,depth) != MagickFalse)
+    primitive=FileToString(draw_info->primitive,~0UL,exception);
+  else
+    primitive=AcquireString(draw_info->primitive);
+  return(primitive);
+}
+
+static MagickBooleanType PrepareMVGImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (SetMVGImageOpaque(image,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType IsMVGRenderable(const Image *image,
+  const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
+{
+  if (depth >= MagickMaxRecursionDepth)
+    ThrowBinaryException(DrawError,"VectorGraphicsNestedTooDeeply",
+      image->filename);
+  if ((draw_info->primitive == (char *) NULL) ||
+      (*draw_info->primitive == '\0'))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void InitializeMVGGraphicContext(const MVGRenderState *state)
 {
   const DrawInfo
@@ -5071,22 +5150,13 @@ static MagickBooleanType RenderMVGContent(Image *image,
   assert(draw_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (depth >= MagickMaxRecursionDepth)
-    ThrowBinaryException(DrawError,"VectorGraphicsNestedTooDeeply",
-      image->filename);
-  if ((draw_info->primitive == (char *) NULL) ||
-      (*draw_info->primitive == '\0'))
+  if (IsMVGRenderable(image,draw_info,depth,exception) == MagickFalse)
     return(MagickFalse);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),"begin draw-image");
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (PrepareMVGImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (SetMVGImageOpaque(image,exception) == MagickFalse)
-    return(MagickFalse);
-  if (IsMVGFileReference(draw_info,depth) != MagickFalse)
-    primitive=FileToString(draw_info->primitive,~0UL,exception);
-  else
-    primitive=AcquireString(draw_info->primitive);
+  primitive=AcquireMVGPrimitive(draw_info,depth,exception);
   if (primitive == (char *) NULL)
     return(MagickFalse);
   primitive_extent=(double) strlen(primitive);
@@ -5133,9 +5203,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     /*
       Interpret graphic primitive.
     */
-    if (GetNextToken(q,&q,MagickPathExtent,keyword) < 1)
-      break;
-    if (*keyword == '\0')
+    if (GetMVGMacroToken(&q,MagickPathExtent,keyword) == MagickFalse)
       break;
     if (*keyword == '#')
       {
@@ -5158,7 +5226,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     if (primitive_type == UndefinedPrimitive)
       {
         FinishMVGGradient(&render_state);
-        if ((draw_info->debug != MagickFalse) && (q > p))
+        if (IsMVGDebugSpan(draw_info,p,q) != MagickFalse)
           (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int)
             (q-p-1),p);
         continue;
@@ -5170,7 +5238,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     if (status == 0)
       break;
     primitive_info[i].primitive=UndefinedPrimitive;
-    if ((draw_info->debug != MagickFalse) && (q > p))
+    if (IsMVGDebugSpan(draw_info,p,q) != MagickFalse)
       (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
     CheckMVGPrimitiveExtent(&render_state);
     if (status == 0)
@@ -5184,9 +5252,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     DrawMVGPrimitive(&render_state);
     proceed=SetImageProgress(image,RenderImageTag,q-primitive,(MagickSizeType)
       primitive_extent);
-    if (proceed == MagickFalse)
-      break;
-    if (status == 0)
+    if (IsMVGRenderStopped(proceed,status) != MagickFalse)
       break;
   }
   if (draw_info->debug != MagickFalse)
@@ -5195,10 +5261,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     Relinquish resources.
   */
   ReleaseMVGRenderResources(&render_state);
-  if ((status == MagickFalse) && (exception->severity < ErrorException))
-    ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
-      keyword);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(FinishMVGRender(status,keyword,exception));
 }
 
 MagickExport MagickBooleanType DrawImage(Image *image,const DrawInfo *draw_info,
@@ -5534,6 +5597,95 @@ static void TraceArcSegmentPoints(const ArcSegmentInput *segment,
     (p+3)->point=end;
 }
 
+static PointInfo GetArcMidpointOffset(const PointInfo start,
+  const PointInfo end,const double cosine,const double sine)
+{
+  PointInfo
+    center;
+
+  center.x=(double) (cosine*(end.x-start.x)/2+sine*(end.y-start.y)/2);
+  center.y=(double) (cosine*(end.y-start.y)/2-sine*(end.x-start.x)/2);
+  return(center);
+}
+
+static double GetArcRadiiDelta(const PointInfo center,const PointInfo radii)
+{
+  double
+    delta;
+
+  delta=(center.x*center.x)/(radii.x*radii.x)+(center.y*center.y)/
+    (radii.y*radii.y);
+  return(delta);
+}
+
+static PointInfo GetArcUnitPoint(const PointInfo point,const double cosine,
+  const double sine,const PointInfo radii)
+{
+  PointInfo
+    unit_point;
+
+  unit_point.x=(double) (cosine*point.x/radii.x+sine*point.y/radii.x);
+  unit_point.y=(double) (cosine*point.y/radii.y-sine*point.x/radii.y);
+  return(unit_point);
+}
+
+static PointInfo GetArcCenter(const PointInfo *points,const double factor,
+  const double alpha,const double beta)
+{
+  PointInfo
+    center;
+
+  center.x=(double) ((points[0].x+points[1].x)/2-factor*beta);
+  center.y=(double) ((points[0].y+points[1].y)/2+factor*alpha);
+  return(center);
+}
+
+static size_t GetArcSegmentCount(const double theta)
+{
+  size_t
+    arc_segments;
+
+  arc_segments=(size_t) CastDoubleToSsizeT(ceil(fabs((double) (theta/(0.5*
+    MagickPI+MagickEpsilon)))));
+  return(arc_segments);
+}
+
+static PointInfo ScaleArcRadii(PointInfo radii,const double delta)
+{
+  if (delta > 1.0)
+    {
+      radii.x*=sqrt((double) delta);
+      radii.y*=sqrt((double) delta);
+    }
+  return(radii);
+}
+
+static MagickStatusType TraceArcSegments(MVGInfo *mvg_info,
+  const ArcSegmentInput *segment,PointInfo *points,PrimitiveInfo **p)
+{
+  const size_t
+    arc_segments = segment->arc_segments;
+
+  MagickStatusType
+    status;
+
+  ssize_t
+    i;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) arc_segments; i++)
+  {
+    TraceArcSegmentPoints(segment,i,(*p),points);
+    status&=(MagickStatusType) TraceBezier(mvg_info,4);
+    if (status == 0)
+      break;
+    (*p)=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
+    mvg_info->offset+=(ssize_t) (*p)->coordinates;
+    (*p)+=(ptrdiff_t) (*p)->coordinates;
+  }
+  return(status);
+}
+
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   const PointInfo end,const ArcPathShape *shape)
 {
@@ -5552,7 +5704,9 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     beta,
     delta,
     factor,
-    theta;
+    theta,
+    cosine,
+    sine;
 
   MagickStatusType
     status;
@@ -5562,18 +5716,9 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     points[3],
     radii;
 
-  double
-    cosine,
-    sine;
-
   PrimitiveInfo
-    *primitive_info;
-
-  PrimitiveInfo
+    *primitive_info,
     *p;
-
-  ssize_t
-    i;
 
   size_t
     arc_segments;
@@ -5593,57 +5738,30 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     return(TraceLine(primitive_info,start,end));
   cosine=cos(DegreesToRadians(fmod((double) angle,360.0)));
   sine=sin(DegreesToRadians(fmod((double) angle,360.0)));
-  center.x=(double) (cosine*(end.x-start.x)/2+sine*(end.y-start.y)/2);
-  center.y=(double) (cosine*(end.y-start.y)/2-sine*(end.x-start.x)/2);
-  delta=(center.x*center.x)/(radii.x*radii.x)+(center.y*center.y)/
-    (radii.y*radii.y);
+  center=GetArcMidpointOffset(start,end,cosine,sine);
+  delta=GetArcRadiiDelta(center,radii);
   if (delta < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
-  if (delta > 1.0)
-    {
-      radii.x*=sqrt((double) delta);
-      radii.y*=sqrt((double) delta);
-    }
-  points[0].x=(double) (cosine*start.x/radii.x+sine*start.y/radii.x);
-  points[0].y=(double) (cosine*start.y/radii.y-sine*start.x/radii.y);
-  points[1].x=(double) (cosine*end.x/radii.x+sine*end.y/radii.x);
-  points[1].y=(double) (cosine*end.y/radii.y-sine*end.x/radii.y);
+  radii=ScaleArcRadii(radii,delta);
+  points[0]=GetArcUnitPoint(start,cosine,sine,radii);
+  points[1]=GetArcUnitPoint(end,cosine,sine,radii);
   alpha=points[1].x-points[0].x;
   beta=points[1].y-points[0].y;
   if (fabs(alpha*alpha+beta*beta) < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
   factor=GetArcCenterFactor(alpha,beta,large_arc,sweep);
-  center.x=(double) ((points[0].x+points[1].x)/2-factor*beta);
-  center.y=(double) ((points[0].y+points[1].y)/2+factor*alpha);
+  center=GetArcCenter(points,factor,alpha,beta);
   alpha=atan2(points[0].y-center.y,points[0].x-center.x);
   theta=atan2(points[1].y-center.y,points[1].x-center.x)-alpha;
   theta=GetArcSweepTheta(theta,sweep);
-  arc_segments=(size_t) CastDoubleToSsizeT(ceil(fabs((double) (theta/(0.5*
-    MagickPI+MagickEpsilon)))));
-  status=MagickTrue;
+  arc_segments=GetArcSegmentCount(theta);
   p=primitive_info;
-  for (i=0; i < (ssize_t) arc_segments; i++)
   {
-    ArcSegmentInput
-      segment;
+    const ArcSegmentInput
+      segment = { alpha, theta, arc_segments, center, cosine, sine, radii,
+        start, end, primitive_info };
 
-    segment.alpha=alpha;
-    segment.theta=theta;
-    segment.arc_segments=arc_segments;
-    segment.center=center;
-    segment.cosine=cosine;
-    segment.sine=sine;
-    segment.radii=radii;
-    segment.start=start;
-    segment.end=end;
-    segment.primitive_info=primitive_info;
-    TraceArcSegmentPoints(&segment,i,p,points);
-    status&=(MagickStatusType) TraceBezier(mvg_info,4);
-    if (status == 0)
-      break;
-    p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
-    mvg_info->offset+=(ssize_t) p->coordinates;
-    p+=(ptrdiff_t) p->coordinates;
+    status=TraceArcSegments(mvg_info,&segment,points,&p);
   }
   return(FinishArcPath(mvg_info,status,offset,p));
 }

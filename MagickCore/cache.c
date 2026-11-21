@@ -1333,13 +1333,9 @@ static Cache GetImagePixelCache(Image *image,const MagickBooleanType clone,
       LockSemaphoreInfo(cache_info->semaphore);
       if ((cache_info->reference_count > 1) || (cache_info->mode == ReadMode))
         {
-          ImagePixelCacheClone
-            pixel_cache_clone;
+          const ImagePixelCacheClone
+            pixel_cache_clone = { image, clone, cache_info, exception };
 
-          pixel_cache_clone.image=image;
-          pixel_cache_clone.clone=clone;
-          pixel_cache_clone.cache_info=cache_info;
-          pixel_cache_clone.exception=exception;
           CloneImagePixelCache(&pixel_cache_clone,&status,&destroy);
         }
       UnlockSemaphoreInfo(cache_info->semaphore);
@@ -1841,17 +1837,17 @@ static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
       ssize_t
         x_offset;
 
-      VirtualPixelOffsets
-        offsets;
-
       x_offset=x+u;
       length=(MagickSizeType) MagickMin((ssize_t) cache_info->columns-
         x_offset,(ssize_t) columns-u);
-      offsets.x_offset=x_offset;
-      offsets.y_offset=y_offset;
-      if (TransferVirtualPixel(virtual_rows,&offsets,&targets,&broke) ==
-          MagickFalse)
-        continue;
+      {
+        const VirtualPixelOffsets
+          offsets = { x_offset, y_offset };
+
+        if (TransferVirtualPixel(virtual_rows,&offsets,&targets,&broke) ==
+            MagickFalse)
+          continue;
+      }
       if (broke != MagickFalse)
         break;
       /*
@@ -1933,9 +1929,6 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
 
   void
     *magick_restrict virtual_metacontent;
-
-  VirtualPixelRows
-    virtual_rows;
 
   /*
     Acquire pixels.
@@ -2057,18 +2050,14 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
     default:
       break;
   }
-  virtual_rows.image=image;
-  virtual_rows.virtual_pixel_method=virtual_pixel_method;
-  virtual_rows.x=x;
-  virtual_rows.y=y;
-  virtual_rows.columns=columns;
-  virtual_rows.rows=rows;
-  virtual_rows.cache_info=cache_info;
-  virtual_rows.virtual_nexus=virtual_nexus;
-  virtual_rows.virtual_pixel=virtual_pixel;
-  virtual_rows.virtual_metacontent=virtual_metacontent;
-  virtual_rows.exception=exception;
-  v=GetVirtualPixelRows(&virtual_rows,q,s);
+  {
+    const VirtualPixelRows
+      virtual_rows = { image, virtual_pixel_method, x, y, columns, rows,
+        cache_info, virtual_nexus, virtual_pixel, virtual_metacontent,
+        exception };
+
+    v=GetVirtualPixelRows(&virtual_rows,q,s);
+  }
   /*
     Free resources.
   */

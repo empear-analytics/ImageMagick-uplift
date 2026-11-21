@@ -47,6 +47,19 @@ extern MagickPrivate MagickBooleanType
 extern MagickPrivate void
   PolicyComponentTerminus(void);
 
+static inline MagickBooleanType ParseShredPassesOption(char *option,
+  ssize_t *passes)
+{
+  if (option != (char *) NULL)
+    {
+      (*passes)=(ssize_t) StringToLong(option);
+      option=DestroyString(option);
+      if ((*passes) < 0)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static inline ssize_t GetShredPasses(void)
 {
   char
@@ -58,21 +71,11 @@ static inline ssize_t GetShredPasses(void)
     passes;
 
   option=GetPolicyValue("system:shred");
-  if (option != (char *) NULL)
-    {
-      policy_passes=(ssize_t) StringToLong(option);
-      option=DestroyString(option);
-      if (policy_passes < 0)
-        return(0);
-    }
+  if (ParseShredPassesOption(option,&policy_passes) == MagickFalse)
+    return(0);
   option=GetEnvironmentValue("MAGICK_SHRED_PASSES");
-  if (option != (char *) NULL)
-    {
-      env_passes=(ssize_t) StringToLong(option);
-      option=DestroyString(option);
-      if (env_passes < 0)
-        return(0);
-    }
+  if (ParseShredPassesOption(option,&env_passes) == MagickFalse)
+    return(0);
   passes=MagickMax(policy_passes,env_passes);
   return(passes);
 }

@@ -1162,6 +1162,7 @@ DATA_URI_TYPES = [("image/ppm", _PPM_2X1), ("image/x-portable-pixmap", _PPM_2X1)
                   ("image/svg+xml", _SVG_4X3), ("image/x-svg", _SVG_4X3),
                   ("noslash", _PPM_2X1), ("image/", _PPM_2X1), ("image/x-", _PPM_2X1)]
 PING_SCENES = ["frame%d.miff[0-2]", "frame%d.miff[1]", "frame%d.miff[0-1]"]
+READ_SCENES = ["frame%d.miff[0-2]", "frame%d.miff[1]"]
 
 
 def _constitute_cases():
@@ -1171,6 +1172,10 @@ def _constitute_cases():
     for pattern in PING_SCENES:
         steps = [[img("anim"), "+adjoin", "frame%d.miff"], ["identify", "-ping", pattern]]
         yield _case("constitute", "identify -ping %s" % pattern, steps, [])
+    # ReadImages' scene range (ReadSceneImages), the read twin of the pings above.
+    for pattern in READ_SCENES:
+        steps = [[img("anim"), "+adjoin", "frame%d.miff"], [pattern, "info:"]]
+        yield _case("constitute", "read scenes %s" % pattern, steps, [])
     # Pings that fail: PingImage must not touch the image the reader did not return.
     for name, text in (("bad.miff", "garbage"), ("zero.ppm", "P6\n0 0\n255\n")):
         yield _with_inputs(_case("constitute", "identify -ping failing %s" % name,
