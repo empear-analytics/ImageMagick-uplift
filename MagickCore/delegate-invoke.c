@@ -84,6 +84,7 @@
 #include "MagickCore/utility-private.h"
 #include "MagickCore/xml-tree.h"
 #include "MagickCore/xml-tree-private.h"
+#include "MagickCore/delegate-property-private.h"
 #include "MagickCore/delegate-invoke-private.h"
 
 /*

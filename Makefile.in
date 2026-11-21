@@ -440,7 +440,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/configure.h MagickCore/constitute.c MagickCore/constitute-codec.c MagickCore/constitute-write.c MagickCore/constitute-pixels.c \
 	MagickCore/constitute.h MagickCore/constitute-pixels-private.h MagickCore/decorate.c MagickCore/decorate-raise.c \
 	MagickCore/decorate.h MagickCore/delegate.c MagickCore/delegate-invoke.c \
-	MagickCore/delegate.h MagickCore/delegate-private.h MagickCore/delegate-invoke-private.h \
+	MagickCore/delegate.h MagickCore/delegate-private.h MagickCore/delegate-invoke-private.h MagickCore/delegate-property-private.h \
 	MagickCore/deprecate.c MagickCore/deprecate.h \
 	MagickCore/display.c MagickCore/display-image.c MagickCore/display.h \
 	MagickCore/display-private.h MagickCore/display-image-annotate-private.h MagickCore/display-image-annotate-chop-private.h MagickCore/display-image-crop-private.h MagickCore/display-image-composite-crop-private.h MagickCore/display-image-draw-private.h MagickCore/display-image-draw-undo-private.h MagickCore/display-image-apply-private.h MagickCore/display-image-apply-effects-private.h MagickCore/display-image-apply-filters-private.h MagickCore/display-image-matte-private.h MagickCore/display-image-matte-roi-private.h MagickCore/display-image-tile-private.h MagickCore/display-image-window-private.h MagickCore/display-image-window-setup-private.h MagickCore/display-image-event-private.h MagickCore/distort.c MagickCore/distort-sparse.c MagickCore/distort-affine.c MagickCore/distort-resize.c \
@@ -5861,6 +5861,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/delegate.h \
   MagickCore/delegate-private.h \
   MagickCore/delegate-invoke-private.h \
+  MagickCore/delegate-property-private.h \
   MagickCore/deprecate.c \
   MagickCore/deprecate.h \
   MagickCore/display.c \
@@ -6444,6 +6445,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/constitute-pixels-private.h \
   MagickCore/delegate-private.h \
   MagickCore/delegate-invoke-private.h \
+  MagickCore/delegate-property-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
