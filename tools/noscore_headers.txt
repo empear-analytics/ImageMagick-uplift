@@ -23,6 +23,7 @@ MagickCore/distribute-cache-private.h 4b602a4508276e878e58c84ad60029deb03f0ed5  
 MagickCore/exception-private.h b65d9ac7a3fbd7bbe6e817cb899fe6dc8f597f9f  # Throw*Exception statement macros and declarations
 MagickCore/fx-private.h 0c44c015c9028307f70a211c18775e1cac0813ef  # declarations only
 MagickCore/gem-private.h 15d570c9e4f788a0a3eaef31a2a1ba82c337ae06  # declarations only
+MagickCore/geometry-parse-debug-private.h 48e6ecc4356c5eed91bb7b470744f91fdb67daba  # Recipe UB fragment: statements of an #if 0 debugging block, no function
 MagickCore/geometry-private.h 4e82a0c5b095769d45947062d6790a4f9ab9bf2f  # declarations only
 MagickCore/linked-list-private.h eb5e90c85edfe3b4ac6a610009ee46ebbf70aae8  # a struct and declarations
 MagickCore/log-private.h 515cfd2f9f1d7f992d335e1b9023f6778ac98ba4  # declarations only

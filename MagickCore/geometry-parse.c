@@ -808,18 +808,7 @@ static MagickStatusType FinishGeometryInfo(char *p,
   GeometryInfo *geometry_info)
 {
   flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
-#if 0
-  /* Debugging Geometry */
-  (void) fprintf(stderr,"ParseGeometry...\n");
-  (void) fprintf(stderr,"Flags: %c %c %s %s %s\n",
-    (flags & RhoValue) ? 'W' : ' ',(flags & SigmaValue) ? 'H' : ' ',
-    (flags & XiValue) ? ((flags & XiNegative) ? "-X" : "+X") : "  ",
-    (flags & PsiValue) ? ((flags & PsiNegative) ? "-Y" : "+Y") : "  ",
-    (flags & ChiValue) ? ((flags & ChiNegative) ? "-Z" : "+Z") : "  ");
-  (void) fprintf(stderr,"Geometry: %lg,%lg,%lg,%lg,%lg\n",geometry_info->rho,
-    geometry_info->sigma,geometry_info->xi,geometry_info->psi,
-    geometry_info->chi);
-#endif
+#include "MagickCore/geometry-parse-debug-private.h"
   return(flags);
 }
 
