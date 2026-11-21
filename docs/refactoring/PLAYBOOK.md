@@ -11782,9 +11782,18 @@ recipe turns an expression into data.
    another parameter with a constant (no call, no assignment, no increment); (c) `chain
    || (r)`, where `r` is a last parenthesised operand with no call, assignment or
    increment. No `#if` line stands inside the function.
+   *Ladder form* (2026-11-21): the body is, apart from comments, a run of statements
+   `if (Ci) return(MagickTrue);` followed by `return(MagickFalse);`, where every `Ci`
+   reads only `n`, an `int` parameter, and holds no call, assignment or increment; at
+   least two of them are `n == Li` (`code == 0x0020`), each `Li` an integer literal or a
+   character constant, all distinct. Those equality tests are the chain, in the
+   ladder's order; the other tests (a range, `(n >= a) && (n <= b)`) stay. The function
+   may be a `static inline` function of a private header, the table directly above it
+   in the header, as Recipe TB step 1 allows.
 2. Directly above the function write a `static const` array with no size, of the
    declared type of `n` (`FunctionE`, `int`), named for what it holds, whose elements are
-   `L1 ... Lk` in the chain's order, its line breaks where the chain's were.
+   `L1 ... Lk` in the chain's order, its line breaks where the chain's were (in the
+   ladder form, one element per line).
 3. Declare `size_t i;` at the top of the function and replace the `return` with the
    lookup `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` / `if (T[i] == n)` /
    `return(MagickTrue);`, then: in form (a) `return(MagickFalse);`; in form (b) the
@@ -11792,6 +11801,12 @@ recipe turns an expression into data.
    `return(MagickFalse);`; in form (c) the lookup is followed by
    `return((r) ? MagickTrue : MagickFalse);`, `r`'s text unchanged. The function's
    name, parameters, return type and comments stay.
+   Ladder form: the equality tests leave and the lookup, ending in its
+   `return(MagickTrue);`, stands where the first of them stood; the other `if`
+   statements keep their text and their order around it, and `return(MagickFalse);`
+   closes the function as before. Check by a harness that calls both versions for
+   every `int` value from the smallest constant minus one to the largest plus one, and
+   for `INT_MIN`, `-1` and `INT_MAX`, and finds every result equal.
 4. Check by script that the table holds exactly the constants of the chain, each once
    and in its order, that `a` or `r` reappears unchanged, and that nothing else in the
    file changed.
@@ -11848,6 +11863,13 @@ static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
 - The table is new data the function only reads: `static`, `const`, not visible outside
   the file; no existing table changes (*Absolutely forbidden*). Every constant of the
   chain is still written once, in the table. No literal is changed; the loop adds `0`.
+- Ladder form. Every statement but the last returns `MagickTrue` when its test holds, and
+  no test has a side effect, so the function returns `MagickTrue` exactly when one of the
+  tests holds and `MagickFalse` otherwise: the order in which the tests run cannot be
+  observed. The lookup holds when `n` equals one of the `Li`, which is when one of the
+  equality tests held, and the tests that stay are the same text; so the set of values
+  for which the function returns `MagickTrue` is unchanged. The harness checks that
+  for every value the tests can tell apart.
 - Only the number of comparisons and a loop counter change, which is speed (step 1).
 
 **Evidence level:** oracle (the cases that reach the predicate's callers), with step 4's
@@ -27363,3 +27385,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | NEW | TG | Guard a Loop's Tail Block with a Continue: a loop body's last statement `if (c) { S }`, no `else`, whose `S` nests the bump, becomes `if (<inverse>) continue;` followed by `S` one level out; `continue` goes where falling off the body went; proof `obj_identical.sh` IDENTICAL; a step lowering the function's cc goes first when the `continue` would raise it into *Complex Method* | `constitute-write.c`'s `WriteImages` (campaign B, M141): the progress block's nested `break`; a probe after a Recipe E step, 9.92 to 10.0 | mandate (2026-10-24) |
 | 2026-11-21 | NEW | DB | Merge Declaration Blocks of One Type: a later declaration block whose type line equals an earlier one's in the same declaration list (no initialisers, or only constant ones, and no name between them that refers to its declarators) is deleted and its declarators appended to the earlier block; proof `obj_identical.sh` IDENTICAL | `draw.c`'s `TraceArcPath` (campaign B, M141): two second blocks (`double`, `PrimitiveInfo *`) left by earlier extractions, four lines of a Large Method | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | TB | Step 1, break membership form: the label group's body may be `break;` with `default: return(MagickFalse);` and `return(MagickTrue);` after the `switch`; the loop returns `MagickTrue` at a match and the function ends `return(MagickFalse);`; a leading `if (c) return(MagickTrue);` on the parameter alone stays before the loop | `draw.c`'s `IsValidListChar` (campaign B, M141): a digit range, then eight separator labels that break to `return(MagickTrue);`; probe 6.42 to 6.63 | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | EM | Step 1, ladder form: a run of `if (Ci) return(MagickTrue);` ending in `return(MagickFalse);`, every `Ci` reading only an `int` parameter with no side effect; its equality tests against literals go into the table, the lookup stands where the first stood, and the other tests (ranges) keep their place; a harness over every value the constants bound checks the two versions agree | `token-private.h`'s `IsUTFSpace` (campaign B, M141): two ranges and ten single code points, cc 15; probe 8.74 to 9.09 | mandate (2026-10-24) |
