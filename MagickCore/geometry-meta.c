@@ -187,8 +187,7 @@ static void SetMetaGeometrySize(const MetaGeometryInput *input,
       /*
         Respect aspect ratio of the image.
       */
-      scale_factor=GetAspectScaleFactor(flags,width,height,stasis_width,
-        stasis_height);
+      scale_factor=GetAspectScaleFactor(flags,width,height,input);
       *width=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_width+0.5),
         1.0));
       *height=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_height+0.5),

@@ -63,9 +63,12 @@ static void EnlargeGeometryToSize(size_t *width,size_t *height,
 }
 
 static double GetAspectScaleFactor(const MagickStatusType flags,
-  const size_t *width,const size_t *height,const size_t stasis_width,
-  const size_t stasis_height)
+  const size_t *width,const size_t *height,const MetaGeometryInput *input)
 {
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
   double
     scale_factor;
 
