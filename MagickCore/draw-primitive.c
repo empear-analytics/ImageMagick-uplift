@@ -474,9 +474,30 @@ typedef struct _StrokeBoxes
     *box_q;
 } StrokeBoxes;
 
-static ssize_t TraceMiterPointP(const StrokeBoxes *boxes,PointInfo *stroke_p,
-  ssize_t p,const double miterlimit)
+typedef enum
 {
+  PMiterPointSide,
+  QMiterPointSide
+} MiterPointSide;
+
+typedef struct _MiterPoint
+{
+  const StrokeBoxes
+    *boxes;
+
+  MiterPointSide
+    side;
+} MiterPoint;
+
+static inline ssize_t TraceMiterPoint(const MiterPoint *miter,
+  PointInfo *stroke,ssize_t offset,const double miterlimit)
+{
+  const StrokeBoxes
+    *const boxes = miter->boxes;
+
+  const MiterPointSide
+    side = miter->side;
+
   PointInfo
     *const box_p = boxes->box_p,
     *const box_q = boxes->box_q;
@@ -484,38 +505,47 @@ static ssize_t TraceMiterPointP(const StrokeBoxes *boxes,PointInfo *stroke_p,
   double
     dot_product;
 
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_p[p++]=box_p[4];
-          else
-            {
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
-  return(p);
+  dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+  if (side == PMiterPointSide)
+    {
+      if (dot_product <= miterlimit)
+        stroke[offset++]=box_p[4];
+      else
+        {
+          stroke[offset++]=box_p[1];
+          stroke[offset++]=box_p[2];
+        }
+    }
+  else
+    {
+      if (dot_product <= miterlimit)
+        stroke[offset++]=box_q[4];
+      else
+        {
+          stroke[offset++]=box_q[1];
+          stroke[offset++]=box_q[2];
+        }
+    }
+  return(offset);
+}
+
+static ssize_t TraceMiterPointP(const StrokeBoxes *boxes,PointInfo *stroke_p,
+  ssize_t p,const double miterlimit)
+{
+  const MiterPoint
+    miter = { boxes, PMiterPointSide };
+
+  return(TraceMiterPoint(&miter,stroke_p,p,miterlimit));
 }
 
 static ssize_t TraceMiterPointQ(const StrokeBoxes *boxes,PointInfo *stroke_q,
   ssize_t q,const double miterlimit)
 {
-  PointInfo
-    *const box_p = boxes->box_p,
-    *const box_q = boxes->box_q;
+  const MiterPoint
+    miter = { boxes, QMiterPointSide };
 
-  double
-    dot_product;
-
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_q[q++]=box_q[4];
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-            }
-  return(q);
+  return(TraceMiterPoint(&miter,stroke_q,q,miterlimit));
 }
 
 typedef struct _StrokeTargets
