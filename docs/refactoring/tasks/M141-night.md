@@ -13,7 +13,7 @@ the logcfg tie M01 and M90 explained.
 
 | File | Before | After | Steps |
 | --- | --- | --- | --- |
-| draw-primitive.c | 3.67 | 7.22 | E, FB, SM, W, W, D, FB, FI, FB, N, CE, O, W, FI; then the three-header OH chain |
+| draw-primitive.c | 3.67 | 8.04 | E, FB, SM, W, W, D, FB, FI, FB, N, CE, O, W, FI; then the three-header OH chain; then FM, MS, H on TraceStrokePolygon (Code Duplication gone) |
 | draw.c | 5.51 | 6.63 | FB, LT, O (ParseMVGClass cleared); E, N, DB, E, D (TraceArcPath cleared, Overall Code Complexity gone); TB (IsValidListChar) |
 | constitute.c | 8.81 | 10.0 | CF (Ping/ReadSceneImages), after two new oracle cases for ReadSceneImages |
 | constitute-write.c | 9.92 | 10.0 | E, TG |
@@ -23,6 +23,8 @@ the logcfg tie M01 and M90 explained.
 | stream-read.c | 9.68 | 10.0 | OH |
 | geometry-meta.c | 8.73 | 9.68 | OH, N, N |
 | geometry-meta-private.h | 9.19 | 10.0 | IP, IP, IP, D, E |
+| token-private.h | 8.74 | 9.09 | EM (IsUTFSpace) |
+| xml-tree.c | 9.02 | 9.09 | HT (ParseXMLTreeTags) |
 | pixel-export.c, pixel-import.c | 7.32 | 9.68 | OH |
 | delegate-invoke.c | 8.28 | 9.68 | OH |
 | image-filename.c | 9.38 | 9.68 | OH |
@@ -47,6 +49,9 @@ Files left at 9.68 hold only the argument counts of public (MagickExport or Magi
 - **TG** (new): Guard a Loop's Tail Block with a Continue. Guard level, IDENTICAL.
 - **DB** (new): Merge Declaration Blocks of One Type. Guard level, IDENTICAL.
 - **TB** (amended): break membership form, with a leading parameter-only test.
+- **EM** (amended): ladder form, a run of `if (...) return(MagickTrue);` whose equality tests go into the table while range tests stay; checked by an exhaustive harness.
+- **HT** (amended): call form, where each arm ends in its own call's exit test.
+- **FM** (amended): several members bound at the top of the twins' bodies.
 
 ## How the OH carves were proven
 - Form A carves leave the translation unit's tokens in the same order. The proof is `pp_identical.sh` and `obj_identical.sh` IDENTICAL, or differing only in the file name of moved asserts (as in 5c47fa8e5). stream-read.c also differs in three cold assert paths, which now load their own file-name string.
@@ -63,6 +68,11 @@ Files left at 9.68 hold only the argument counts of public (MagickExport or Magi
 - **property.c:** Recipe CS on TraceSVGClippath, mirroring TracePSClippath's AddPSClippathKnot, revealed a Code Duplication finding between the two knot helpers (7.34 -> 6.79).
 - **profile.c:** Recipe E step 7 on ProfileImage's icc block scored 8.19 -> 8.29, but leaves `name` unused in the helper on builds without LCMS, which `main.yml`'s `-Wextra -Werror` jobs are. No recipe adds `magick_unreferenced`.
 - **image-view.c** (6.84): no oracle case reaches its iterators.
+- **draw-gradient.c:** Recipe N on DrawGradientImage's per-pixel row loop, then FB, reached 10.0 in a probe, but the N step measured 3.6-4.5% slower on a 2500x2500 linear gradient (clang -O2, one thread; a base-vs-base control 0.1%). Not taken.
+- **draw-gradient-private.h:** Recipe MT's folding form on GetPadGradientColor/GetReflectGradientColor leaves the merged function at cc 9 and splits two call lines (9.38 -> 9.3).
+- **token-private.h:** extracting ConvertMacRomanToUTF8's UTF-8 encoder makes it a clone of ConvertLatin1ToUTF8 (8.74 -> 7.94).
+- **draw-primitive-path-private.h:** Recipe FB on DrawDashPolygon's segment fill scores 8.27 but obj_identical prints DIFFERENT. Reverted, as FB step 6 requires.
+- **cache-view.c:** one helper for the thread-id and assert prologue of twelve wrappers leaves the duplication (in the bodies) and the score unchanged.
 - **cache.c and blob.c** are plateaus. Moving a whole hot family (SetPixelCacheNexusPixels' five functions) out of cache.c leaves it at 3.52.
 
 ## For the owner
