@@ -62,6 +62,19 @@ static void EnlargeGeometryToSize(size_t *width,size_t *height,
     *height=stasis_height;
 }
 
+static double GetMinimumAspectScale(const MagickStatusType flags,
+  const size_t extent,const size_t stasis_extent,const size_t other_extent)
+{
+  double
+    scale_factor;
+
+  scale_factor=(double) extent/(double) stasis_extent;
+  if (((flags & MinimumValue) != 0) &&
+      (scale_factor < ((double) extent/(double) other_extent)))
+    scale_factor=(double) extent/(double) other_extent;
+  return(scale_factor);
+}
+
 static double GetAspectScaleFactor(const MagickStatusType flags,
   const size_t *width,const size_t *height,const MetaGeometryInput *input)
 {
@@ -89,19 +102,11 @@ static double GetAspectScaleFactor(const MagickStatusType flags,
       }
     else
       if ((flags & RhoValue) != 0)
-        {
-          scale_factor=(double) *width/(double) stasis_width;
-          if (((flags & MinimumValue) != 0) &&
-              (scale_factor < ((double) *width/(double) stasis_height)))
-            scale_factor=(double) *width/(double) stasis_height;
-        }
+        scale_factor=GetMinimumAspectScale(flags,*width,stasis_width,
+          stasis_height);
       else
-        {
-          scale_factor=(double) *height/(double) stasis_height;
-          if (((flags & MinimumValue) != 0) &&
-              (scale_factor < ((double) *height/(double) stasis_width)))
-            scale_factor=(double) *height/(double) stasis_width;
-        }
+        scale_factor=GetMinimumAspectScale(flags,*height,stasis_height,
+          stasis_width);
   return(scale_factor);
 }
 
