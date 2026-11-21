@@ -100,16 +100,6 @@
 %      the given geometry specification.
 %
 */
-typedef struct _MetaGeometryInput
-{
-  const char
-    *geometry;
-
-  size_t
-    stasis_width,
-    stasis_height;
-} MetaGeometryInput;
-
 static void ScaleMetaGeometryByPercent(const MetaGeometryInput *input,
   GeometryInfo *geometry_info,size_t *width,size_t *height)
 {
@@ -182,8 +172,7 @@ static void SetMetaGeometrySize(const MetaGeometryInput *input,
     stasis_width = input->stasis_width,
     stasis_height = input->stasis_height;
 
-  if (IsMetaGeometryAspectKept(flags,width,height,stasis_width,
-        stasis_height) != MagickFalse)
+  if (IsMetaGeometryAspectKept(flags,width,height,input) != MagickFalse)
     {
       if ((flags & RhoValue) == 0)
         *width=stasis_width;

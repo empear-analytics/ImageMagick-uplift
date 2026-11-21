@@ -22,10 +22,24 @@
 extern "C" {
 #endif
 
+typedef struct _MetaGeometryInput
+{
+  const char
+    *geometry;
+
+  size_t
+    stasis_width,
+    stasis_height;
+} MetaGeometryInput;
+
 static inline MagickBooleanType IsMetaGeometryAspectKept(
   const MagickStatusType flags,const size_t *width,const size_t *height,
-  const size_t stasis_width,const size_t stasis_height)
+  const MetaGeometryInput *input)
 {
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
   return((((flags & AspectValue) != 0) || ((*width == stasis_width) &&
     (*height == stasis_height))) ? MagickTrue : MagickFalse);
 }
