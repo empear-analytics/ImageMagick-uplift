@@ -22,6 +22,7 @@ the logcfg tie M01 and M90 explained.
 | profile-sync.c | 9.38 | 10.0 | OH |
 | stream-read.c | 9.68 | 10.0 | OH |
 | geometry-meta.c | 8.73 | 9.68 | OH, N, N |
+| geometry-meta-private.h | 9.19 | 10.0 | IP, IP, IP, D, E |
 | pixel-export.c, pixel-import.c | 7.32 | 9.68 | OH |
 | delegate-invoke.c | 8.28 | 9.68 | OH |
 | image-filename.c | 9.38 | 9.68 | OH |
@@ -58,6 +59,10 @@ Files left at 9.68 hold only the argument counts of public (MagickExport or Magi
 - **matrix.c:** helpers that cleared Overall Code Complexity revealed a Code Duplication finding (9.09 -> 8.81).
 - **geometry-meta.c** (before the carve): a helper that cleared Bumpy Road raised Overall Code Complexity (8.73 -> 8.10).
 - **resource.c and locale.c** sit at the Lines of Code limit. A Recipe SD split of RelinquishMagickResource (8.97 -> 8.81) and Recipe IP on LoadIncludedLocaleFile (8.96 -> 8.69) both cross it.
+- **policy-path.c:** three helpers for IsPathContainsSymlink (cc 14 to 9) brought Overall Code Complexity and an argument finding (9.53 -> 8.54).
+- **property.c:** Recipe CS on TraceSVGClippath, mirroring TracePSClippath's AddPSClippathKnot, revealed a Code Duplication finding between the two knot helpers (7.34 -> 6.79).
+- **profile.c:** Recipe E step 7 on ProfileImage's icc block scored 8.19 -> 8.29, but leaves `name` unused in the helper on builds without LCMS, which `main.yml`'s `-Wextra -Werror` jobs are. No recipe adds `magick_unreferenced`.
+- **image-view.c** (6.84): no oracle case reaches its iterators.
 - **cache.c and blob.c** are plateaus. Moving a whole hot family (SetPixelCacheNexusPixels' five functions) out of cache.c leaves it at 3.52.
 
 ## For the owner
