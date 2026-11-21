@@ -463,7 +463,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/geometry.h MagickCore/geometry-private.h \
 	MagickCore/histogram.c MagickCore/histogram.h \
 	MagickCore/identify.c MagickCore/identify.h MagickCore/image.c MagickCore/image-mask.c MagickCore/image-fill.c MagickCore/image-clone.c MagickCore/image-settings.c MagickCore/image-append.c MagickCore/image-filename.c \
-	MagickCore/image.h MagickCore/image-private.h \
+	MagickCore/image.h MagickCore/image-private.h MagickCore/image-filename-private.h \
 	MagickCore/image-view.c MagickCore/image-view.h \
 	MagickCore/layer.c MagickCore/layer-frames.c MagickCore/layer-optimize.c MagickCore/layer-dispose.c MagickCore/layer-composite.c MagickCore/layer-merge.c MagickCore/layer.h MagickCore/layer-frames-bounds-private.h MagickCore/layer-frames-private.h MagickCore/linked-list.c \
 	MagickCore/linked-list.h MagickCore/list.c MagickCore/list.h \
@@ -5974,6 +5974,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-filename.c \
   MagickCore/image.h \
   MagickCore/image-private.h \
+  MagickCore/image-filename-private.h \
   MagickCore/image-view.c \
   MagickCore/image-view.h \
   MagickCore/layer.c \
@@ -6479,6 +6480,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
+  MagickCore/image-filename-private.h \
   MagickCore/layer-frames-bounds-private.h \
   MagickCore/layer-frames-private.h \
   MagickCore/linked-list-private.h \
