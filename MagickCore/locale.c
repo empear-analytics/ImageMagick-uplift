@@ -1421,6 +1421,48 @@ static MagickStatusType LoadIncludedLocaleFile(const LocaleLoadTarget *target,
   return(status);
 }
 
+typedef struct _LocaleIncludeScan
+{
+  const LocaleLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *token;
+
+  const char
+    *locale;
+} LocaleIncludeScan;
+
+static void LoadLocaleIncludeElement(const LocaleIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  const LocaleLoadTarget
+    *const target = scan->target;
+
+  const char
+    *const filename = scan->filename;
+
+  const size_t
+    depth = scan->depth,
+    extent = scan->extent;
+
+  char
+    *const token = scan->token;
+
+  const char
+    *const locale = scan->locale;
+
+  while (NextIncludeFile(q,extent,token,locale) != MagickFalse)
+    (*status)=LoadIncludedLocaleFile(target,filename,token,depth,(*status));
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1485,8 +1527,12 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         /*
           Include element.
         */
-        while (NextIncludeFile(&q,extent,token,locale) != MagickFalse)
-          status=LoadIncludedLocaleFile(target,filename,token,depth,status);
+        {
+          const LocaleIncludeScan
+            scan = { target, filename, depth, extent, token, locale };
+
+          LoadLocaleIncludeElement(&scan,&q,&status);
+        }
         continue;
       }
     if (LocaleCompare(keyword,"<locale") == 0)
