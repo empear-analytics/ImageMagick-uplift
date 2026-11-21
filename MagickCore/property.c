@@ -6362,19 +6362,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     return(handler(image,value,exception));
   switch (*property)
   {
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-    case '8':
-    {
-      if (LocaleNCompare("8bim:",property,5) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break;
-    }
-#endif
+#include "MagickCore/property-set-8bim-private.h"
     case 'B':
     case 'b':
     {
@@ -6387,73 +6375,20 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
         }
       break; /* not an attribute, add as a property */
     }
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-    case 'E':
-    case 'e':
-    {
-      if (LocaleNCompare("exif:",property,5) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break; /* not an attribute, add as a property */
-    }
-    case 'F':
-    case 'f':
-    {
-      if (LocaleNCompare("fx:",property,3) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break; /* not an attribute, add as a property */
-    }
-#endif
+#include "MagickCore/property-set-exif-fx-private.h"
     case 'I':
     case 'i':
     {
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-      if (LocaleNCompare("iptc:",property,5) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-#endif
+#include "MagickCore/property-set-iptc-private.h"
       break; /* not an attribute, add as a property */
     }
     case 'P':
     case 'p':
     {
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-      if (LocaleNCompare("pixel:",property,6) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-#endif
+#include "MagickCore/property-set-pixel-private.h"
       break; /* not an attribute, add as a property */
     }
-#if 0  /* Percent escape's sets values with this prefix: for later use
-          Throwing an exception causes this setting to fail */
-    case 'X':
-    case 'x':
-    {
-      if (LocaleNCompare("xmp:",property,4) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
-      break; /* not an attribute, add as a property */
-    }
-#endif
+#include "MagickCore/property-set-xmp-private.h"
   }
   /* Default: not an attribute, add as a property */
   status=AddValueToSplayTree((SplayTreeInfo *) image->properties,

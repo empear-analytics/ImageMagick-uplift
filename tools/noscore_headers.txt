@@ -37,6 +37,11 @@ MagickCore/opencl-private.h 3142689ede806483fc5aa3e706622def96f89c3d  # structs,
 MagickCore/option-private.h a7e73d8e7dce2bb2267cc8c473e0919fbfab515e  # declarations only
 MagickCore/pixel-private.h 202c0bdceb89b581bc8c3b1d9eea6176f16b1e82  # declarations only
 MagickCore/profile-private.h 96c7e56b4d37a4ff4bdd86b37a4790aee75d5bd7  # declarations only
+MagickCore/property-set-8bim-private.h 574b3c73c9a00945f3f5e51061ed7641b85be982  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
+MagickCore/property-set-exif-fx-private.h 80f4a8a74b50b0356d5498efe2defe9f11753abb  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
+MagickCore/property-set-iptc-private.h 5fba6243527b87602fb74ab97cb660d2391446e5  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
+MagickCore/property-set-pixel-private.h b91619f983e7f0a2eec65d7662744b608dc69bf2  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
+MagickCore/property-set-xmp-private.h ed747d1e61829595c43d3ad6baa4799ef7fd6449  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
 MagickCore/registry-private.h 02378c83f0c1ee59cf033d651c83e31a293e5554  # declarations only
 MagickCore/resize-private.h 638b891ee4631624c433973f49f1f7c3b30a1308  # an enum and declarations
 MagickCore/resource-private.h 0965d639613e7b32a63e0c65aefe8f23234bfa15  # declarations only
