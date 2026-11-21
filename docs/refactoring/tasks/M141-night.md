@@ -25,6 +25,7 @@ the logcfg tie M01 and M90 explained.
 | geometry-meta-private.h | 9.19 | 10.0 | IP, IP, IP, D, E |
 | token-private.h | 8.74 | 9.09 | EM (IsUTFSpace) |
 | xml-tree.c | 9.02 | 9.09 | HT (ParseXMLTreeTags) |
+| geometry-parse.c | 8.81 | 9.09 | UB (FinishGeometryInfo's #if 0 printout) |
 | pixel-export.c, pixel-import.c | 7.32 | 9.68 | OH |
 | delegate-invoke.c | 8.28 | 9.68 | OH |
 | image-filename.c | 9.38 | 9.68 | OH |
@@ -34,13 +35,16 @@ the logcfg tie M01 and M90 explained.
 | matrix.c | 8.81 | 9.09 | E |
 | profile.c | 7.41 | 8.19 | SL, D |
 | locale.c | 8.91 | 8.96 | Q |
-| annotate.c, property.c, constitute-codec.c | 5.83, 7.30, 8.73 | 5.86, 7.34, 8.75 | FB, FI, D |
+| property.c | 7.30 | 7.60 | D; UB (SetImageProperty's five #if 0 blocks, cc 29 -> 16) |
+| annotate.c, constitute-codec.c | 5.83, 8.73 | 5.86, 8.75 | FB, FI |
 
 New headers (Recipe OH):
 - From draw-primitive.c, convert 8.22, path 8.23, alpha 8.73, fill 8.97, log 9.46 and render 8.03. Path, fill and render were later carved again (into convert, alpha and log).
 - From the other files: pixel-export 7.32, pixel-import 7.32, quantum-import 8.28, quantum-export 8.28, delegate-invoke 9.09, delegate-property 8.81, draw-gradient 9.38, image-filename 9.38, profile-sync 9.68, stream-read 9.68, constitute-pixels 9.5 and geometry-meta 9.19.
 
 Each header scores at least the file's score before its carve (owner, 2026-11-18). They are campaign B files now and stay on the list.
+
+Recipe UB fragments (no include guard, no function, listed in `tools/noscore_headers.txt` by blob hash): geometry-parse-debug, and property-set-8bim, -exif-fx, -iptc, -pixel and -xmp.
 
 Files left at 9.68 hold only the argument counts of public (MagickExport or MagickPrivate) functions.
 
