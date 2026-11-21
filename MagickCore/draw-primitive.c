@@ -955,9 +955,6 @@ static void AssembleStrokePolygon(const StrokePolygonInput *assembly,
   stroke_polygon[0].coordinates=(size_t) (p+q+2*closed_path+1);
 }
 
-static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
-  const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
-{
 #define MaxStrokePad  (6*BezierQuantum+360)
 #define CheckPathExtent(pad_p,pad_q) \
 {   \
@@ -1003,6 +1000,10 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     } \
 }
 
+
+static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
+  const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
+{
   double
     dot_product,
     mid,
