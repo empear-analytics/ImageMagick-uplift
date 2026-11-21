@@ -443,6 +443,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile-sync.c \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-sync-private.h \
   MagickCore/quantize.c \
   MagickCore/quantize-remap.c \
   MagickCore/quantize-kmeans.c \
@@ -885,6 +886,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/pixel-import-private.h \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-sync-private.h \
   MagickCore/quantize-private.h \
   MagickCore/quantize-assign-private.h \
   MagickCore/quantum-private.h \

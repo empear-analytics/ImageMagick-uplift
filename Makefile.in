@@ -492,7 +492,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/prepress.c MagickCore/prepress.h \
 	MagickCore/property.c MagickCore/property.h \
 	MagickCore/profile.c MagickCore/profile-sync.c MagickCore/profile.h \
-	MagickCore/profile-private.h MagickCore/quantize.c MagickCore/quantize-remap.c MagickCore/quantize-kmeans.c MagickCore/quantize-error.c MagickCore/quantize-info.c MagickCore/quantize-posterize.c \
+	MagickCore/profile-private.h MagickCore/profile-sync-private.h MagickCore/quantize.c MagickCore/quantize-remap.c MagickCore/quantize-kmeans.c MagickCore/quantize-error.c MagickCore/quantize-info.c MagickCore/quantize-posterize.c \
 	MagickCore/quantize.h MagickCore/quantize-private.h MagickCore/quantize-assign-private.h MagickCore/quantum.c MagickCore/quantum-type.c \
 	MagickCore/quantum.h MagickCore/quantum-export.c \
 	MagickCore/quantum-import.c MagickCore/quantum-private.h MagickCore/quantum-export-private.h MagickCore/quantum-import-private.h \
@@ -6079,6 +6079,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile-sync.c \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-sync-private.h \
   MagickCore/quantize.c \
   MagickCore/quantize-remap.c \
   MagickCore/quantize-kmeans.c \
@@ -6516,6 +6517,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/pixel-import-private.h \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-sync-private.h \
   MagickCore/quantize-private.h \
   MagickCore/quantize-assign-private.h \
   MagickCore/quantum-private.h \
