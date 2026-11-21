@@ -326,6 +326,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/geometry-parse.c \
   MagickCore/geometry.h \
   MagickCore/geometry-private.h \
+  MagickCore/geometry-meta-private.h \
   MagickCore/histogram.c \
   MagickCore/histogram.h \
   MagickCore/identify.c \
@@ -852,6 +853,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/fx-translate-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
+  MagickCore/geometry-meta-private.h \
   MagickCore/image-private.h \
   MagickCore/image-filename-private.h \
   MagickCore/layer-frames-bounds-private.h \
