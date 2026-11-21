@@ -595,7 +595,8 @@ typedef struct _StrokeArc
     arc_segments;
 } StrokeArc;
 
-static void TraceArcPointsQ(const StrokeArc *arc,const StrokeTargets *targets)
+static void TraceArcPoints(const StrokeArc *arc,PointInfo **const stroke,
+  ssize_t *const offset)
 {
   const PointInfo
     center = arc->center;
@@ -612,56 +613,17 @@ static void TraceArcPointsQ(const StrokeArc *arc,const StrokeTargets *targets)
   double
     delta_theta;
 
-  PointInfo
-    **const stroke_q = targets->stroke_q;
-
   ssize_t
-    j,
-    *const q = targets->q;
+    j;
 
   for (j=1; j < (ssize_t) arc_segments; j++)
   {
     delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
-    (*stroke_q)[*q].x=(double) (center.x+mid*cos(fmod((double)
+    (*stroke)[*offset].x=(double) (center.x+mid*cos(fmod((double)
       (theta.p+delta_theta),DegreesToRadians(360.0))));
-    (*stroke_q)[*q].y=(double) (center.y+mid*sin(fmod((double)
+    (*stroke)[*offset].y=(double) (center.y+mid*sin(fmod((double)
       (theta.p+delta_theta),DegreesToRadians(360.0))));
-    (*q)++;
-  }
-}
-
-static void TraceArcPointsP(const StrokeArc *arc,const StrokeTargets *targets)
-{
-  const PointInfo
-    center = arc->center;
-
-  const StrokeSegment
-    theta = arc->theta;
-
-  const double
-    mid = arc->mid;
-
-  const size_t
-    arc_segments = arc->arc_segments;
-
-  double
-    delta_theta;
-
-  PointInfo
-    **const stroke_p = targets->stroke_p;
-
-  ssize_t
-    j,
-    *const p = targets->p;
-
-  for (j=1; j < (ssize_t) arc_segments; j++)
-  {
-    delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
-    (*stroke_p)[*p].x=(double) (center.x+mid*cos(fmod((double)
-      (theta.p+delta_theta),DegreesToRadians(360.0))));
-    (*stroke_p)[*p].y=(double) (center.y+mid*sin(fmod((double)
-      (theta.p+delta_theta),DegreesToRadians(360.0))));
-    (*p)++;
+    (*offset)++;
   }
 }
 
@@ -1201,7 +1163,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           arc.theta=theta;
           arc.mid=mid;
           arc.arc_segments=arc_segments;
-          TraceArcPointsQ(&arc,&targets);
+          TraceArcPoints(&arc,targets.stroke_q,targets.q);
           stroke_q[q++]=box_q[2];
           break;
         }
@@ -1240,7 +1202,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           arc.theta=theta;
           arc.mid=mid;
           arc.arc_segments=arc_segments;
-          TraceArcPointsP(&arc,&targets);
+          TraceArcPoints(&arc,targets.stroke_p,targets.p);
           stroke_p[p++]=box_p[2];
           break;
         }
