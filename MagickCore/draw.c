@@ -753,25 +753,31 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   return(macros);
 }
 
+static const int
+  ListSeparatorCharacters[] =
+  {
+    '.',
+    '+',
+    '-',
+    ',',
+    ' ',
+    '\t',
+    '\r',
+    '\n'
+  };
+
 static inline MagickBooleanType IsValidListChar(int c)
 {
+  size_t
+    i;
+
   if ((c >= '0') && (c <= '9'))
     return(MagickTrue);
-  switch (c)
-  {
-    case '.':
-    case '+':
-    case '-':
-    case ',':
-    case ' ':
-    case '\t':
-    case '\r':
-    case '\n':
-      break;
-    default:
-      return(MagickFalse);
-  }
-  return(MagickTrue);
+  for (i=0; i < (sizeof(ListSeparatorCharacters)/
+       sizeof(*ListSeparatorCharacters)); i++)
+    if (ListSeparatorCharacters[i] == c)
+      return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsValidPoint(const char *point)
