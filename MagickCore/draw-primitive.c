@@ -98,6 +98,7 @@
 #include "MagickCore/draw-primitive-path-private.h"
 #include "MagickCore/draw-primitive-alpha-private.h"
 #include "MagickCore/draw-primitive-fill-private.h"
+#include "MagickCore/draw-primitive-log-private.h"
 #include "MagickCore/draw-primitive-render-private.h"
 
 /*
