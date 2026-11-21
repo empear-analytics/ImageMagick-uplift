@@ -31,7 +31,7 @@ the logcfg tie M01 and M90 explained.
 | image-filename.c | 9.38 | 9.68 | OH |
 | constitute-pixels.c | 9.2 | 9.68 | OH |
 | draw-gradient.c | 8.38 | 9.5 | FB, OH |
-| quantum-import.c, quantum-export.c | 8.28 | 9.24, 9.26 | OH |
+| quantum-import.c, quantum-export.c | 8.28 | 9.68 | OH; then E (GetImportPixels, GetExportPixels), which moves the first-function include span off ImportQuantumPixels and ExportQuantumPixels |
 | matrix.c | 8.81 | 9.09 | E |
 | profile.c | 7.41 | 8.19 | SL, D |
 | locale.c | 8.91 | 8.96 | Q |
@@ -78,6 +78,9 @@ Files left at 9.68 hold only the argument counts of public (MagickExport or Magi
 - **draw-primitive-path-private.h:** Recipe FB on DrawDashPolygon's segment fill scores 8.27 but obj_identical prints DIFFERENT. Reverted, as FB step 6 requires.
 - **cache-view.c:** one helper for the thread-id and assert prologue of twelve wrappers leaves the duplication (in the bodies) and the score unchanged.
 - **cache.c and blob.c** are plateaus. Moving a whole hot family (SetPixelCacheNexusPixels' five functions) out of cache.c leaves it at 3.52.
+
+## The PR's CodeScene gate
+From the quantum carves on, the PR check failed "Prevent hotspot decline: Large Method" on quantum-import.c and quantum-export.c. The carves left ImportQuantumPixels and ExportQuantumPixels as their files' first functions, and CodeScene measures the first function from the end of the licence comment (docs/cs-first-function-span-findings.md): 62 and 58 lines were reported as 82 and 79. A Recipe E step in each file (a2c56b97c, 37dfa06cc; object code IDENTICAL) puts a small helper first, which takes the span. Both files are at 9.68, and the violations should clear on the next analysis.
 
 ## For the owner
 1. **draw-primitive.c to 10.0.** OH's mid-file form would move the stroke code after DrawPrimitive into a header (probe: the file 10.0, the header 7.16).
