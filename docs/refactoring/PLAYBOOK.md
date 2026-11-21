@@ -18688,6 +18688,20 @@ selector.
    between the two points.
 4. Build: a call left behind does not compile. Run `refactor_guard.py --calls` with
    `--renamed F=H --renamed G=H`.
+5. *Several members* (2026-11-21). `F` may read several members `s->m1 ... s->mk` where
+   `G` reads `s->n1 ... s->nk` (`targets->stroke_q` and `targets->q` against
+   `targets->stroke_p` and `targets->p`), each once, in a binding at the top of the body
+   (`PointInfo **const stroke_q = targets->stroke_q;`), `mi` and `ni` of one type `Ti`
+   for each `i`, and `s` used nowhere else. `H` takes, in place of `s`, one parameter per
+   binding, of the binding's declared type with its top-level `const` (`PointInfo
+   **const stroke`), in the bindings' order and named for the role (`stroke`,
+   `offset`); the bindings go and each use of a bound local
+   is written with its parameter's name, nothing else changed (the renaming of step 1).
+   `H` keeps at most four parameters. Each call `F(e,x)` becomes `H(x,e->m1,...,e->mk)`
+   (for `e` written `&t`, `t.m1`, the same member), and `G`'s calls take `n1 ... nk`.
+   The binding read each member once, at the top of the body, before any statement ran;
+   the call reads it once, just before the body runs, and nothing runs between the two
+   points, so each parameter holds the value its binding held.
 
 **Before:**
 
@@ -27400,3 +27414,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | AMEND | TB | Step 1, break membership form: the label group's body may be `break;` with `default: return(MagickFalse);` and `return(MagickTrue);` after the `switch`; the loop returns `MagickTrue` at a match and the function ends `return(MagickFalse);`; a leading `if (c) return(MagickTrue);` on the parameter alone stays before the loop | `draw.c`'s `IsValidListChar` (campaign B, M141): a digit range, then eight separator labels that break to `return(MagickTrue);`; probe 6.42 to 6.63 | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | EM | Step 1, ladder form: a run of `if (Ci) return(MagickTrue);` ending in `return(MagickFalse);`, every `Ci` reading only an `int` parameter with no side effect; its equality tests against literals go into the table, the lookup stands where the first stood, and the other tests (ranges) keep their place; a harness over every value the constants bound checks the two versions agree | `token-private.h`'s `IsUTFSpace` (campaign B, M141): two ranges and ten single code points, cc 15; probe 8.74 to 9.09 | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | HT | Step 6, call form: when each branch ends in `if (G == F) return(F);` with a different call `G` in each and nothing after it, a new local `V` takes each call's result in its branch and one `if (V == F) return(F);` follows the selection | `xml-tree.c`'s `ParseXMLTreeTags` (campaign B, M141): the start-tag and markup arms each end in their own exit test, its two bumps; probe 9.02 to 9.09, adding no function in a file at the function-count limit | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | FM | Step 5, several members: twins that bind several members of one struct parameter at the top of their bodies (`targets->stroke_q` and `targets->q` against `targets->stroke_p` and `targets->p`) fold into one function taking one value per binding, the bindings replaced by the parameters | `draw-primitive.c`'s `TraceArcPointsP` and `TraceArcPointsQ` (campaign B, M141): the two arc loops of `TraceStrokePolygon`, a *Code Duplication* pair; probe 7.22 to 7.44 | mandate (2026-10-24) |
