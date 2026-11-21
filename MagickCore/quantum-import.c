@@ -72,6 +72,14 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/quantum-import-private.h"
 
+static inline const unsigned char *GetImportPixels(
+  const QuantumInfo *quantum_info,const unsigned char *magick_restrict pixels)
+{
+  if (pixels == (const unsigned char *) NULL)
+    pixels=(const unsigned char *) GetQuantumPixels(quantum_info);
+  return(pixels);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -139,8 +147,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (pixels == (const unsigned char *) NULL)
-    pixels=(const unsigned char *) GetQuantumPixels(quantum_info);
+  pixels=GetImportPixels(quantum_info,pixels);
   x=0;
   p=pixels;
   GetImportPixelQueue(image,image_view,&number_pixels,&q);
