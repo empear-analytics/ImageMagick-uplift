@@ -455,6 +455,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/quantum-export.c \
   MagickCore/quantum-import.c \
   MagickCore/quantum-private.h \
+  MagickCore/quantum-import-private.h \
   MagickCore/random.c \
   MagickCore/random_.h \
   MagickCore/random-private.h \
@@ -880,6 +881,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/quantize-private.h \
   MagickCore/quantize-assign-private.h \
   MagickCore/quantum-private.h \
+  MagickCore/quantum-import-private.h \
   MagickCore/random-private.h \
   MagickCore/registry-private.h \
   MagickCore/resample-private.h \
