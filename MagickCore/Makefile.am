@@ -220,6 +220,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/delegate-invoke.c \
   MagickCore/delegate.h \
   MagickCore/delegate-private.h \
+  MagickCore/delegate-invoke-private.h \
   MagickCore/deprecate.c \
   MagickCore/deprecate.h \
   MagickCore/display.c \
@@ -798,6 +799,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \
   MagickCore/delegate-private.h \
+  MagickCore/delegate-invoke-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
