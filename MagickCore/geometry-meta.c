@@ -198,9 +198,6 @@ static void SetMetaGeometrySize(const MetaGeometryInput *input,
 static void LimitMetaGeometrySize(const MetaGeometryInput *input,
   const MagickStatusType flags,size_t *width,size_t *height)
 {
-  const char
-    *const geometry = input->geometry;
-
   const size_t
     stasis_width = input->stasis_width,
     stasis_height = input->stasis_height;
@@ -210,7 +207,7 @@ static void LimitMetaGeometrySize(const MetaGeometryInput *input,
   if ((flags & LessValue) != 0)
     EnlargeGeometryToSize(width,height,stasis_width,stasis_height);
   if ((flags & AreaValue) != 0)
-    LimitGeometryArea(geometry,width,height,stasis_width,stasis_height);
+    LimitGeometryArea(input,width,height);
 }
 
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,

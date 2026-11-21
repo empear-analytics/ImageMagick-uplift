@@ -105,9 +105,16 @@ static double GetAspectScaleFactor(const MagickStatusType flags,
   return(scale_factor);
 }
 
-static void LimitGeometryArea(const char *geometry,size_t *width,
-  size_t *height,const size_t stasis_width,const size_t stasis_height)
+static void LimitGeometryArea(const MetaGeometryInput *input,size_t *width,
+  size_t *height)
 {
+  const char
+    *const geometry = input->geometry;
+
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
   GeometryInfo
     geometry_info;
 
