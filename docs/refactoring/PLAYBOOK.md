@@ -12774,6 +12774,19 @@ block with a `return` that is not a throw macro's; Recipe D, whose copies are mo
 6. When `Z` is empty, `Q` ends in `T` and no function is needed: the selection becomes
    `if (C) P0 else Q0` followed by `T`; check it by reading, both branches ending in the
    same text.
+   *Call form* (2026-11-21): when `Z` is empty and each branch ends instead in
+   `if (G == F) return(F);`, where `G` is a call of a function returning
+   `MagickBooleanType` (a different call in each branch, `G1` in `P` and `G2` in `Q`) and
+   `F` is one constant written the same way in both, declare a new local
+   `MagickBooleanType V;` (a name the function does not use) among the function's
+   declarations, in their order; replace each branch's test by `V=G1;` and `V=G2;`
+   (the calls copied character for character, each branch keeping its braces and its
+   declarations), and write `if (V == F) return(F);` once directly after the selection.
+   No other statement reads or writes `V`. Check by reading: each branch evaluates its
+   call at the place it did, after the same statements, and the test after the selection
+   compares the value that call returned with `F`, so the function returns `F` exactly
+   where it did and goes on otherwise. Step 7's script does not apply; `--calls` shows
+   no call added or removed.
 7. Run `tools/tail_hoist_check.py <file> <Caller> <Helper>`: it must print
    `IDENTICAL-MODULO-HOIST`. The checks it makes: before the step, the caller held
    `if (C) { P0 T } else { Q }` where after it holds the new selection and `T`; `Q` is the
@@ -27386,3 +27399,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | NEW | DB | Merge Declaration Blocks of One Type: a later declaration block whose type line equals an earlier one's in the same declaration list (no initialisers, or only constant ones, and no name between them that refers to its declarators) is deleted and its declarators appended to the earlier block; proof `obj_identical.sh` IDENTICAL | `draw.c`'s `TraceArcPath` (campaign B, M141): two second blocks (`double`, `PrimitiveInfo *`) left by earlier extractions, four lines of a Large Method | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | TB | Step 1, break membership form: the label group's body may be `break;` with `default: return(MagickFalse);` and `return(MagickTrue);` after the `switch`; the loop returns `MagickTrue` at a match and the function ends `return(MagickFalse);`; a leading `if (c) return(MagickTrue);` on the parameter alone stays before the loop | `draw.c`'s `IsValidListChar` (campaign B, M141): a digit range, then eight separator labels that break to `return(MagickTrue);`; probe 6.42 to 6.63 | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | EM | Step 1, ladder form: a run of `if (Ci) return(MagickTrue);` ending in `return(MagickFalse);`, every `Ci` reading only an `int` parameter with no side effect; its equality tests against literals go into the table, the lookup stands where the first stood, and the other tests (ranges) keep their place; a harness over every value the constants bound checks the two versions agree | `token-private.h`'s `IsUTFSpace` (campaign B, M141): two ranges and ten single code points, cc 15; probe 8.74 to 9.09 | mandate (2026-10-24) |
+| 2026-11-21 | AMEND | HT | Step 6, call form: when each branch ends in `if (G == F) return(F);` with a different call `G` in each and nothing after it, a new local `V` takes each call's result in its branch and one `if (V == F) return(F);` follows the selection | `xml-tree.c`'s `ParseXMLTreeTags` (campaign B, M141): the start-tag and markup arms each end in their own exit test, its two bumps; probe 9.02 to 9.09, adding no function in a file at the function-count limit | mandate (2026-10-24) |
