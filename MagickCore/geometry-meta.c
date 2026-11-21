@@ -100,6 +100,81 @@
 %      the given geometry specification.
 %
 */
+typedef struct _MetaGeometryInput
+{
+  const char
+    *geometry;
+
+  size_t
+    stasis_width,
+    stasis_height;
+} MetaGeometryInput;
+
+static void ScaleMetaGeometryByPercent(const MetaGeometryInput *input,
+  GeometryInfo *geometry_info,size_t *width,size_t *height)
+{
+  const char
+    *const geometry = input->geometry;
+
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
+  MagickStatusType
+    percent_flags;
+
+  PointInfo
+    scale;
+
+  /*
+    Geometry is a percentage of the image size.
+  */
+  percent_flags=ParseGeometry(geometry,geometry_info);
+  scale.x=geometry_info->rho;
+  if ((percent_flags & RhoValue) == 0)
+    scale.x=100.0;
+  scale.y=geometry_info->sigma;
+  if ((percent_flags & SigmaValue) == 0)
+    scale.y=scale.x;
+  *width=CastDoubleToSizeT(scale.x*stasis_width/100.0+0.5);
+  *height=CastDoubleToSizeT(scale.y*stasis_height/100.0+0.5);
+}
+
+static void ScaleMetaGeometryByAspect(const MetaGeometryInput *input,
+  GeometryInfo *geometry_info,size_t *width,size_t *height)
+{
+  const char
+    *const geometry = input->geometry;
+
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
+  double
+    geometry_ratio,
+    image_ratio;
+
+  /*
+    Geometry is a relative to image size and aspect ratio.
+  */
+  (void) ParseGeometry(geometry,geometry_info);
+  geometry_ratio=geometry_info->rho;
+  image_ratio=(double) stasis_width*MagickSafeReciprocal((double)
+    stasis_height);
+  if (geometry_ratio >= image_ratio)
+    {
+      *width=stasis_width;
+      *height=CastDoubleToSizeT((double) (MagickSafeReciprocal(
+        geometry_ratio)*stasis_height*image_ratio)+0.5);
+    }
+  else
+    {
+      *width=CastDoubleToSizeT(MagickSafeReciprocal(image_ratio)*
+        stasis_width*geometry_ratio+0.5);
+      *height=stasis_height;
+    }
+}
+
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -133,52 +208,19 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   flags=GetGeometry(geometry,x,y,width,height);
   if ((flags & PercentValue) != 0)
     {
-      MagickStatusType
-        percent_flags;
+      const MetaGeometryInput
+        input = { geometry, stasis_width, stasis_height };
 
-      PointInfo
-        scale;
-
-      /*
-        Geometry is a percentage of the image size.
-      */
-      percent_flags=ParseGeometry(geometry,&geometry_info);
-      scale.x=geometry_info.rho;
-      if ((percent_flags & RhoValue) == 0)
-        scale.x=100.0;
-      scale.y=geometry_info.sigma;
-      if ((percent_flags & SigmaValue) == 0)
-        scale.y=scale.x;
-      *width=CastDoubleToSizeT(scale.x*stasis_width/100.0+0.5);
-      *height=CastDoubleToSizeT(scale.y*stasis_height/100.0+0.5);
+      ScaleMetaGeometryByPercent(&input,&geometry_info,width,height);
       stasis_width=(*width);
       stasis_height=(*height);
     }
   if ((flags & AspectRatioValue) != 0)
     {
-      double
-        geometry_ratio,
-        image_ratio;
+      const MetaGeometryInput
+        input = { geometry, stasis_width, stasis_height };
 
-      /*
-        Geometry is a relative to image size and aspect ratio.
-      */
-      (void) ParseGeometry(geometry,&geometry_info);
-      geometry_ratio=geometry_info.rho;
-      image_ratio=(double) stasis_width*MagickSafeReciprocal((double)
-        stasis_height);
-      if (geometry_ratio >= image_ratio)
-        {
-          *width=stasis_width;
-          *height=CastDoubleToSizeT((double) (MagickSafeReciprocal(
-            geometry_ratio)*stasis_height*image_ratio)+0.5);
-        }
-      else
-        {
-          *width=CastDoubleToSizeT(MagickSafeReciprocal(image_ratio)*
-            stasis_width*geometry_ratio+0.5);
-          *height=stasis_height;
-        }
+      ScaleMetaGeometryByAspect(&input,&geometry_info,width,height);
       stasis_width=(*width);
       stasis_height=(*height);
     }
