@@ -75,6 +75,28 @@ static double GetMinimumAspectScale(const MagickStatusType flags,
   return(scale_factor);
 }
 
+static double GetFitAspectScale(const MagickStatusType flags,
+  const size_t *width,const size_t *height,const MetaGeometryInput *input)
+{
+  const size_t
+    stasis_width = input->stasis_width,
+    stasis_height = input->stasis_height;
+
+  double
+    scale_factor;
+
+  scale_factor=(double) *width/(double) stasis_width;
+  if ((flags & MinimumValue) == 0)
+    {
+      if (scale_factor > ((double) *height/(double) stasis_height))
+        scale_factor=(double) *height/(double) stasis_height;
+    }
+  else
+    if (scale_factor < ((double) *height/(double) stasis_height))
+      scale_factor=(double) *height/(double) stasis_height;
+  return(scale_factor);
+}
+
 static double GetAspectScaleFactor(const MagickStatusType flags,
   const size_t *width,const size_t *height,const MetaGeometryInput *input)
 {
@@ -89,17 +111,7 @@ static double GetAspectScaleFactor(const MagickStatusType flags,
     scale_factor=1.0;
   else
     if (((flags & RhoValue) != 0) && (flags & SigmaValue) != 0)
-      {
-        scale_factor=(double) *width/(double) stasis_width;
-        if ((flags & MinimumValue) == 0)
-          {
-            if (scale_factor > ((double) *height/(double) stasis_height))
-              scale_factor=(double) *height/(double) stasis_height;
-          }
-        else
-          if (scale_factor < ((double) *height/(double) stasis_height))
-            scale_factor=(double) *height/(double) stasis_height;
-      }
+      scale_factor=GetFitAspectScale(flags,width,height,input);
     else
       if ((flags & RhoValue) != 0)
         scale_factor=GetMinimumAspectScale(flags,*width,stasis_width,
