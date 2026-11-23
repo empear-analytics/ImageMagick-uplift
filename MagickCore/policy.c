@@ -830,10 +830,41 @@ static MagickBooleanType IsPolicyEvaluationRequired(const PolicyDomain domain,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType IsRightsAuthorizedByName(
-  const PolicyDomain domain,const char *name,const PolicyRights rights,
-  const char *pattern)
+typedef struct _PolicyRightsQuery
 {
+  PolicyDomain
+    domain;
+
+  const char
+    *name,
+    *pattern;
+} PolicyRightsQuery;
+
+typedef struct _PolicyRightsTargets
+{
+  MagickBooleanType
+    *matched_any;
+
+  PolicyRights
+    *effective_rights;
+
+  MagickBooleanType
+    *canonical_matched_any;
+
+  PolicyRights
+    *canonical_allowed_accumulator;
+} PolicyRightsTargets;
+
+static void MatchPolicyRights(const PolicyRightsQuery *query,
+  const PolicyRightsTargets *targets)
+{
+  const PolicyDomain
+    domain = query->domain;
+
+  const char
+    *name = query->name,
+    *pattern = query->pattern;
+
   char
     *canonical_directory = (char *) NULL,
     *canonical_path = (char *) NULL,
@@ -843,21 +874,8 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
     *p;
 
   MagickBooleanType
-    canonical_matched_any = MagickFalse,
-    matched_any = MagickFalse,
-    paths_provisioned = MagickFalse,
-    status;
+    paths_provisioned = MagickFalse;
 
-  PolicyRights
-    canonical_allowed_accumulator = AllPolicyRights,
-    effective_rights = AllPolicyRights;
-
-  if (IsPolicyEvaluationRequired(domain,name,rights,pattern) == MagickFalse)
-    return(MagickTrue);
-  /*
-    Evaluate policies in order; the last matching lexical or canonical policy
-    wins.
-  */
   LockSemaphoreInfo(policy_semaphore);
   ResetLinkedListIterator(policy_cache);
   p=GetHeadElementInLinkedList(policy_cache);
@@ -894,21 +912,53 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       }
     if (match == MagickFalse)
       continue;
-    matched_any=MagickTrue;
-    effective_rights=policy->rights;
+    *targets->matched_any=MagickTrue;
+    *targets->effective_rights=policy->rights;
     if (matched_canonical != MagickFalse)
       {
         /*
           If this matched a canonical form, retain the last matching rights.
         */
-        canonical_matched_any=MagickTrue;
-        canonical_allowed_accumulator=policy->rights;
+        *targets->canonical_matched_any=MagickTrue;
+        *targets->canonical_allowed_accumulator=policy->rights;
       }
   }
   UnlockSemaphoreInfo(policy_semaphore);
   canonical_directory=DestroyString(canonical_directory);
   canonical_candidate=DestroyString(canonical_candidate);
   canonical_path=DestroyString(canonical_path);
+}
+
+MagickExport MagickBooleanType IsRightsAuthorizedByName(
+  const PolicyDomain domain,const char *name,const PolicyRights rights,
+  const char *pattern)
+{
+  MagickBooleanType
+    canonical_matched_any = MagickFalse,
+    matched_any = MagickFalse,
+    status;
+
+  PolicyRights
+    canonical_allowed_accumulator = AllPolicyRights,
+    effective_rights = AllPolicyRights;
+
+  PolicyRightsQuery
+    query;
+
+  const PolicyRightsTargets
+    targets = { &matched_any, &effective_rights, &canonical_matched_any,
+      &canonical_allowed_accumulator };
+
+  if (IsPolicyEvaluationRequired(domain,name,rights,pattern) == MagickFalse)
+    return(MagickTrue);
+  /*
+    Evaluate policies in order; the last matching lexical or canonical policy
+    wins.
+  */
+  query.domain=domain;
+  query.name=name;
+  query.pattern=pattern;
+  MatchPolicyRights(&query,&targets);
   /*
     Is rights authorized?
   */
