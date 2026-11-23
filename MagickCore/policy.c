@@ -855,6 +855,72 @@ typedef struct _PolicyRightsTargets
     *canonical_allowed_accumulator;
 } PolicyRightsTargets;
 
+typedef struct _PolicyPathQuery
+{
+  const PolicyInfo
+    *policy;
+
+  const char
+    *pattern;
+} PolicyPathQuery;
+
+typedef struct _PolicyPathTargets
+{
+  MagickBooleanType
+    *paths_provisioned;
+
+  char
+    **canonical_directory,
+    **canonical_candidate,
+    **canonical_path;
+
+  MagickBooleanType
+    *matched_canonical,
+    *match;
+} PolicyPathTargets;
+
+static void MatchPolicyPath(const PolicyPathQuery *query,
+  const PolicyPathTargets *targets)
+{
+  const PolicyInfo
+    *policy = query->policy;
+
+  const char
+    *pattern = query->pattern;
+
+  MagickBooleanType
+    *const paths_provisioned = targets->paths_provisioned;
+
+  char
+    **const canonical_directory = targets->canonical_directory,
+    **const canonical_candidate = targets->canonical_candidate,
+    **const canonical_path = targets->canonical_path;
+
+  MagickBooleanType
+    *const matched_canonical = targets->matched_canonical,
+    *const match = targets->match;
+
+  if (policy->domain == PathPolicyDomain)
+    {
+      if (*paths_provisioned == MagickFalse)
+        {
+          /*
+            Generate directory, basename, and canonical path.
+          */
+          *paths_provisioned=MagickTrue;
+          AcquireCanonicalPaths(pattern,canonical_directory,
+            canonical_candidate,canonical_path);
+        }
+      /*
+        Match against directory, basename, and canonical path.
+      */
+      *matched_canonical=IsCanonicalMatch(*canonical_path,*canonical_candidate,
+        *canonical_directory,policy->pattern);
+      if (*match == MagickFalse)
+        *match=*matched_canonical;
+    }
+}
+
 static void MatchPolicyRights(const PolicyRightsQuery *query,
   const PolicyRightsTargets *targets)
 {
@@ -888,28 +954,19 @@ static void MatchPolicyRights(const PolicyRightsQuery *query,
       match = MagickFalse,
       matched_canonical = MagickFalse;
 
+    PolicyPathQuery
+      path_query;
+
+    const PolicyPathTargets
+      path_targets = { &paths_provisioned, &canonical_directory,
+        &canonical_candidate, &canonical_path, &matched_canonical, &match };
+
     if (IsPolicyForName(policy,domain,name) == MagickFalse)
       continue;
     match=GlobExpression(pattern,policy->pattern,MagickFalse);
-    if (policy->domain == PathPolicyDomain)
-      {
-        if (paths_provisioned == MagickFalse)
-          {
-            /*
-              Generate directory, basename, and canonical path.
-            */
-            paths_provisioned=MagickTrue;
-            AcquireCanonicalPaths(pattern,&canonical_directory,
-              &canonical_candidate,&canonical_path);
-          }
-        /*
-          Match against directory, basename, and canonical path.
-        */
-        matched_canonical=IsCanonicalMatch(canonical_path,canonical_candidate,
-          canonical_directory,policy->pattern);
-        if (match == MagickFalse)
-          match=matched_canonical;
-      }
+    path_query.policy=policy;
+    path_query.pattern=pattern;
+    MatchPolicyPath(&path_query,&path_targets);
     if (match == MagickFalse)
       continue;
     *targets->matched_any=MagickTrue;
