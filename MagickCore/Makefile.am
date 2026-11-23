@@ -445,6 +445,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/pixel-import-private.h \
   MagickCore/policy.c \
   MagickCore/policy-path.c \
+  MagickCore/policy-value.c \
   MagickCore/policy.h \
   MagickCore/policy-private.h \
   MagickCore/prepress.c \
