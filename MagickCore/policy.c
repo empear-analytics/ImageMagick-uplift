@@ -452,9 +452,8 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 static inline MagickBooleanType IsListedPolicy(const PolicyInfo *policy,
   const char *pattern)
 {
-  return(((policy->stealth == MagickFalse) &&
-    (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((policy->stealth == MagickFalse) &&
+    (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse)));
 }
 
 MagickExport const PolicyInfo **GetPolicyInfoList(const char *pattern,
