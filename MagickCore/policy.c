@@ -1205,8 +1205,8 @@ static void *DestroyPolicyElement(void *policy_info)
 static inline MagickBooleanType IsIncludeElementOpen(const char *token,
   const char *q)
 {
-  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) (((*token != '/') && (*(token+1) != '>')) &&
+    (*q != '\0')));
 }
 
 static void GetIncludePath(const char *filename,const char *token,
