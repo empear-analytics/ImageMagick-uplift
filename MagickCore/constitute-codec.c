@@ -885,6 +885,21 @@ static const MagickInfo *GetEndianMagickInfo(const ImageInfo *image_info,
   return(magick_info);
 }
 
+static MagickBooleanType SelectReadImageScenes(ImageInfo *read_info,
+  Image **image,ExceptionInfo *exception)
+{
+  if (IsSceneSelection(read_info,(*image)) != MagickFalse)
+    {
+      (*image)=SelectImageScenes((*image),read_info->scenes,exception);
+      if ((*image) == (Image *) NULL)
+        {
+          read_info=DestroyImageInfo(read_info);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 typedef struct _ReadImageFinish
 {
   ImageInfo
@@ -1004,15 +1019,8 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       read_info=DestroyImageInfo(read_info);
       ThrowReaderException(ImageError,"NegativeOrZeroImageSize");
     }
-  if (IsSceneSelection(read_info,image) != MagickFalse)
-    {
-      image=SelectImageScenes(image,read_info->scenes,exception);
-      if (image == (Image *) NULL)
-        {
-          read_info=DestroyImageInfo(read_info);
-          return(image);
-        }
-    }
+  if (SelectReadImageScenes(read_info,&image,exception) == MagickFalse)
+    return(image);
   finish.read_info=read_info;
   finish.magick=magick;
   finish.magick_filename=magick_filename;
