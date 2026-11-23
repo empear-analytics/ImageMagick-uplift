@@ -862,6 +862,17 @@ static void CheckReadImageArguments(const ImageInfo *image_info,
   assert(exception != (ExceptionInfo *) NULL);
 }
 
+static void ReportDecodedImage(const ImageInfo *read_info,const Image *image,
+  const ExceptionInfo *exception)
+{
+  if (exception->severity >= ErrorException)
+    (void) LogMagickEvent(ExceptionEvent,GetMagickModule(),
+      "Coder (%s) generated an image despite an error (%d), "
+      "notify the developers",image->magick,exception->severity);
+  if (IsBlobTemporary(image) != MagickFalse)
+    (void) RelinquishUniqueFileResource(read_info->filename);
+}
+
 typedef struct _ReadImageFinish
 {
   ImageInfo
@@ -977,12 +988,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       read_info=DestroyImageInfo(read_info);
       return(image);
     }
-  if (exception->severity >= ErrorException)
-    (void) LogMagickEvent(ExceptionEvent,GetMagickModule(),
-      "Coder (%s) generated an image despite an error (%d), "
-      "notify the developers",image->magick,exception->severity);
-  if (IsBlobTemporary(image) != MagickFalse)
-    (void) RelinquishUniqueFileResource(read_info->filename);
+  ReportDecodedImage(read_info,image,exception);
   if (HasPingImageSizes(read_info,image) == MagickFalse)
     {
       read_info=DestroyImageInfo(read_info);
