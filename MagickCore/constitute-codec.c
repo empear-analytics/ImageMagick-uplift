@@ -900,6 +900,13 @@ static MagickBooleanType SelectReadImageScenes(ImageInfo *read_info,
   return(MagickTrue);
 }
 
+static void ReleaseTemporaryReadInput(ImageInfo *read_info,Image *image,
+  const char *filename)
+{
+  if (read_info->temporary != MagickFalse)
+    ReleaseTemporaryReadFile(read_info,image,filename);
+}
+
 typedef struct _ReadImageFinish
 {
   ImageInfo
@@ -1006,8 +1013,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   else
     if (DecodeDelegateImage(read_info,&image,exception) == MagickFalse)
       return((Image *) NULL);
-  if (read_info->temporary != MagickFalse)
-    ReleaseTemporaryReadFile(read_info,image,filename);
+  ReleaseTemporaryReadInput(read_info,image,filename);
   if (image == (Image *) NULL)
     {
       read_info=DestroyImageInfo(read_info);
