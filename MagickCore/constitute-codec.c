@@ -873,6 +873,18 @@ static void ReportDecodedImage(const ImageInfo *read_info,const Image *image,
     (void) RelinquishUniqueFileResource(read_info->filename);
 }
 
+static const MagickInfo *GetEndianMagickInfo(const ImageInfo *image_info,
+  ImageInfo *read_info,ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  magick_info=GetReadMagickInfo(read_info,exception);
+  if (magick_info != (const MagickInfo *) NULL)
+    SetReadEndian(image_info,read_info,magick_info);
+  return(magick_info);
+}
+
 typedef struct _ReadImageFinish
 {
   ImageInfo
@@ -957,9 +969,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   /*
     Call appropriate image reader based on image type.
   */
-  magick_info=GetReadMagickInfo(read_info,exception);
-  if (magick_info != (const MagickInfo *) NULL)
-    SetReadEndian(image_info,read_info,magick_info);
+  magick_info=GetEndianMagickInfo(image_info,read_info,exception);
   if (OpenSeekableReadStream(image_info,read_info,magick_info,exception) ==
       MagickFalse)
     return((Image *) NULL);
