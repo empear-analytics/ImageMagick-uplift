@@ -798,30 +798,14 @@ static void AcquireCanonicalPaths(const char *pattern,
   *canonical_path=realpath_utf8(pattern);
 }
 
-MagickExport MagickBooleanType IsRightsAuthorizedByName(
-  const PolicyDomain domain,const char *name,const PolicyRights rights,
-  const char *pattern)
+static MagickBooleanType IsPolicyEvaluationRequired(const PolicyDomain domain,
+  const char *name,const PolicyRights rights,const char *pattern)
 {
-  char
-    *canonical_directory = (char *) NULL,
-    *canonical_path = (char *) NULL,
-    *canonical_candidate = (char *) NULL;
-
-  ElementInfo
-    *p;
-
   ExceptionInfo
     *exception;
 
   MagickBooleanType
-    canonical_matched_any = MagickFalse,
-    matched_any = MagickFalse,
-    paths_provisioned = MagickFalse,
     status;
-
-  PolicyRights
-    canonical_allowed_accumulator = AllPolicyRights,
-    effective_rights = AllPolicyRights;
 
   /*
     Load policies.
@@ -841,8 +825,35 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       if ((GetLogEventMask() & PolicyEvent) != 0)
         (void) LogMagickEvent(PolicyEvent,GetMagickModule(),
           "  authorized: true (no security policies found)");
-      return(MagickTrue);
+      return(MagickFalse);
     }
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType IsRightsAuthorizedByName(
+  const PolicyDomain domain,const char *name,const PolicyRights rights,
+  const char *pattern)
+{
+  char
+    *canonical_directory = (char *) NULL,
+    *canonical_path = (char *) NULL,
+    *canonical_candidate = (char *) NULL;
+
+  ElementInfo
+    *p;
+
+  MagickBooleanType
+    canonical_matched_any = MagickFalse,
+    matched_any = MagickFalse,
+    paths_provisioned = MagickFalse,
+    status;
+
+  PolicyRights
+    canonical_allowed_accumulator = AllPolicyRights,
+    effective_rights = AllPolicyRights;
+
+  if (IsPolicyEvaluationRequired(domain,name,rights,pattern) == MagickFalse)
+    return(MagickTrue);
   /*
     Evaluate policies in order; the last matching lexical or canonical policy
     wins.
