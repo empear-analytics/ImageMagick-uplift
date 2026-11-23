@@ -128,14 +128,18 @@ typedef struct _ConstituteInfo
     ticks_per_second;
 } ConstituteInfo;
 
+static void LimitDelayAbove(Image *next,
+  const ConstituteInfo *constitute_info)
+{
+  if (next->delay > constitute_info->delay)
+    next->delay=constitute_info->delay;
+}
+
 static void SyncDelayFromConstituteInfo(Image *next,
   const ConstituteInfo *constitute_info)
 {
   if ((constitute_info->delay_flags & GreaterValue) != 0)
-    {
-      if (next->delay > constitute_info->delay)
-        next->delay=constitute_info->delay;
-    }
+    LimitDelayAbove(next,constitute_info);
   else
     if ((constitute_info->delay_flags & LessValue) != 0)
       {
