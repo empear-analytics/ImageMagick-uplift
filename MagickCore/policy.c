@@ -1650,6 +1650,22 @@ static MagickBooleanType ValidateSecurityPolicy(const char *policy,
   return(MagickTrue);
 }
 
+static void SetUserPolicyValues(LinkedListInfo *user_policies,
+  ExceptionInfo *exception)
+{
+  PolicyInfo
+    *p;
+
+  ResetLinkedListIterator(user_policies);
+  p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
+  while (p != (PolicyInfo *) NULL)
+  {
+    if ((p->name != (char *) NULL) && (p->value != (char *) NULL))
+      (void) SetMagickSecurityPolicyValue(p->domain,p->name,p->value,exception);
+    p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
+  }
+}
+
 MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   ExceptionInfo *exception)
 {
@@ -1658,9 +1674,6 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
 
   LinkedListInfo
     *user_policies;
-
-  PolicyInfo
-    *p;
 
   PolicyLoadTarget policy_target;
   PolicyLoadTarget user_target;
@@ -1692,14 +1705,7 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
       user_policies=DestroyLinkedList(user_policies,DestroyPolicyElement);
       return(MagickFalse);
     }
-  ResetLinkedListIterator(user_policies);
-  p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
-  while (p != (PolicyInfo *) NULL)
-  {
-    if ((p->name != (char *) NULL) && (p->value != (char *) NULL))
-      (void) SetMagickSecurityPolicyValue(p->domain,p->name,p->value,exception);
-    p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
-  }
+  SetUserPolicyValues(user_policies,exception);
   user_policies=DestroyLinkedList(user_policies,DestroyPolicyElement);
   return(status);
 }
