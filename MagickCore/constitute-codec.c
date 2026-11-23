@@ -862,6 +862,55 @@ static void CheckReadImageArguments(const ImageInfo *image_info,
   assert(exception != (ExceptionInfo *) NULL);
 }
 
+typedef struct _ReadImageFinish
+{
+  ImageInfo
+    *read_info;
+
+  char
+    *magick,
+    *magick_filename,
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} ReadImageFinish;
+
+static Image *FinishReadImageList(const ReadImageFinish *finish,Image *image)
+{
+  ImageInfo
+    *const read_info = finish->read_info;
+
+  char
+    *const magick = finish->magick,
+    *const magick_filename = finish->magick_filename,
+    *const filename = finish->filename;
+
+  ExceptionInfo
+    *const exception = finish->exception;
+
+  ConstituteInfo
+    constitute_info;
+
+  Image
+    *next;
+
+  InitializeConstituteInfo(read_info,&constitute_info);
+  for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    next->taint=MagickFalse;
+    SetReadImageNames(next,magick,magick_filename);
+    if (IsBlobTemporary(image) != MagickFalse)
+      (void) CopyMagickString(next->filename,filename,MagickPathExtent);
+    SyncReadImageMetadata(read_info,next,&constitute_info,exception);
+    if (IsExtractRequested(read_info) != MagickFalse)
+      next=ApplyExtractGeometry(read_info,next,exception);
+    FinishReadImageMetadata(read_info,next,&constitute_info,exception);
+    image=next;
+  }
+  return(image);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -870,9 +919,6 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     magick[MagickPathExtent],
     magick_filename[MagickPathExtent];
 
-  ConstituteInfo
-    constitute_info;
-
   const MagickInfo
     *magick_info;
 
@@ -880,11 +926,13 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     *decoder;
 
   Image
-    *image,
-    *next;
+    *image;
 
   ImageInfo
     *read_info;
+
+  ReadImageFinish
+    finish;
 
   /*
     Determine image type from filename prefix or suffix (e.g. image.jpg).
@@ -949,19 +997,12 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
           return(image);
         }
     }
-  InitializeConstituteInfo(read_info,&constitute_info);
-  for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
-  {
-    next->taint=MagickFalse;
-    SetReadImageNames(next,magick,magick_filename);
-    if (IsBlobTemporary(image) != MagickFalse)
-      (void) CopyMagickString(next->filename,filename,MagickPathExtent);
-    SyncReadImageMetadata(read_info,next,&constitute_info,exception);
-    if (IsExtractRequested(read_info) != MagickFalse)
-      next=ApplyExtractGeometry(read_info,next,exception);
-    FinishReadImageMetadata(read_info,next,&constitute_info,exception);
-    image=next;
-  }
+  finish.read_info=read_info;
+  finish.magick=magick;
+  finish.magick_filename=magick_filename;
+  finish.filename=filename;
+  finish.exception=exception;
+  image=FinishReadImageList(&finish,image);
   read_info=DestroyImageInfo(read_info);
   if (GetBlobError(image) != MagickFalse)
     ThrowReaderException(CorruptImageError,"UnableToReadImageData");
