@@ -210,10 +210,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/configure.h \
   MagickCore/constitute.c \
   MagickCore/constitute-codec.c \
+  MagickCore/constitute-encode.c \
   MagickCore/constitute-write.c \
   MagickCore/constitute-pixels.c \
   MagickCore/constitute.h \
   MagickCore/constitute-pixels-private.h \
+  MagickCore/constitute-codec-private.h \
   MagickCore/decorate.c \
   MagickCore/decorate-raise.c \
   MagickCore/decorate.h \
@@ -816,6 +818,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \
   MagickCore/constitute-pixels-private.h \
+  MagickCore/constitute-codec-private.h \
   MagickCore/delegate-private.h \
   MagickCore/delegate-invoke-private.h \
   MagickCore/delegate-property-private.h \
