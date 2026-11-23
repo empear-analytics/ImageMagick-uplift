@@ -715,17 +715,24 @@ static MagickBooleanType IsPolicyCacheInstantiated(ExceptionInfo *exception)
 %
 */
 
+static inline MagickBooleanType IsPolicyRightDenied(const PolicyRights rights,
+  const PolicyRights effective_rights,const PolicyRights right)
+{
+  return((((rights & right) != 0) &&
+      ((effective_rights & right) == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsEffectiveRightsAuthorized(const PolicyRights rights,
   const PolicyRights effective_rights,MagickBooleanType status)
 {
-  if (((rights & ReadPolicyRights) != 0) &&
-      ((effective_rights & ReadPolicyRights) == 0))
+  if (IsPolicyRightDenied(rights,effective_rights,ReadPolicyRights) !=
+      MagickFalse)
     status=MagickFalse;
-  if (((rights & WritePolicyRights) != 0) &&
-      ((effective_rights & WritePolicyRights) == 0))
+  if (IsPolicyRightDenied(rights,effective_rights,WritePolicyRights) !=
+      MagickFalse)
     status=MagickFalse;
-  if (((rights & ExecutePolicyRights) != 0) &&
-      ((effective_rights & ExecutePolicyRights) == 0))
+  if (IsPolicyRightDenied(rights,effective_rights,ExecutePolicyRights) !=
+      MagickFalse)
     status=MagickFalse;
   return(status);
 }
