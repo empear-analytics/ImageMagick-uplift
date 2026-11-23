@@ -449,6 +449,14 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsListedPolicy(const PolicyInfo *policy,
+  const char *pattern)
+{
+  return(((policy->stealth == MagickFalse) &&
+    (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport const PolicyInfo **GetPolicyInfoList(const char *pattern,
   size_t *number_policies,ExceptionInfo *exception)
 {
@@ -480,8 +488,7 @@ MagickExport const PolicyInfo **GetPolicyInfoList(const char *pattern,
       *policy;
 
     policy=(const PolicyInfo *) p->value;
-    if ((policy->stealth == MagickFalse) &&
-        (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse))
+    if (IsListedPolicy(policy,pattern) != MagickFalse)
       policies[i++]=policy;
     p=p->next;
   }
@@ -576,8 +583,7 @@ MagickExport char **GetPolicyList(const char *pattern,size_t *number_policies,
       *policy;
 
     policy=(const PolicyInfo *) p->value;
-    if ((policy->stealth == MagickFalse) &&
-        (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse))
+    if (IsListedPolicy(policy,pattern) != MagickFalse)
       policies[i++]=AcquirePolicyString(policy->name,1);
     p=p->next;
   }
