@@ -108,6 +108,7 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
 | constitute-pixels-private.h | 9.5 | 10.0 | FD (alpha), FD (CMYK), TB (`IsCMYKMapChannel`) |
 | delegate.c | 8.81 | 9.38 | E (`FormatDelegateName`), E (`DestroyDelegateCommandList`) |
 | matrix.c | 9.09 | 9.68 | DT (three ternaries), E (`SetMatrixSynchronize`), E (`RelinquishMatrixMemory`) |
+| utility-unique.c | 9.92 | 10.0 | RV step 6 (f) (`LinkUniqueRelativePath`) |
 
 - **Recipe FD added** (`731167b0b`), and TB's character form widened to its predicates
   (`397ca7c23`). FD folds a `switch` group that does work and breaks into the head of the
@@ -122,6 +123,15 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
   cleared earlier than lizard's mean predicted: lizard counts both sides of every `#if`, and
   delegate.c cleared at a lizard mean of 4.02. matrix.c's three DT steps were object-identical.
   The Code Duplication finding M141 saw behind matrix.c's helpers did not appear with these two.
+
+- **Recipe RV amended** (`dcffa06c6`): a block in a compiled `#if defined(M)` feature branch
+  gets its helper under its own `#if defined(M)`; checked by deleting every `M` region from
+  both versions and comparing.
+- **Whole catalogue** at `66b97f518`, working-tree candidate: 16,005 cases, 1 diverged, the
+  known `gaps/c5651ffad8` logcfg tie-break.
+- **Disk:** an LLVM profile run of the 37 `AcquireUniqueSymbolicLink` cases (`oracle.py exec`
+  with `LLVM_PROFILE_FILE`) filled the volume. Use `linecov.py` or a single case for line
+  reach.
 
 ### Plateaus recorded
 - **delegate.c (9.38):** *Excess Number of Function Arguments* on `ExternalDelegateCommand`
@@ -141,3 +151,7 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
 - **magick.c (9.61):** `GetMagickInfo`'s complexity is in `MAGICKCORE_BUILD_MODULES` branches
   and the signal handlers', so only one side of each is compiled here.
 - **memory-quantum.c (9.63):** `CopyMagickMemory` is a hot `memcpy` path that no case reaches.
+- **random.c (9.45), configure-paths.c (9.18):** the Large and Complex Methods are platform
+  entropy and path branches (`/dev/urandom`, Windows, `!MAGICKCORE_INSTALLED_SUPPORT`).
+- **identify.c (9.38), option.c (9.38):** line and declaration limits (option.c's are its
+  option tables).
