@@ -184,16 +184,15 @@ static MagickBooleanType SetMatrixExtent(
 #if defined(SIGBUS)
   (void) signal(SIGBUS,MatrixSignalHandler);
 #endif
-  return(count != (MagickOffsetType) 1 ? MagickFalse : MagickTrue);
+  return((MagickBooleanType) !(count != (MagickOffsetType) 1));
 }
 
 static inline MagickBooleanType IsMatrixMemoryAvailable(
   const MagickBooleanType status,const MatrixInfo *matrix_info)
 {
-  return(((status != MagickFalse) &&
+  return((MagickBooleanType) ((status != MagickFalse) &&
     (matrix_info->length == (MagickSizeType) ((size_t) matrix_info->length)) &&
-    ((size_t) matrix_info->length <= GetMaxMemoryRequest())) ? MagickTrue :
-    MagickFalse);
+    ((size_t) matrix_info->length <= GetMaxMemoryRequest())));
 }
 
 static void AcquireMatrixMemory(MatrixInfo *matrix_info)
@@ -912,7 +911,7 @@ MagickExport MagickBooleanType NullMatrix(MatrixInfo *matrix_info)
     if (x < (ssize_t) matrix_info->length)
       break;
   }
-  return(y < (ssize_t) matrix_info->rows ? MagickFalse : MagickTrue);
+  return((MagickBooleanType) !(y < (ssize_t) matrix_info->rows));
 }
 
 /*
