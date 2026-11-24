@@ -1830,6 +1830,66 @@ static MagickBooleanType SkipMarkupElement(const char *keyword,
   return(MagickFalse);
 }
 
+typedef struct _ColorConfigureInput
+{
+  const ColorLoadTarget
+    *target;
+
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *filename;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *keyword,
+    *token;
+} ColorConfigureInput;
+
+static void ParseColorConfigureToken(const ColorConfigureInput *input,
+  const char **q,MagickStatusType *status,ColorInfo **color_info)
+{
+  (void) CopyMagickString(input->keyword,input->token,MagickPathExtent);
+  if (SkipMarkupElement(input->keyword,q,input->extent,input->token) !=
+      MagickFalse)
+    return;
+  if (LocaleCompare(input->keyword,"<include") == 0)
+    {
+      /*
+        Include element.
+      */
+      (*status)=LoadIncludeElement(input->target,input->filename,input->depth,
+        input->extent,input->token,q,(*status));
+      return;
+    }
+  if (LocaleCompare(input->keyword,"<color") == 0)
+    {
+      /*
+        Color element.
+      */
+      (*color_info)=AcquireColorInfo(input->filename);
+      return;
+    }
+  if ((*color_info) == (ColorInfo *) NULL)
+    return;
+  if (IsElementEnd(input->keyword) != MagickFalse)
+    {
+      (*status)=AppendColorInfoToCache(input->cache,(*color_info),
+        input->exception);
+      (*color_info)=(ColorInfo *) NULL;
+    }
+  else
+    (*q)=ReadColorInfoAttribute((*color_info),input->keyword,(*q),
+      input->extent,input->token,input->exception);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1874,35 +1934,13 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
     (void) GetNextToken(q,&q,extent,token);
     if (*token == '\0')
       break;
-    (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (SkipMarkupElement(keyword,&q,extent,token) != MagickFalse)
-      continue;
-    if (LocaleCompare(keyword,"<include") == 0)
-      {
-        /*
-          Include element.
-        */
-        status=LoadIncludeElement(target,filename,depth,extent,token,&q,
-          status);
-        continue;
-      }
-    if (LocaleCompare(keyword,"<color") == 0)
-      {
-        /*
-          Color element.
-        */
-        color_info=AcquireColorInfo(filename);
-        continue;
-      }
-    if (color_info == (ColorInfo *) NULL)
-      continue;
-    if (IsElementEnd(keyword) != MagickFalse)
-      {
-        status=AppendColorInfoToCache(cache,color_info,exception);
-        color_info=(ColorInfo *) NULL;
-      }
-    else
-      q=ReadColorInfoAttribute(color_info,keyword,q,extent,token,exception);
+    {
+      const ColorConfigureInput
+        input = { target, cache, exception, filename, depth, extent, keyword,
+          token };
+
+      ParseColorConfigureToken(&input,&q,&status,&color_info);
+    }
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));
