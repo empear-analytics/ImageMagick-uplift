@@ -142,8 +142,12 @@ static inline double *PolynomialCoefficients(double *coeff,
   for (i=1; i < number_arguments; i+=cp_size) { /* NB: start = 1 not 0 */
     for (j=0; j < (ssize_t) nterms; j++)
       terms[j] = poly_basis_fn(j,arguments[i+cp_x],arguments[i+cp_y]);
-    LeastSquaresAddTerms(matrix,vectors,terms,
-         &(arguments[i+cp_values]),nterms,number_values);
+    {
+      const LeastSquaresSystem
+        least_squares = { matrix, vectors, nterms, number_values };
+
+      LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+cp_values]));
+    }
   }
   terms = (double *) RelinquishMagickMemory(terms);
   /* Solve for LeastSquares Coefficients */

@@ -603,28 +603,29 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %
 %  The format of the AcquireMagickMatrix method is:
 %
-%      void LeastSquaresAddTerms(double **matrix,double **vectors,
-%        const double *terms,const double *results,const size_t rank,
-%        const size_t number_vectors);
+%      void LeastSquaresAddTerms(const LeastSquaresSystem *least_squares,
+%        const double *terms,const double *results);
 %
 %  A description of each parameter follows:
 %
-%    o matrix: the square matrix to add given terms/results to.
+%    o least_squares: the system the terms are added to:
 %
-%    o vectors: the result vectors to add terms/results to.
+%      o matrix: the square matrix to add given terms/results to.
+%
+%      o vectors: the result vectors to add terms/results to.
+%
+%      o rank: the rank or size of the dimensions of the square matrix.
+%        Also the length of vectors, and number of terms being added.
+%
+%      o number_vectors: Number of result vectors, and number or results
+%        being added.  Also represents the number of separable systems of
+%        equations that is being solved.
 %
 %    o terms: the pre-calculated terms (without the unknown coefficient
 %             weights) that forms the equation being added.
 %
 %    o results: the result(s) that should be generated from the given terms
 %               weighted by the yet-to-be-solved coefficients.
-%
-%    o rank: the rank or size of the dimensions of the square matrix.
-%            Also the length of vectors, and number of terms being added.
-%
-%    o number_vectors: Number of result vectors, and number or results being
-%      added.  Also represents the number of separable systems of equations
-%      that is being solved.
 %
 %  Example of use...
 %
@@ -635,6 +636,7 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %     double **matrix = AcquireMagickMatrix(3UL,3UL);
 %     double **vectors = AcquireMagickMatrix(2UL,3UL);
 %     double terms[3], results[2];
+%     const LeastSquaresSystem least_squares = { matrix, vectors, 3UL, 2UL };
 %     ...
 %     for each given x,y -> u,v
 %        terms[0] = x;
@@ -642,7 +644,7 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %        terms[2] = 1;
 %        results[0] = u;
 %        results[1] = v;
-%        LeastSquaresAddTerms(matrix,vectors,terms,results,3UL,2UL);
+%        LeastSquaresAddTerms(&least_squares,terms,results);
 %     ...
 %     if ( GaussJordanElimination(matrix,vectors,3UL,2UL) ) {
 %       c0 = vectors[0][0];
@@ -658,10 +660,18 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %     RelinquishMagickMatrix(vectors,2UL);
 %
 */
-MagickPrivate void LeastSquaresAddTerms(double **matrix,double **vectors,
-  const double *terms,const double *results,const size_t rank,
-  const size_t number_vectors)
+MagickPrivate void LeastSquaresAddTerms(
+  const LeastSquaresSystem *least_squares,const double *terms,
+  const double *results)
 {
+  double
+    **const matrix = least_squares->matrix,
+    **const vectors = least_squares->vectors;
+
+  const size_t
+    rank = least_squares->rank,
+    number_vectors = least_squares->number_vectors;
+
   ssize_t
     i,
     j;

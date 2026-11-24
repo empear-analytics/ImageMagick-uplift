@@ -331,14 +331,22 @@ static inline void AddAffineThirdPoint(const AffineThirdPoint *point,double *ter
     /* Image Distortion - rotate the u,v coordinates too */
     double
       uv2[2];
+
+    const LeastSquaresSystem
+      least_squares = { matrix, vectors, 3UL, 2UL };
+
     uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
     uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
-    LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
+    LeastSquaresAddTerms(&least_squares,terms,uv2);
   }
   else {
     /* Sparse Gradient - use values of p0 for linear gradient */
-    LeastSquaresAddTerms(matrix,vectors,terms,
-          &(arguments[cp_values]),3UL,number_values);
+    {
+      const LeastSquaresSystem
+        least_squares = { matrix, vectors, 3UL, number_values };
+
+      LeastSquaresAddTerms(&least_squares,terms,&(arguments[cp_values]));
+    }
   }
 }
 
@@ -399,6 +407,9 @@ static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors
     cp_y = context->cp_y,
     cp_values = context->cp_values;
 
+  const LeastSquaresSystem
+    least_squares = { matrix, vectors, 3UL, number_values };
+
   double
     terms[3];
 
@@ -411,8 +422,7 @@ static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors
     terms[0] = arguments[i+cp_x];  /* x */
     terms[1] = arguments[i+cp_y];  /* y */
     terms[2] = 1;                  /* 1 */
-    LeastSquaresAddTerms(matrix,vectors,terms,
-             &(arguments[i+cp_values]),3UL,number_values);
+    LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+cp_values]));
   }
   if ( number_arguments == 2*cp_size ) {
     AffineThirdPoint
@@ -509,6 +519,9 @@ static inline double *AffineCoefficients(double *coeff,const DistortMethod *meth
 static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
   const double *arguments,const size_t number_arguments)
 {
+  const LeastSquaresSystem
+    least_squares = { matrix, vectors, 4UL, 1UL };
+
   double
     terms[5];
 
@@ -521,12 +534,12 @@ static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
     terms[1]=(-arguments[i+1]);
     terms[2]=1.0;
     terms[3]=0.0;
-    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+2]),4UL,1UL);
+    LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+2]));
     terms[0]=arguments[i+1];
     terms[1]=arguments[i+0];
     terms[2]=0.0;
     terms[3]=1.0;
-    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+3]),4UL,1UL);
+    LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+3]));
   }
 }
 
@@ -837,6 +850,9 @@ static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
     cp_y = context->cp_y,
     cp_values = context->cp_values;
 
+  const LeastSquaresSystem
+    least_squares = { matrix, vectors, 8UL, 1UL };
+
   double
     terms[8];
 
@@ -857,8 +873,7 @@ static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
     terms[5]=0.0;
     terms[6]=-terms[0]*arguments[i+cp_u];  /* 1/(c6*x) */
     terms[7]=-terms[1]*arguments[i+cp_u];  /* 1/(c7*y) */
-    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_u]),
-        8UL,1UL);
+    LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+cp_u]));
 
     terms[0]=0.0;
     terms[1]=0.0;
@@ -868,8 +883,7 @@ static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
     terms[5]=1.0;                         /*   c5*1   */
     terms[6]=-terms[3]*arguments[i+cp_v]; /* 1/(c6*x) */
     terms[7]=-terms[4]*arguments[i+cp_v]; /* 1/(c7*y) */
-    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_v]),
-        8UL,1UL);
+    LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+cp_v]));
   }
 }
 
@@ -1038,6 +1052,9 @@ static inline MagickBooleanType SolveBilinearCoefficients(double *coeff,
     cp_y = context->cp_y,
     cp_values = context->cp_values;
 
+  const LeastSquaresSystem
+    least_squares = { matrix, vectors, 4UL, number_values };
+
   double
     terms[4];
 
@@ -1054,8 +1071,7 @@ static inline MagickBooleanType SolveBilinearCoefficients(double *coeff,
     terms[1] = arguments[i+cp_y];   /*  y  */
     terms[2] = terms[0]*terms[1];   /* x*y */
     terms[3] = 1;                   /*  1  */
-    LeastSquaresAddTerms(matrix,vectors,terms,
-         &(arguments[i+cp_values]),4UL,number_values);
+    LeastSquaresAddTerms(&least_squares,terms,&(arguments[i+cp_values]));
   }
   /* Solve for LeastSquares Coefficients */
   status=GaussJordanElimination(matrix,vectors,4UL,number_values);

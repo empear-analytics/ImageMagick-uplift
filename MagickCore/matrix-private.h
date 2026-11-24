@@ -25,9 +25,20 @@ extern "C" {
 extern MagickPrivate MagickBooleanType
   GaussJordanElimination(double **,double **,const size_t,const size_t);
 
+typedef struct _LeastSquaresSystem
+{
+  double
+    **matrix,
+    **vectors;
+
+  size_t
+    rank,
+    number_vectors;
+} LeastSquaresSystem;
+
 extern MagickPrivate void
-  LeastSquaresAddTerms(double **,double **,const double *,const double *,
-    const size_t, const size_t);
+  LeastSquaresAddTerms(const LeastSquaresSystem *,const double *,
+    const double *);
 
 #if defined(__cplusplus) || defined(c_plusplus)
 }

@@ -1233,8 +1233,19 @@ static int QuantumCmd(int argc,char **argv,ExceptionInfo *exception)
 
 /* matrix.c: MatrixInfo in memory, mapped and on disk; the least-squares helpers */
 extern MagickBooleanType GaussJordanElimination(double **,double **,const size_t,const size_t);
+/* the library under test may take the system as a struct (M142, Recipe B): driver/build.sh
+   defines IMDRIVER_LEAST_SQUARES_ADD_TERMS when that build's matrix-private.h declares it */
+#if defined(IMDRIVER_LEAST_SQUARES_ADD_TERMS)
+typedef struct _LeastSquaresSystem
+{
+  double **matrix, **vectors;
+  size_t rank, number_vectors;
+} LeastSquaresSystem;
+extern void LeastSquaresAddTerms(const LeastSquaresSystem *,const double *,const double *);
+#else
 extern void LeastSquaresAddTerms(double **,double **,const double *,const double *,const size_t,
   const size_t);
+#endif
 
 static int MatrixCmd(int argc,char **argv,ExceptionInfo *exception)
 {
@@ -1342,7 +1353,14 @@ static int MatrixCmd(int argc,char **argv,ExceptionInfo *exception)
           {
             for (j=0; j < n; j++) terms[j]=pow((double) k,(double) j);
             for (i=0; i < vectors; i++) results[i]=3.0+2.0*k-0.25*k*k+i;
+#if defined(IMDRIVER_LEAST_SQUARES_ADD_TERMS)
+            {
+              const LeastSquaresSystem least_squares = { matrix, v, n, vectors };
+              LeastSquaresAddTerms(&least_squares,terms,results);
+            }
+#else
             LeastSquaresAddTerms(matrix,v,terms,results,n,vectors);
+#endif
           }
         }
       status=GaussJordanElimination(matrix,v,n,vectors);
