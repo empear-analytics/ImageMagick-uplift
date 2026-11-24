@@ -393,6 +393,19 @@ static void EncodeImageWithFallback(const EncodeFallbackInfo *info,
     }
 }
 
+static const MagickInfo *GetEncoderMagickInfo(const ImageInfo *write_info,
+  ExceptionInfo *sans_exception,ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  magick_info=GetMagickInfo(write_info->magick,sans_exception);
+  if (sans_exception->severity == PolicyError)
+    magick_info=GetMagickInfo(write_info->magick,exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  return(magick_info);
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -445,10 +458,7 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   /*
     Call appropriate image writer based on image type.
   */
-  magick_info=GetMagickInfo(write_info->magick,sans_exception);
-  if (sans_exception->severity == PolicyError)
-    magick_info=GetMagickInfo(write_info->magick,exception);
-  sans_exception=DestroyExceptionInfo(sans_exception);
+  magick_info=GetEncoderMagickInfo(write_info,sans_exception,exception);
   if (magick_info != (const MagickInfo *) NULL)
     SyncEndianFromMagickInfo(image_info,image,magick_info);
   if ((image->ping != MagickFalse) &&
