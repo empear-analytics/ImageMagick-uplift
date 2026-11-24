@@ -2066,7 +2066,17 @@ merges code, not parameters.
    tree (MagickCore, MagickWand, coders, utilities, Magick++, `tools/`) lists them, and
    the message names each. A caller in code no build compiles (`coders/dps.c` without
    the DPS delegate, `#if 0`, a commented-out call), or in a file of the other campaign,
-   holds the step: report it. (c) The function is never taken by address and is not
+   holds the step: report it. The owner may release a reported function; its callers in
+   the other campaign's files then change in the same commit (owner 2026-11-24, "If you
+   can do these changes without breaking any test cases, sure", for `LeastSquaresAddTerms`
+   and campaign A's `distort-private.h` and `distort-linear-private.h`). A caller in the
+   oracle driver (`tools/oracle/driver/imdriver.c`) declares the function by hand and is
+   linked against the baseline library too, so it keeps both calls: `driver/build.sh`
+   defines `IMDRIVER_<FUNCTION>` when the build's private header declares the typedef
+   (`grep` of its `_Name`), and the driver's declaration, typedef and call stand in
+   `#if defined(IMDRIVER_<FUNCTION>)`, the old ones in its `#else`. Both builds' drivers
+   then run the case, and a driver case on the function must show 0 diverged uncached
+   (`oracle.py run --filter ... --no-cache`). (c) The function is never taken by address and is not
    listed in `MagickCore/methods.h` with a different arity (that file only renames).
    (d) Object identity per file: the defining file and every file with a changed call,
    compiled with `-fno-inline` against `HEAD`'s and the working tree's headers (both
@@ -27589,3 +27599,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-24 | NEW | FD | In a `switch` whose `default:` group `D` does work, a group `G` whose body is statements `S` and its one `break;` (no `return`, `continue` or `goto`) is deleted; `D`'s body becomes `if (<Name>(e) != MagickFalse) S else T` before its `break;`, `<Name>` LP step 2's predicate of `G`'s labels. `e` may be `a[k]` with a local `k`. *Careful* gives the value-by-value argument (`G`'s values now reach `default:` and only they satisfy the predicate). Not LP, PL, PT or DG: `G` does not leave the function and the other groups need not return | `constitute-pixels-private.h`'s `SetImageTraitsFromMap` (M142): probed 9.5 to 9.58 to 9.68 and, with TB on the CMYK predicate, 10.0; label peels after the `switch` measured lower in M138 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | TB | Step 1, character labels: the `char` predicate may also be one Recipe FD made (LP step 2's shape over a character `switch`); nothing else changes, the argument of the 2026-11-10 row applies unchanged | `constitute-pixels-private.h`'s `IsCMYKMapChannel` (M142), eight letters, cc 10, the file's last *Complex Method*; probed 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | RV | Step 6 (new (f)): a block inside a compiled `#if defined(M)` feature branch with no `#else` puts its helper directly above the caller under its own `#if defined(M)` ... `#endif`, so a configuration without `M` drops helper and call together; checked by script that the file with every `M` region deleted is unchanged, blank lines aside | `utility-unique.c`'s `AcquireUniqueSymbolicLink` (M142): the relative-path block calls `getcwd` and `symlink` under `MAGICKCORE_HAVE_SYMLINK`; probed 9.92 to 10.0 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | B | Step 1, MagickPrivate form, condition (b): a function held by a caller in the other campaign's files may be released by the owner, the callers there changing in the same commit; a caller in the oracle driver keeps the old call under `#else` of a macro that `driver/build.sh` defines from the build's own private header, since one driver source links against both the baseline and the candidate library | `matrix.c`'s `LeastSquaresAddTerms` (M142, 6 arguments, the file's last finding): nine calls in campaign A's `distort-private.h` and `distort-linear-private.h` and one in `imdriver.c` (the `matrix gauss N lsq` cases) | owner |
