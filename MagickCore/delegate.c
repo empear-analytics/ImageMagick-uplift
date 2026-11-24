@@ -1178,6 +1178,17 @@ static void ListDelegateCommands(FILE *file,
   commands=(char **) RelinquishMagickMemory(commands);
 }
 
+static void FormatDelegateName(char *delegate,
+  const DelegateInfo **delegate_info,const ssize_t i)
+{
+  *delegate='\0';
+  if (delegate_info[i]->encode != (char *) NULL)
+    (void) CopyMagickString(delegate,delegate_info[i]->encode,
+      MagickPathExtent);
+  (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
+  delegate[9]='\0';
+}
+
 MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1208,12 +1219,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
       continue;
     ListDelegatePath(file,path,delegate_info,i);
     path=delegate_info[i]->path;
-    *delegate='\0';
-    if (delegate_info[i]->encode != (char *) NULL)
-      (void) CopyMagickString(delegate,delegate_info[i]->encode,
-        MagickPathExtent);
-    (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
-    delegate[9]='\0';
+    FormatDelegateName(delegate,delegate_info,i);
     ListDelegateCommands(file,delegate_info,i,delegate);
   }
   (void) fflush(file);
