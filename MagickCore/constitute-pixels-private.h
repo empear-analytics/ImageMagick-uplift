@@ -51,22 +51,27 @@ static MagickBooleanType IsAlphaMapChannel(const char channel)
   return(MagickFalse);
 }
 
+static const char
+  CMYKMapChannels[] =
+  {
+    'C',
+    'c',
+    'm',
+    'M',
+    'Y',
+    'y',
+    'K',
+    'k'
+  };
+
 static MagickBooleanType IsCMYKMapChannel(const char channel)
 {
-  switch (channel)
-  {
-    case 'C':
-    case 'c':
-    case 'm':
-    case 'M':
-    case 'Y':
-    case 'y':
-    case 'K':
-    case 'k':
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(CMYKMapChannels)/sizeof(*CMYKMapChannels)); i++)
+    if (CMYKMapChannels[i] == channel)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
