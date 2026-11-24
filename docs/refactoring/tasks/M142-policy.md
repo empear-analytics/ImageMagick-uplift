@@ -107,7 +107,7 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
 | --- | --- | --- | --- |
 | constitute-pixels-private.h | 9.5 | 10.0 | FD (alpha), FD (CMYK), TB (`IsCMYKMapChannel`) |
 | delegate.c | 8.81 | 9.38 | E (`FormatDelegateName`), E (`DestroyDelegateCommandList`) |
-| matrix.c | 9.09 | 9.68 | DT (three ternaries), E (`SetMatrixSynchronize`), E (`RelinquishMatrixMemory`) |
+| matrix.c | 9.09 | 10.0 | DT (three ternaries), E (`SetMatrixSynchronize`), E (`RelinquishMatrixMemory`), B (`LeastSquaresAddTerms`, MagickPrivate form) |
 | utility-unique.c | 9.92 | 10.0 | RV step 6 (f) (`LinkUniqueRelativePath`) |
 
 - **Recipe FD added** (`731167b0b`), and TB's character form widened to its predicates
@@ -136,9 +136,6 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
 ### Plateaus recorded
 - **delegate.c (9.38):** *Excess Number of Function Arguments* on `ExternalDelegateCommand`
   (`MagickExport`, 5 arguments) and *String Heavy Function Arguments*.
-- **matrix.c (9.68):** `LeastSquaresAddTerms` has 6 arguments; all its callers are in campaign
-  A's `distort-private.h` and `distort-linear-private.h`. **Question for the owner/campaign
-  A:** a struct for its `(terms, rank, number_vectors)`-style arguments would touch those files.
 - **log.c (8.81):** at the line limit (1304 code lines), and every public root that Recipe S
   could split off (the list family, `LogMagickEventList`, the handler setters) uses
   `log_cache`, `log_semaphore` or the event mask, as resource.c's do. Its two argument
@@ -155,3 +152,21 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
   entropy and path branches (`/dev/urandom`, Windows, `!MAGICKCORE_INSTALLED_SUPPORT`).
 - **identify.c (9.38), option.c (9.38):** line and declaration limits (option.c's are its
   option tables).
+
+## Owner answers (2026-11-24, night)
+
+The owner answered both PR questions: "If you can do these changes without breaking any test
+cases, sure".
+- **matrix.c to 10.0** (`b81d7b685`). `LeastSquaresAddTerms` takes a `const LeastSquaresSystem *`
+  (matrix, vectors, rank, number_vectors) under Recipe B's MagickPrivate form. Its nine calls in
+  campaign A's `distort-private.h` and `distort-linear-private.h` change in the same commit, and
+  every distort file keeps its score. Recipe B's condition (b) was amended first (`4c6ee5617`).
+  The oracle driver calls the function too, and one driver source links against both libraries.
+  So `driver/build.sh` defines `IMDRIVER_LEAST_SQUARES_ADD_TERMS` from the build's own
+  `matrix-private.h`, and the old call stays under `#else`.
+- **The `--no-verify` amend of `7b0b3c6e6`** was not redone by rewriting pushed history.
+  Instead the CodeScene pre-commit gate was run on the same change: `7b0b3c6e6`'s diff staged on
+  its parent in a temporary worktree, with a staged tree identical to the commit's
+  (`ac1388de9`). It passed.
+- **Whole catalogue** at `b81d7b685` (both drivers rebuilt): 16,005 cases, 1 diverged, the
+  known `gaps/c5651ffad8` logcfg tie-break.
