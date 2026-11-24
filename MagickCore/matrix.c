@@ -382,6 +382,18 @@ MagickExport double **AcquireMagickMatrix(const size_t number_rows,
 %    o matrix_info: the matrix.
 %
 */
+static void RelinquishMatrixMemory(MatrixInfo *matrix_info)
+{
+  if (matrix_info->mapped == MagickFalse)
+    matrix_info->elements=RelinquishAlignedMemory(matrix_info->elements);
+  else
+    {
+      (void) UnmapBlob(matrix_info->elements,(size_t) matrix_info->length);
+      matrix_info->elements=(unsigned short *) NULL;
+    }
+  RelinquishMagickResource(MemoryResource,matrix_info->length);
+}
+
 MagickExport MatrixInfo *DestroyMatrixInfo(MatrixInfo *matrix_info)
 {
   assert(matrix_info != (MatrixInfo *) NULL);
@@ -391,14 +403,7 @@ MagickExport MatrixInfo *DestroyMatrixInfo(MatrixInfo *matrix_info)
   {
     case MemoryCache:
     {
-      if (matrix_info->mapped == MagickFalse)
-        matrix_info->elements=RelinquishAlignedMemory(matrix_info->elements);
-      else
-        {
-          (void) UnmapBlob(matrix_info->elements,(size_t) matrix_info->length);
-          matrix_info->elements=(unsigned short *) NULL;
-        }
-      RelinquishMagickResource(MemoryResource,matrix_info->length);
+      RelinquishMatrixMemory(matrix_info);
       break;
     }
     case MapCache:
