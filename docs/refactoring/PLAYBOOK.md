@@ -6333,6 +6333,12 @@ helper returns a status the caller tests, which here would always lead to the sa
    body). The helper takes `const Name *` first, then the written variables by pointer,
    at most four parameters in all. The fill copies each value where the block read it,
    and the block writes none of them (N's argument), so every read sees what it saw.
+   Two forms that step 7 already has (2026-11-24): the helper may write `name->member` at
+   every use of a member instead of binding it (Recipe N step 4's member form, member by
+   member), and when every member's variable is a plain identifier the fill may take
+   Recipe Z step 5's FB form (no local among the declarations; where the block stood, a
+   compound statement holding `const Name name = { v1, v2, ... };`, a blank line and the
+   call), the initialiser reading each variable where the assignments would have.
 5. Where the block stood, write the call. The `continue;` that followed the block stays,
    directly after the call. Check every argument against its parameter by reading.
 6. A block that is the whole body of a sequential loop, declarations included, whose
@@ -27425,3 +27431,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | AMEND | HT | Step 6, call form: when each branch ends in `if (G == F) return(F);` with a different call `G` in each and nothing after it, a new local `V` takes each call's result in its branch and one `if (V == F) return(F);` follows the selection | `xml-tree.c`'s `ParseXMLTreeTags` (campaign B, M141): the start-tag and markup arms each end in their own exit test, its two bumps; probe 9.02 to 9.09, adding no function in a file at the function-count limit | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | FM | Step 5, several members: twins that bind several members of one struct parameter at the top of their bodies (`targets->stroke_q` and `targets->q` against `targets->stroke_p` and `targets->p`) fold into one function taking one value per binding, the bindings replaced by the parameters | `draw-primitive.c`'s `TraceArcPointsP` and `TraceArcPointsQ` (campaign B, M141): the two arc loops of `TraceStrokePolygon`, a *Code Duplication* pair; probe 7.22 to 7.44 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | GL | Step 6, predicate and assignment form: the inner test may be `Q(v,...) != MagickFalse` where `Q` is a same-file `static` whose one `return` is a `&&` chain led by `v != NULL`, so a `NULL` `v` evaluates nothing else and fails as the skipped guard did; and `D` may be `v=L;` to a local declared at the caller's top and used only in `D`, the test and `B` | `constitute-encode.c`'s `WriteImage` (campaign B, M142): the bi-modal delegate block (`option`, `IsSingleImageDelegateCopy`, `GetDelegateInfo`, `IsDirectDelegate`) is one of the function's two bumps; probe 8.79 to 8.89, Bumpy Road cleared | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | OC | Step 4, member and FB forms: the helper may read the input struct as `name->member` (N step 4's member form), and the fill may be Z step 5's FB form, a compound statement holding `const Name name = { ... };` and the call, as step 7's struct already may | `type.c`'s `LoadTypeCache` (campaign B, M142): the XML loop's tail (markup skip, include, element) as an OC helper with nine inputs and three written variables; bound locals and a member-by-member fill crossed *Lines of Code in a Single File* (8.81 to 8.54), the member and FB forms score 9.09 | mandate (2026-10-24) |
