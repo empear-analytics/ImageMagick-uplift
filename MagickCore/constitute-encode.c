@@ -426,6 +426,82 @@ static const DelegateInfo *GetBimodalDelegateInfo(const ImageInfo *image_info,
   return((const DelegateInfo *) NULL);
 }
 
+typedef struct _WriteImageInputs
+{
+  const ImageInfo
+    *image_info;
+
+  const MagickInfo
+    *magick_info;
+
+  char
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} WriteImageInputs;
+
+static MagickBooleanType EncodeWriteImage(ImageInfo *write_info,Image *image,
+  const WriteImageInputs *inputs)
+{
+  const ImageInfo
+    *const image_info = inputs->image_info;
+
+  const MagickInfo
+    *const magick_info = inputs->magick_info;
+
+  char
+    *const filename = inputs->filename;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  EncodeImageHandler
+    *encoder;
+
+  MagickBooleanType
+    status,
+    temporary;
+
+  status=MagickFalse;
+  temporary=MagickFalse;
+  if ((magick_info != (const MagickInfo *) NULL) &&
+      (GetMagickEncoderSeekableStream(magick_info) != MagickFalse))
+    {
+      char
+        image_filename[MagickPathExtent];
+
+      (void) CopyMagickString(image_filename,image->filename,MagickPathExtent);
+      status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
+      (void) CopyMagickString(image->filename, image_filename,MagickPathExtent);
+      if ((status != MagickFalse) &&
+          (CloseSeekableWriteBlob(write_info,image,&temporary) == MagickFalse))
+        status=MagickFalse;
+    }
+  encoder=GetImageEncoder(magick_info);
+  if (encoder != (EncodeImageHandler *) NULL)
+    {
+      const EncodeTarget
+        target = { write_info, image, exception };
+
+      /*
+        Call appropriate image writer based on image type.
+      */
+      status=EncodeImageWithInfo(magick_info,encoder,&target);
+    }
+  else
+    {
+      const EncodeFallbackInfo
+        fallback = { write_info, image, filename, exception };
+
+      EncodeImageWithFallback(&fallback,&status);
+    }
+  if (temporary != MagickFalse)
+    status=CopyTemporaryImageFile(write_info,image,exception);
+  IdentifyVerboseWrite(write_info,image,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -438,9 +514,6 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   const MagickInfo
     *magick_info;
 
-  EncodeImageHandler
-    *encoder;
-
   ExceptionInfo
     *sans_exception;
 
@@ -448,8 +521,10 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
     *write_info;
 
   MagickBooleanType
-    status,
-    temporary;
+    status;
+
+  WriteImageInputs
+    inputs;
 
   /*
     Determine image type from filename prefix or suffix (e.g. image.jpg).
@@ -500,42 +575,11 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
       (void) CopyMagickString(image->filename,filename,MagickPathExtent);
       return(status);
     }
-  status=MagickFalse;
-  temporary=MagickFalse;
-  if ((magick_info != (const MagickInfo *) NULL) &&
-      (GetMagickEncoderSeekableStream(magick_info) != MagickFalse))
-    {
-      char
-        image_filename[MagickPathExtent];
-
-      (void) CopyMagickString(image_filename,image->filename,MagickPathExtent);
-      status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
-      (void) CopyMagickString(image->filename, image_filename,MagickPathExtent);
-      if ((status != MagickFalse) &&
-          (CloseSeekableWriteBlob(write_info,image,&temporary) == MagickFalse))
-        status=MagickFalse;
-    }
-  encoder=GetImageEncoder(magick_info);
-  if (encoder != (EncodeImageHandler *) NULL)
-    {
-      const EncodeTarget
-        target = { write_info, image, exception };
-
-      /*
-        Call appropriate image writer based on image type.
-      */
-      status=EncodeImageWithInfo(magick_info,encoder,&target);
-    }
-  else
-    {
-      const EncodeFallbackInfo
-        fallback = { write_info, image, filename, exception };
-
-      EncodeImageWithFallback(&fallback,&status);
-    }
-  if (temporary != MagickFalse)
-    status=CopyTemporaryImageFile(write_info,image,exception);
-  IdentifyVerboseWrite(write_info,image,exception);
+  inputs.image_info=image_info;
+  inputs.magick_info=magick_info;
+  inputs.filename=filename;
+  inputs.exception=exception;
+  status=EncodeWriteImage(write_info,image,&inputs);
   write_info=DestroyImageInfo(write_info);
   if (GetBlobError(image) != MagickFalse)
     ThrowWriterException(FileOpenError,"UnableToWriteFile");
