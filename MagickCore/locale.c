@@ -1374,6 +1374,90 @@ static void LoadLocaleIncludeElement(const LocaleIncludeScan *scan,
     (*status)=LoadIncludedLocaleFile(target,filename,token,depth,(*status));
 }
 
+typedef struct _LocaleConfigureInput
+{
+  const LocaleLoadTarget
+    *target;
+
+  SplayTreeInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *filename,
+    *locale;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *keyword,
+    *message,
+    *tag,
+    *token;
+} LocaleConfigureInput;
+
+static void ParseLocaleConfigureToken(const LocaleConfigureInput *input,
+  const char **q,MagickStatusType *status,LocaleInfo **locale_info)
+{
+  (void) CopyMagickString(input->keyword,input->token,MagickLocaleExtent);
+  if (SkipLocaleElement(q,input->keyword,input->extent,input->token) !=
+      MagickFalse)
+    return;
+  if (LocaleCompare(input->keyword,"<include") == 0)
+    {
+      /*
+        Include element.
+      */
+      {
+        const LocaleIncludeScan
+          scan = { input->target, input->filename, input->depth,
+            input->extent, input->token, input->locale };
+
+        LoadLocaleIncludeElement(&scan,q,status);
+      }
+      return;
+    }
+  if (LocaleCompare(input->keyword,"<locale") == 0)
+    {
+      /*
+        Locale element.
+      */
+      (*q)=SkipLocaleAttributes((*q),input->extent,input->token);
+      return;
+    }
+  if (HandleStructuralElement(input->keyword,input->tag) != MagickFalse)
+    return;
+  if (LocaleCompare(input->keyword,"<message") == 0)
+    {
+      /*
+        Message element.
+      */
+      (*q)=ReadMessageName((*q),input->extent,input->token,input->tag);
+      (*q)=ReadMessageText((*q),input->message);
+      (*locale_info)=AcquireLocaleMessage(input->filename,input->tag,
+        input->message);
+      (*status)=AddLocaleMessage(input->cache,(*locale_info),
+        input->exception);
+      (void) ConcatenateMagickString(input->tag,input->message,
+        MagickLocaleExtent);
+      (void) ConcatenateMagickString(input->tag,"\n",MagickLocaleExtent);
+      (*q)++;
+    }
+  else if (*input->keyword == '<')
+    {
+      /*
+        Subpath element.
+      */
+      AppendSubpathElement(input->keyword,input->token,input->tag);
+    }
+  else
+    (void) GetNextToken((*q),(const char **) NULL,input->extent,input->token);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1430,54 +1514,13 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
     (void) GetNextToken(q,&q,extent,token);
     if (*token == '\0')
       break;
-    (void) CopyMagickString(keyword,token,MagickLocaleExtent);
-    if (SkipLocaleElement(&q,keyword,extent,token) != MagickFalse)
-      continue;
-    if (LocaleCompare(keyword,"<include") == 0)
-      {
-        /*
-          Include element.
-        */
-        {
-          const LocaleIncludeScan
-            scan = { target, filename, depth, extent, token, locale };
+    {
+      const LocaleConfigureInput
+        input = { target, cache, exception, filename, locale, depth, extent,
+          keyword, message, tag, token };
 
-          LoadLocaleIncludeElement(&scan,&q,&status);
-        }
-        continue;
-      }
-    if (LocaleCompare(keyword,"<locale") == 0)
-      {
-        /*
-          Locale element.
-        */
-        q=SkipLocaleAttributes(q,extent,token);
-        continue;
-      }
-    if (HandleStructuralElement(keyword,tag) != MagickFalse)
-      continue;
-    if (LocaleCompare(keyword,"<message") == 0)
-      {
-        /*
-          Message element.
-        */
-        q=ReadMessageName(q,extent,token,tag);
-        q=ReadMessageText(q,message);
-        locale_info=AcquireLocaleMessage(filename,tag,message);
-        status=AddLocaleMessage(cache,locale_info,exception);
-        (void) ConcatenateMagickString(tag,message,MagickLocaleExtent);
-        (void) ConcatenateMagickString(tag,"\n",MagickLocaleExtent);
-        q++;
-      }
-    else if (*keyword == '<')
-      {
-        /*
-          Subpath element.
-        */
-        AppendSubpathElement(keyword,token,tag);
-      }
-    else
-      (void) GetNextToken(q,(const char **) NULL,extent,token);
+      ParseLocaleConfigureToken(&input,&q,&status,&locale_info);
+    }
   }
   token=(char *) RelinquishMagickMemory(token);
   (void) SetFatalErrorHandler(fatal_handler);
