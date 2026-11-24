@@ -6385,7 +6385,8 @@ _DRIVER_CASES += [("driver constitute %s %s" % (_cst_map, _cst_type),
     ("cmyk", "char"), ("CMYKA", "char"), ("I", "char"), ("i", "char"), ("IA", "char"),
     ("R", "char"), ("M", "char"), ("k", "char"), ("Y", "char"), ("RGBP", "char"),
     ("RGB", "double"), ("RGB", "float"), ("RGB", "long"), ("RGB", "longlong"), ("RGB", "short"),
-    ("RGB", "quantum"))]
+    ("RGB", "quantum"), ("A", "char"), ("o", "char"), ("C", "char"), ("y", "char"),
+    ("Ka", "char"))]
 GAP_STEP_CASES += [(label, steps, {}) for label, steps in _DRIVER_CASES]
 # ConfigureFileToStringInfo reads a file (it maps it); the case ships one.
 GAP_STEP_CASES += [("driver string configfile", _driver("string", "configfile", "cf.dat"),
