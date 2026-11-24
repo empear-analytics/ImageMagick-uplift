@@ -8228,6 +8228,14 @@ Recipe LB (a `break;`, not a `return`).
    constant, the caller may pass `&w` as `T *result` and write `return(w);` in place of
    `return(returned);`, and declare no `returned`: each `return(R);` is still rewritten
    as `(*result)=R;` and `return(MagickTrue);` one for one, the helper's text unchanged.
+   (f) A block in a compiled feature branch (2026-11-24). When the block stands inside an
+   `#if defined(M)` branch with no `#else` that this build compiles (`M` a configure
+   result such as `MAGICKCORE_HAVE_SYMLINK`, not a platform or delegate), the new function
+   stands directly above the caller between its own `#if defined(M)` and `#endif` lines,
+   the same text as the branch's directive. A configuration without `M` drops the helper
+   with the call, as it dropped the block (no undeclared `symlink`, no unused static);
+   check by script that the file with every `#if defined(M)` ... `#endif` region deleted
+   is the same before and after the step, blank lines aside.
 
 **Before:**
 
@@ -27580,3 +27588,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-24 | AMEND | OC | Step 4, member and FB forms: the helper may read the input struct as `name->member` (N step 4's member form), and the fill may be Z step 5's FB form, a compound statement holding `const Name name = { ... };` and the call, as step 7's struct already may | `type.c`'s `LoadTypeCache` (campaign B, M142): the XML loop's tail (markup skip, include, element) as an OC helper with nine inputs and three written variables; bound locals and a member-by-member fill crossed *Lines of Code in a Single File* (8.81 to 8.54), the member and FB forms score 9.09 | mandate (2026-10-24) |
 | 2026-11-24 | NEW | FD | In a `switch` whose `default:` group `D` does work, a group `G` whose body is statements `S` and its one `break;` (no `return`, `continue` or `goto`) is deleted; `D`'s body becomes `if (<Name>(e) != MagickFalse) S else T` before its `break;`, `<Name>` LP step 2's predicate of `G`'s labels. `e` may be `a[k]` with a local `k`. *Careful* gives the value-by-value argument (`G`'s values now reach `default:` and only they satisfy the predicate). Not LP, PL, PT or DG: `G` does not leave the function and the other groups need not return | `constitute-pixels-private.h`'s `SetImageTraitsFromMap` (M142): probed 9.5 to 9.58 to 9.68 and, with TB on the CMYK predicate, 10.0; label peels after the `switch` measured lower in M138 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | TB | Step 1, character labels: the `char` predicate may also be one Recipe FD made (LP step 2's shape over a character `switch`); nothing else changes, the argument of the 2026-11-10 row applies unchanged | `constitute-pixels-private.h`'s `IsCMYKMapChannel` (M142), eight letters, cc 10, the file's last *Complex Method*; probed 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | RV | Step 6 (new (f)): a block inside a compiled `#if defined(M)` feature branch with no `#else` puts its helper directly above the caller under its own `#if defined(M)` ... `#endif`, so a configuration without `M` drops helper and call together; checked by script that the file with every `M` region deleted is unchanged, blank lines aside | `utility-unique.c`'s `AcquireUniqueSymbolicLink` (M142): the relative-path block calls `getcwd` and `symlink` under `MAGICKCORE_HAVE_SYMLINK`; probed 9.92 to 10.0 | mandate (2026-10-24) |
