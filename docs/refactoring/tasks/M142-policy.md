@@ -41,3 +41,24 @@ policy.c keeps only *String Heavy Function Arguments*, which comes from the publ
   `GlobExpression_` (cc 32 without the group) and `MatchCharacterClass` must both be cleared
   before the file rises. The group's extraction also needs an amendment to Recipe RC, a
   returning counterpart of its step 6 void form ("wherever the switch stands").
+
+## Constitute family (2026-11-23/24)
+
+After the policy.c work, the branch took the constitute family (S split of `WriteImage` into
+`constitute-encode.c`, `92495ad7c`; `constitute-codec.c` to 10.0 by `a0c0ed5be`).
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| constitute-encode.c | 8.78 | 10.0 | E (`GetEncoderMagickInfo`), GL step 6 (`GetBimodalDelegateInfo`), E (`IdentifyVerboseWrite`), N (`EncodeWriteImage`) |
+| constitute-pixels.c | 9.68 | 9.68 | plateau: *Excess Number of Function Arguments* on `ConstituteImage`, a `MagickExport` signature (6 arguments) |
+| constitute-pixels-private.h | 9.5 | 9.5 | not taken: `SetImageTraitsFromMap` (cc 18) is reached by 1 case (`encode/47309673f6`) |
+
+- Recipe GL gained step 6 (`c500c4bb7`): the inner test may be a same-file predicate whose `&&`
+  chain starts with `v != NULL`, and `D` may assign a local declared at the caller's top.
+- The `IdentifyVerboseWrite` step alone cleared *Overall Code Complexity* (8.89 to 9.48).
+- The tail extraction left the GetBlobError `ThrowWriterException` in `WriteImage`: the macro
+  writes `image` and names the function through `GetMagickModule()`.
+- **Gap:** only one case reaches `ConstituteImage`, and no case reaches `IsDirectDelegate`
+  (the `delegate:bimodal` path of `WriteImage`). Cases for `ConstituteImage` maps with alpha
+  (`RGBA`, `O`), CMYK (`CMYK`), intensity (`I`) and a one-letter unknown map would put
+  `SetImageTraitsFromMap` within reach of a label-set recipe (EM, LP or DG).
