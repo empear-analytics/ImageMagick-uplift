@@ -236,12 +236,22 @@ static void MapMatrixFile(MatrixInfo *matrix_info)
     }
 }
 
-MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
-  const size_t rows,const size_t stride,ExceptionInfo *exception)
+static void SetMatrixSynchronize(MatrixInfo *matrix_info)
 {
   char
     *synchronize;
 
+  synchronize=GetEnvironmentValue("MAGICK_SYNCHRONIZE");
+  if (synchronize != (const char *) NULL)
+    {
+      matrix_info->synchronize=IsStringTrue(synchronize);
+      synchronize=DestroyString(synchronize);
+    }
+}
+
+MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
+  const size_t rows,const size_t stride,ExceptionInfo *exception)
+{
   MagickBooleanType
     status;
 
@@ -257,12 +267,7 @@ MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   matrix_info->rows=rows;
   matrix_info->stride=stride;
   matrix_info->semaphore=AcquireSemaphoreInfo();
-  synchronize=GetEnvironmentValue("MAGICK_SYNCHRONIZE");
-  if (synchronize != (const char *) NULL)
-    {
-      matrix_info->synchronize=IsStringTrue(synchronize);
-      synchronize=DestroyString(synchronize);
-    }
+  SetMatrixSynchronize(matrix_info);
   matrix_info->length=(MagickSizeType) columns*rows*stride;
   if (matrix_info->columns != (size_t) (matrix_info->length/rows/stride))
     {
