@@ -62,3 +62,42 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
   (the `delegate:bimodal` path of `WriteImage`). Cases for `ConstituteImage` maps with alpha
   (`RGBA`, `O`), CMYK (`CMYK`), intensity (`I`) and a one-letter unknown map would put
   `SetImageTraitsFromMap` within reach of a label-set recipe (EM, LP or DG).
+
+## Config loaders and oracle cases (2026-11-24, later)
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| type.c | 8.81 | 9.09 | OC (`ParseTypeConfigureToken`), Complex Method cleared |
+| color.c | 8.76 | 9.09 | OC (`ParseColorConfigureToken`), Complex Method cleared |
+| locale.c | 8.96 | 9.38 | S (`GetLocaleOptions` to `locale-options.c`, 10.0), then OC (`ParseLocaleConfigureToken`); Complex and Large Method cleared |
+
+- **Recipe OC amended** (`ef98f2310`): step 4's input struct may be read as `name->member` and
+  filled in Recipe Z step 5's FB form. The bound-local, member-by-member form crossed type.c's
+  *Lines of Code in a Single File* (8.81 to 8.54); the member and FB forms score 9.09.
+- **The XML loaders share one shape.** The loop-body tail after `if (*token == '\0') break;`
+  (markup skip, include, element) is one OC helper: `continue;` becomes `return;`, and the
+  written cursors (`q`, `status`, the current info node) go as pointers. Every `Load*Cache` in
+  MagickCore is now below cc 9.
+- **locale.c needed line budget first.** OC alone crossed the line limit (8.96 to 8.81). Each of
+  three dry-run splits (`GetLocaleOptions`, `ListLocaleInfo`, the case-mapping group) left
+  locale.c at 8.96 and let OC reach 9.38. The smallest was taken.
+- **Oracle cases:** imdriver `constitute` and 21 driver cases (`edac7599b`) put 22 cases on
+  `ConstituteImage`/`SetImageTraitsFromMap` (from 1).
+- **Unreached:** `LoadLocaleIncludeElement` (no case includes a locale file), checked by
+  reading in `749c3ac28`.
+
+### Not taken (probed or read)
+- **configure-paths.c `GetConfigurePaths`** (cc 18): the complexity is in
+  `!MAGICKCORE_INSTALLED_SUPPORT` and Windows branches, which the oracle build does not compile.
+- **deprecate.c:** both findings are in Windows-only HBITMAP functions.
+- **resource.c** (Large Method on `RelinquishMagickResource`, at the line limit): every public
+  root refuses a split (shared `LockResourceSemaphore`/`UnlockResourceSemaphore`,
+  `FormatResourceSize`, and the file-scope `resource_info`, `resource_semaphore` and
+  `temporary_resources`). Freeing budget needs the shared-header and accessor rulings.
+- **pixel.c:** `IntensityFromSamples` is an always-inline per-pixel function, and
+  `SortImagePixels`' bump is the progress block of an OpenMP loop; both need timing.
+- **constitute-pixels-private.h `SetImageTraitsFromMap`:** label peels were measured lower in
+  M138; now within reach of 22 cases.
+- **CodeScene C thresholds** (cs-mcp `rules_config_list_thresholds`): *Lines of Code in a
+  Single File* warns at 1000, *Overall Code Complexity* at a mean of 4, Complex Method at cc 9,
+  Large Method at 70 lines, arguments above 4.
