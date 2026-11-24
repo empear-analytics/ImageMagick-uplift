@@ -36,6 +36,45 @@ static void SetImageDepthFromStorage(Image *image,const StorageType storage)
   }
 }
 
+static MagickBooleanType IsAlphaMapChannel(const char channel)
+{
+  switch (channel)
+  {
+    case 'a':
+    case 'A':
+    case 'O':
+    case 'o':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static const char
+  CMYKMapChannels[] =
+  {
+    'C',
+    'c',
+    'm',
+    'M',
+    'Y',
+    'y',
+    'K',
+    'k'
+  };
+
+static MagickBooleanType IsCMYKMapChannel(const char channel)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(CMYKMapChannels)/sizeof(*CMYKMapChannels)); i++)
+    if (CMYKMapChannels[i] == channel)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void SetImageTraitsFromMap(Image *image,const char *map)
 {
   ssize_t
@@ -49,26 +88,6 @@ static void SetImageTraitsFromMap(Image *image,const char *map)
   {
     switch (map[i])
     {
-      case 'a':
-      case 'A':
-      case 'O':
-      case 'o':
-      {
-        image->alpha_trait=BlendPixelTrait;
-        break;
-      }
-      case 'C':
-      case 'c':
-      case 'm':
-      case 'M':
-      case 'Y':
-      case 'y':
-      case 'K':
-      case 'k':
-      {
-        image->colorspace=CMYKColorspace;
-        break;
-      }
       case 'I':
       case 'i':
       {
@@ -77,7 +96,11 @@ static void SetImageTraitsFromMap(Image *image,const char *map)
       }
       default:
       {
-        if (length == 1)
+        if (IsCMYKMapChannel(map[i]) != MagickFalse)
+          image->colorspace=CMYKColorspace;
+        else if (IsAlphaMapChannel(map[i]) != MagickFalse)
+          image->alpha_trait=BlendPixelTrait;
+        else if (length == 1)
           image->colorspace=GRAYColorspace;
         break;
       }

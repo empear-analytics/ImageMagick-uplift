@@ -1155,6 +1155,16 @@ static void ListDelegatePath(FILE *file,const char *path,
     }
 }
 
+static void DestroyDelegateCommandList(char **commands)
+{
+  ssize_t
+    j;
+
+  for (j=0; commands[j] != (char *) NULL; j++)
+    commands[j]=DestroyString(commands[j]);
+  commands=(char **) RelinquishMagickMemory(commands);
+}
+
 static void ListDelegateCommands(FILE *file,
   const DelegateInfo **delegate_info,const ssize_t i,const char *delegate)
 {
@@ -1173,9 +1183,18 @@ static void ListDelegateCommands(FILE *file,
   (void) FormatLocaleFile(file,"\"%s\"\n",commands[0]);
   for (j=1; commands[j] != (char *) NULL; j++)
     (void) FormatLocaleFile(file,"                     \"%s\"\n",commands[j]);
-  for (j=0; commands[j] != (char *) NULL; j++)
-    commands[j]=DestroyString(commands[j]);
-  commands=(char **) RelinquishMagickMemory(commands);
+  DestroyDelegateCommandList(commands);
+}
+
+static void FormatDelegateName(char *delegate,
+  const DelegateInfo **delegate_info,const ssize_t i)
+{
+  *delegate='\0';
+  if (delegate_info[i]->encode != (char *) NULL)
+    (void) CopyMagickString(delegate,delegate_info[i]->encode,
+      MagickPathExtent);
+  (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
+  delegate[9]='\0';
 }
 
 MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
@@ -1208,12 +1227,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
       continue;
     ListDelegatePath(file,path,delegate_info,i);
     path=delegate_info[i]->path;
-    *delegate='\0';
-    if (delegate_info[i]->encode != (char *) NULL)
-      (void) CopyMagickString(delegate,delegate_info[i]->encode,
-        MagickPathExtent);
-    (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
-    delegate[9]='\0';
+    FormatDelegateName(delegate,delegate_info,i);
     ListDelegateCommands(file,delegate_info,i,delegate);
   }
   (void) fflush(file);

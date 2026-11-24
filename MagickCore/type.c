@@ -1426,6 +1426,62 @@ static void ParseTypeElement(const TypeElementInput *element,
     font_path);
 }
 
+typedef struct _TypeConfigureInput
+{
+  const TypeLoadTarget
+    *target;
+
+  SplayTreeInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *filename;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *keyword,
+    *token,
+    *font_path;
+} TypeConfigureInput;
+
+static void ParseTypeConfigureToken(const TypeConfigureInput *input,
+  const char **q,MagickStatusType *status,TypeInfo **type_info)
+{
+  TypeElementInput
+    element;
+
+  (void) CopyMagickString(input->keyword,input->token,MagickPathExtent);
+  if (SkipMarkupElement(input->keyword,q,input->extent,input->token) !=
+      MagickFalse)
+    return;
+  if (LocaleCompare(input->keyword,"<include") == 0)
+    {
+      const TypeIncludeScan
+        scan = { input->target, input->filename, input->depth, input->extent,
+          input->keyword, input->token };
+
+      /*
+        Include element.
+      */
+      LoadTypeIncludeElement(&scan,q,status);
+      return;
+    }
+  element.cache=input->cache;
+  element.exception=input->exception;
+  element.keyword=input->keyword;
+  element.token=input->token;
+  element.filename=input->filename;
+  element.font_path=input->font_path;
+  element.extent=input->extent;
+  ParseTypeElement(&element,type_info,status,q);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1475,37 +1531,19 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
 #endif
   for (q=(char *) xml; *q != '\0'; )
   {
-    TypeElementInput
-      element;
-
     /*
       Interpret XML.
     */
     (void) GetNextToken(q,&q,extent,token);
     if (*token == '\0')
       break;
-    (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (SkipMarkupElement(keyword,&q,extent,token) != MagickFalse)
-      continue;
-    if (LocaleCompare(keyword,"<include") == 0)
-      {
-        const TypeIncludeScan
-          scan = { target, filename, depth, extent, keyword, token };
+    {
+      const TypeConfigureInput
+        input = { target, cache, exception, filename, depth, extent, keyword,
+          token, font_path };
 
-        /*
-          Include element.
-        */
-        LoadTypeIncludeElement(&scan,&q,&status);
-        continue;
-      }
-    element.cache=cache;
-    element.exception=exception;
-    element.keyword=keyword;
-    element.token=token;
-    element.filename=filename;
-    element.font_path=font_path;
-    element.extent=extent;
-    ParseTypeElement(&element,&type_info,&status,&q);
+      ParseTypeConfigureToken(&input,&q,&status,&type_info);
+    }
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));

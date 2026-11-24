@@ -76,6 +76,7 @@ $call Make configure.c
 $call Make configure-paths.c
 $call Make constitute.c
 $call Make constitute-codec.c
+$call Make constitute-encode.c
 $call Make constitute-write.c
 $call Make constitute-pixels.c
 $call Make decorate.c
@@ -147,6 +148,7 @@ $call Make layer-composite.c
 $call Make layer-merge.c
 $call Make list.c
 $call Make locale.c
+$call Make locale-options.c
 $call Make locale-format.c
 $call Make log.c
 $call Make magic.c
@@ -180,6 +182,7 @@ $call Make pixel-import.c
 $call Make pixel-export.c
 $call Make policy.c
 $call Make policy-path.c
+$call Make policy-value.c
 $call Make prepress.c
 $call Make property.c
 $call Make PreRvIcccm.c

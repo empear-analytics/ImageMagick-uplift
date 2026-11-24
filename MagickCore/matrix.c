@@ -184,16 +184,15 @@ static MagickBooleanType SetMatrixExtent(
 #if defined(SIGBUS)
   (void) signal(SIGBUS,MatrixSignalHandler);
 #endif
-  return(count != (MagickOffsetType) 1 ? MagickFalse : MagickTrue);
+  return((MagickBooleanType) !(count != (MagickOffsetType) 1));
 }
 
 static inline MagickBooleanType IsMatrixMemoryAvailable(
   const MagickBooleanType status,const MatrixInfo *matrix_info)
 {
-  return(((status != MagickFalse) &&
+  return((MagickBooleanType) ((status != MagickFalse) &&
     (matrix_info->length == (MagickSizeType) ((size_t) matrix_info->length)) &&
-    ((size_t) matrix_info->length <= GetMaxMemoryRequest())) ? MagickTrue :
-    MagickFalse);
+    ((size_t) matrix_info->length <= GetMaxMemoryRequest())));
 }
 
 static void AcquireMatrixMemory(MatrixInfo *matrix_info)
@@ -237,12 +236,22 @@ static void MapMatrixFile(MatrixInfo *matrix_info)
     }
 }
 
-MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
-  const size_t rows,const size_t stride,ExceptionInfo *exception)
+static void SetMatrixSynchronize(MatrixInfo *matrix_info)
 {
   char
     *synchronize;
 
+  synchronize=GetEnvironmentValue("MAGICK_SYNCHRONIZE");
+  if (synchronize != (const char *) NULL)
+    {
+      matrix_info->synchronize=IsStringTrue(synchronize);
+      synchronize=DestroyString(synchronize);
+    }
+}
+
+MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
+  const size_t rows,const size_t stride,ExceptionInfo *exception)
+{
   MagickBooleanType
     status;
 
@@ -258,12 +267,7 @@ MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   matrix_info->rows=rows;
   matrix_info->stride=stride;
   matrix_info->semaphore=AcquireSemaphoreInfo();
-  synchronize=GetEnvironmentValue("MAGICK_SYNCHRONIZE");
-  if (synchronize != (const char *) NULL)
-    {
-      matrix_info->synchronize=IsStringTrue(synchronize);
-      synchronize=DestroyString(synchronize);
-    }
+  SetMatrixSynchronize(matrix_info);
   matrix_info->length=(MagickSizeType) columns*rows*stride;
   if (matrix_info->columns != (size_t) (matrix_info->length/rows/stride))
     {
@@ -378,6 +382,18 @@ MagickExport double **AcquireMagickMatrix(const size_t number_rows,
 %    o matrix_info: the matrix.
 %
 */
+static void RelinquishMatrixMemory(MatrixInfo *matrix_info)
+{
+  if (matrix_info->mapped == MagickFalse)
+    matrix_info->elements=RelinquishAlignedMemory(matrix_info->elements);
+  else
+    {
+      (void) UnmapBlob(matrix_info->elements,(size_t) matrix_info->length);
+      matrix_info->elements=(unsigned short *) NULL;
+    }
+  RelinquishMagickResource(MemoryResource,matrix_info->length);
+}
+
 MagickExport MatrixInfo *DestroyMatrixInfo(MatrixInfo *matrix_info)
 {
   assert(matrix_info != (MatrixInfo *) NULL);
@@ -387,14 +403,7 @@ MagickExport MatrixInfo *DestroyMatrixInfo(MatrixInfo *matrix_info)
   {
     case MemoryCache:
     {
-      if (matrix_info->mapped == MagickFalse)
-        matrix_info->elements=RelinquishAlignedMemory(matrix_info->elements);
-      else
-        {
-          (void) UnmapBlob(matrix_info->elements,(size_t) matrix_info->length);
-          matrix_info->elements=(unsigned short *) NULL;
-        }
-      RelinquishMagickResource(MemoryResource,matrix_info->length);
+      RelinquishMatrixMemory(matrix_info);
       break;
     }
     case MapCache:
@@ -594,28 +603,29 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %
 %  The format of the AcquireMagickMatrix method is:
 %
-%      void LeastSquaresAddTerms(double **matrix,double **vectors,
-%        const double *terms,const double *results,const size_t rank,
-%        const size_t number_vectors);
+%      void LeastSquaresAddTerms(const LeastSquaresSystem *least_squares,
+%        const double *terms,const double *results);
 %
 %  A description of each parameter follows:
 %
-%    o matrix: the square matrix to add given terms/results to.
+%    o least_squares: the system the terms are added to:
 %
-%    o vectors: the result vectors to add terms/results to.
+%      o matrix: the square matrix to add given terms/results to.
+%
+%      o vectors: the result vectors to add terms/results to.
+%
+%      o rank: the rank or size of the dimensions of the square matrix.
+%        Also the length of vectors, and number of terms being added.
+%
+%      o number_vectors: Number of result vectors, and number or results
+%        being added.  Also represents the number of separable systems of
+%        equations that is being solved.
 %
 %    o terms: the pre-calculated terms (without the unknown coefficient
 %             weights) that forms the equation being added.
 %
 %    o results: the result(s) that should be generated from the given terms
 %               weighted by the yet-to-be-solved coefficients.
-%
-%    o rank: the rank or size of the dimensions of the square matrix.
-%            Also the length of vectors, and number of terms being added.
-%
-%    o number_vectors: Number of result vectors, and number or results being
-%      added.  Also represents the number of separable systems of equations
-%      that is being solved.
 %
 %  Example of use...
 %
@@ -626,6 +636,7 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %     double **matrix = AcquireMagickMatrix(3UL,3UL);
 %     double **vectors = AcquireMagickMatrix(2UL,3UL);
 %     double terms[3], results[2];
+%     const LeastSquaresSystem least_squares = { matrix, vectors, 3UL, 2UL };
 %     ...
 %     for each given x,y -> u,v
 %        terms[0] = x;
@@ -633,7 +644,7 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %        terms[2] = 1;
 %        results[0] = u;
 %        results[1] = v;
-%        LeastSquaresAddTerms(matrix,vectors,terms,results,3UL,2UL);
+%        LeastSquaresAddTerms(&least_squares,terms,results);
 %     ...
 %     if ( GaussJordanElimination(matrix,vectors,3UL,2UL) ) {
 %       c0 = vectors[0][0];
@@ -649,10 +660,18 @@ MagickExport size_t GetMatrixRows(const MatrixInfo *matrix_info)
 %     RelinquishMagickMatrix(vectors,2UL);
 %
 */
-MagickPrivate void LeastSquaresAddTerms(double **matrix,double **vectors,
-  const double *terms,const double *results,const size_t rank,
-  const size_t number_vectors)
+MagickPrivate void LeastSquaresAddTerms(
+  const LeastSquaresSystem *least_squares,const double *terms,
+  const double *results)
 {
+  double
+    **const matrix = least_squares->matrix,
+    **const vectors = least_squares->vectors;
+
+  const size_t
+    rank = least_squares->rank,
+    number_vectors = least_squares->number_vectors;
+
   ssize_t
     i,
     j;
@@ -912,7 +931,7 @@ MagickExport MagickBooleanType NullMatrix(MatrixInfo *matrix_info)
     if (x < (ssize_t) matrix_info->length)
       break;
   }
-  return(y < (ssize_t) matrix_info->rows ? MagickFalse : MagickTrue);
+  return((MagickBooleanType) !(y < (ssize_t) matrix_info->rows));
 }
 
 /*

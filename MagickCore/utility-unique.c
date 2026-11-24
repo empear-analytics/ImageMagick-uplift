@@ -216,6 +216,30 @@ static MagickBooleanType CopyToUniqueFile(const char *source,
   return(CopyFileDescriptor(source_file,destination_file,destination));
 }
 
+#if defined(MAGICKCORE_HAVE_SYMLINK)
+static MagickBooleanType LinkUniqueRelativePath(const char *source,
+  char *destination,MagickBooleanType *result)
+{
+  char
+    path[MagickPathExtent];
+
+  *path='\0';
+  if (getcwd(path,MagickPathExtent) == (char *) NULL)
+    {
+      (*result)=MagickFalse;
+      return(MagickTrue);
+    }
+  (void) ConcatenateMagickString(path,DirectorySeparator,MagickPathExtent);
+  (void) ConcatenateMagickString(path,source,MagickPathExtent);
+  if (symlink(path,destination) == 0)
+    {
+      (*result)=MagickTrue;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+#endif
+
 MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
   char *destination)
 {
@@ -227,6 +251,7 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
 #if defined(MAGICKCORE_HAVE_SYMLINK)
   {
     MagickBooleanType
+      returned,
       status;
 
     /*
@@ -246,19 +271,9 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
               return(MagickTrue);
           }
         else
-          {
-            char
-              path[MagickPathExtent];
-
-            *path='\0';
-            if (getcwd(path,MagickPathExtent) == (char *) NULL)
-              return(MagickFalse);
-            (void) ConcatenateMagickString(path,DirectorySeparator,
-              MagickPathExtent);
-            (void) ConcatenateMagickString(path,source,MagickPathExtent);
-            if (symlink(path,destination) == 0)
-              return(MagickTrue);
-          }
+          if (LinkUniqueRelativePath(source,destination,&returned) !=
+              MagickFalse)
+            return(returned);
       }
   }
 #endif

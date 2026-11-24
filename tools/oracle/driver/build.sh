@@ -14,6 +14,10 @@ CC=$(sed -n 's/^CC = //p' Makefile)
 CFLAGS=$(sed -n 's/^CFLAGS = //p' Makefile | sed 's/-fpass-plugin=[^ ]*//')
 CPPFLAGS=$(sed -n 's/^CPPFLAGS = //p' Makefile)
 TOP=$(sed -n 's/^abs_top_srcdir = //p' Makefile)
+# LeastSquaresAddTerms takes a struct from M142 on (Recipe B); call the signature this build has
+if grep -q '_LeastSquaresSystem' "$TOP/MagickCore/matrix-private.h"; then
+  CPPFLAGS="$CPPFLAGS -DIMDRIVER_LEAST_SQUARES_ADD_TERMS"
+fi
 $CC $CFLAGS $CPPFLAGS -I"$B" -I"$TOP" -c "$SRC/imdriver.c" -o utilities/imdriver.o
 ./libtool --silent --tag=CC --mode=link $CC $CFLAGS $(sed -n 's/^LDFLAGS = //p' Makefile) \
   -o utilities/imdriver utilities/imdriver.o MagickCore/libMagickCore-7.*.la

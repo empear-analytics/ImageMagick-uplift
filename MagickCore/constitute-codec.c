@@ -89,6 +89,7 @@
 #include "MagickCore/transform.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/utility-private.h"
+#include "MagickCore/constitute-codec-private.h"
 
 /*
   Typedef declarations.
@@ -104,18 +105,6 @@ typedef struct _InterpretedPropertyTarget
   ExceptionInfo
     *exception;
 } InterpretedPropertyTarget;
-
-typedef struct _EncodeTarget
-{
-  ImageInfo
-    *write_info;
-
-  Image
-    *image;
-
-  ExceptionInfo
-    *exception;
-} EncodeTarget;
 
 typedef struct _ConstituteInfo
 {
@@ -139,14 +128,18 @@ typedef struct _ConstituteInfo
     ticks_per_second;
 } ConstituteInfo;
 
+static void LimitDelayAbove(Image *next,
+  const ConstituteInfo *constitute_info)
+{
+  if (next->delay > constitute_info->delay)
+    next->delay=constitute_info->delay;
+}
+
 static void SyncDelayFromConstituteInfo(Image *next,
   const ConstituteInfo *constitute_info)
 {
   if ((constitute_info->delay_flags & GreaterValue) != 0)
-    {
-      if (next->delay > constitute_info->delay)
-        next->delay=constitute_info->delay;
-    }
+    LimitDelayAbove(next,constitute_info);
   else
     if ((constitute_info->delay_flags & LessValue) != 0)
       {
@@ -258,16 +251,6 @@ static Image *ApplyExtractGeometry(const ImageInfo *read_info,Image *next,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-
-static MagickBooleanType IsCoderAuthorized(const char *module,
-  const char *coder,const PolicyRights rights,ExceptionInfo *exception)
-{
-  if (IsRightsAuthorized(CoderPolicyDomain,rights,coder) == MagickFalse)
-    ThrowPolicyException(coder,MagickFalse);
-  if (IsRightsAuthorized(ModulePolicyDomain,rights,module) == MagickFalse)
-    ThrowPolicyException(module,MagickFalse);
-  return(MagickTrue);
-}
 
 static void InitializeConstituteInfo(const ImageInfo *image_info,
   ConstituteInfo *constitute_info)
@@ -883,6 +866,100 @@ static void CheckReadImageArguments(const ImageInfo *image_info,
   assert(exception != (ExceptionInfo *) NULL);
 }
 
+static void ReportDecodedImage(const ImageInfo *read_info,const Image *image,
+  const ExceptionInfo *exception)
+{
+  if (exception->severity >= ErrorException)
+    (void) LogMagickEvent(ExceptionEvent,GetMagickModule(),
+      "Coder (%s) generated an image despite an error (%d), "
+      "notify the developers",image->magick,exception->severity);
+  if (IsBlobTemporary(image) != MagickFalse)
+    (void) RelinquishUniqueFileResource(read_info->filename);
+}
+
+static const MagickInfo *GetEndianMagickInfo(const ImageInfo *image_info,
+  ImageInfo *read_info,ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  magick_info=GetReadMagickInfo(read_info,exception);
+  if (magick_info != (const MagickInfo *) NULL)
+    SetReadEndian(image_info,read_info,magick_info);
+  return(magick_info);
+}
+
+static MagickBooleanType SelectReadImageScenes(ImageInfo *read_info,
+  Image **image,ExceptionInfo *exception)
+{
+  if (IsSceneSelection(read_info,(*image)) != MagickFalse)
+    {
+      (*image)=SelectImageScenes((*image),read_info->scenes,exception);
+      if ((*image) == (Image *) NULL)
+        {
+          read_info=DestroyImageInfo(read_info);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
+static void ReleaseTemporaryReadInput(ImageInfo *read_info,Image *image,
+  const char *filename)
+{
+  if (read_info->temporary != MagickFalse)
+    ReleaseTemporaryReadFile(read_info,image,filename);
+}
+
+typedef struct _ReadImageFinish
+{
+  ImageInfo
+    *read_info;
+
+  char
+    *magick,
+    *magick_filename,
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} ReadImageFinish;
+
+static Image *FinishReadImageList(const ReadImageFinish *finish,Image *image)
+{
+  ImageInfo
+    *const read_info = finish->read_info;
+
+  char
+    *const magick = finish->magick,
+    *const magick_filename = finish->magick_filename,
+    *const filename = finish->filename;
+
+  ExceptionInfo
+    *const exception = finish->exception;
+
+  ConstituteInfo
+    constitute_info;
+
+  Image
+    *next;
+
+  InitializeConstituteInfo(read_info,&constitute_info);
+  for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    next->taint=MagickFalse;
+    SetReadImageNames(next,magick,magick_filename);
+    if (IsBlobTemporary(image) != MagickFalse)
+      (void) CopyMagickString(next->filename,filename,MagickPathExtent);
+    SyncReadImageMetadata(read_info,next,&constitute_info,exception);
+    if (IsExtractRequested(read_info) != MagickFalse)
+      next=ApplyExtractGeometry(read_info,next,exception);
+    FinishReadImageMetadata(read_info,next,&constitute_info,exception);
+    image=next;
+  }
+  return(image);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -891,9 +968,6 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     magick[MagickPathExtent],
     magick_filename[MagickPathExtent];
 
-  ConstituteInfo
-    constitute_info;
-
   const MagickInfo
     *magick_info;
 
@@ -901,11 +975,13 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     *decoder;
 
   Image
-    *image,
-    *next;
+    *image;
 
   ImageInfo
     *read_info;
+
+  ReadImageFinish
+    finish;
 
   /*
     Determine image type from filename prefix or suffix (e.g. image.jpg).
@@ -919,9 +995,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   /*
     Call appropriate image reader based on image type.
   */
-  magick_info=GetReadMagickInfo(read_info,exception);
-  if (magick_info != (const MagickInfo *) NULL)
-    SetReadEndian(image_info,read_info,magick_info);
+  magick_info=GetEndianMagickInfo(image_info,read_info,exception);
   if (OpenSeekableReadStream(image_info,read_info,magick_info,exception) ==
       MagickFalse)
     return((Image *) NULL);
@@ -943,464 +1017,30 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   else
     if (DecodeDelegateImage(read_info,&image,exception) == MagickFalse)
       return((Image *) NULL);
-  if (read_info->temporary != MagickFalse)
-    ReleaseTemporaryReadFile(read_info,image,filename);
+  ReleaseTemporaryReadInput(read_info,image,filename);
   if (image == (Image *) NULL)
     {
       read_info=DestroyImageInfo(read_info);
       return(image);
     }
-  if (exception->severity >= ErrorException)
-    (void) LogMagickEvent(ExceptionEvent,GetMagickModule(),
-      "Coder (%s) generated an image despite an error (%d), "
-      "notify the developers",image->magick,exception->severity);
-  if (IsBlobTemporary(image) != MagickFalse)
-    (void) RelinquishUniqueFileResource(read_info->filename);
+  ReportDecodedImage(read_info,image,exception);
   if (HasPingImageSizes(read_info,image) == MagickFalse)
     {
       read_info=DestroyImageInfo(read_info);
       ThrowReaderException(ImageError,"NegativeOrZeroImageSize");
     }
-  if (IsSceneSelection(read_info,image) != MagickFalse)
-    {
-      image=SelectImageScenes(image,read_info->scenes,exception);
-      if (image == (Image *) NULL)
-        {
-          read_info=DestroyImageInfo(read_info);
-          return(image);
-        }
-    }
-  InitializeConstituteInfo(read_info,&constitute_info);
-  for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
-  {
-    next->taint=MagickFalse;
-    SetReadImageNames(next,magick,magick_filename);
-    if (IsBlobTemporary(image) != MagickFalse)
-      (void) CopyMagickString(next->filename,filename,MagickPathExtent);
-    SyncReadImageMetadata(read_info,next,&constitute_info,exception);
-    if (IsExtractRequested(read_info) != MagickFalse)
-      next=ApplyExtractGeometry(read_info,next,exception);
-    FinishReadImageMetadata(read_info,next,&constitute_info,exception);
-    image=next;
-  }
+  if (SelectReadImageScenes(read_info,&image,exception) == MagickFalse)
+    return(image);
+  finish.read_info=read_info;
+  finish.magick=magick;
+  finish.magick_filename=magick_filename;
+  finish.filename=filename;
+  finish.exception=exception;
+  image=FinishReadImageList(&finish,image);
   read_info=DestroyImageInfo(read_info);
   if (GetBlobError(image) != MagickFalse)
     ThrowReaderException(CorruptImageError,"UnableToReadImageData");
   return(GetFirstImageInList(image));
 }
 
-static const MagickInfo *GetWriteMagickInfo(ImageInfo *write_info,
-  const Image *image,ExceptionInfo *exception)
-{
-  const MagickInfo
-    *magick_info;
-
-  ExceptionInfo
-    *sans_exception;
-
-  sans_exception=AcquireExceptionInfo();
-  magick_info=GetMagickInfo(write_info->magick,sans_exception);
-  if (sans_exception->severity == PolicyError)
-    magick_info=GetMagickInfo(write_info->magick,exception);
-  sans_exception=DestroyExceptionInfo(sans_exception);
-  if ((write_info->affirm == MagickFalse) &&
-      (magick_info == (const MagickInfo *) NULL))
-    {
-      (void) CopyMagickString(write_info->magick,image->magick,
-        MagickPathExtent);
-      magick_info=GetMagickInfo(write_info->magick,exception);
-    }
-  return(magick_info);
-}
-
-static MagickBooleanType CopyTemporaryImageFile(ImageInfo *write_info,
-  Image *image,ExceptionInfo *exception)
-{
-  MagickBooleanType
-    status;
-
-  /*
-    Copy temporary image file to permanent.
-  */
-  status=OpenBlob(write_info,image,ReadBinaryBlobMode,exception);
-  if (status != MagickFalse)
-    {
-      (void) RelinquishUniqueFileResource(write_info->filename);
-      status=ImageToFile(image,write_info->filename,exception);
-    }
-  if (CloseBlob(image) == MagickFalse)
-    status=MagickFalse;
-  (void) RelinquishUniqueFileResource(image->filename);
-  (void) CopyMagickString(image->filename,write_info->filename,
-    MagickPathExtent);
-  return(status);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   W r i t e I m a g e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  WriteImage() writes an image or an image sequence to a file or file handle.
-%  If writing to a file is on disk, the name is defined by the filename member
-%  of the image structure.  WriteImage() returns MagickFalse is there is a
-%  memory shortage or if the image cannot be written.  Check the exception
-%  member of image to determine the cause for any failure.
-%
-%  The format of the WriteImage method is:
-%
-%      MagickBooleanType WriteImage(const ImageInfo *image_info,Image *image,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: the image info.
-%
-%    o image: the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static inline MagickBooleanType IsSingleImageDelegateCopy(const char *option,
-  const ImageInfo *write_info,const Image *image)
-{
-  return((MagickBooleanType) ((IsStringTrue(option) != MagickFalse) &&
-    (write_info->page == (char *) NULL) &&
-    (GetPreviousImageInList(image) == (Image *) NULL) &&
-    (GetNextImageInList(image) == (Image *) NULL) &&
-    (IsTaintImage(image) == MagickFalse)));
-}
-
-static inline MagickBooleanType IsDirectDelegate(
-  const DelegateInfo *delegate_info,const Image *image)
-{
-  return((MagickBooleanType) ((delegate_info != (const DelegateInfo *) NULL) &&
-    (GetDelegateMode(delegate_info) == 0) &&
-    (IsPathAccessible(image->magick_filename) != MagickFalse)));
-}
-
-static void SyncEndianFromMagickInfo(const ImageInfo *image_info,Image *image,
-  const MagickInfo *magick_info)
-{
-  if (GetMagickEndianSupport(magick_info) == MagickFalse)
-    image->endian=UndefinedEndian;
-  else
-    if ((image_info->endian == UndefinedEndian) &&
-        (GetMagickRawSupport(magick_info) != MagickFalse))
-      image->endian=GetHostEndian();
-}
-
-typedef struct _EncodeFallbackInfo
-{
-  ImageInfo
-    *write_info;
-
-  Image
-    *image;
-
-  char
-    *filename;
-
-  ExceptionInfo
-    *exception;
-} EncodeFallbackInfo;
-
-static const MagickInfo *GetExtensionMagickInfo(const Image *image,
-  ExceptionInfo *exception)
-{
-  char
-    extension[MagickPathExtent];
-
-  const MagickInfo
-    *magick_info;
-
-  GetPathComponent(image->filename,ExtensionPath,extension);
-  if (*extension != '\0')
-    magick_info=GetMagickInfo(extension,exception);
-  else
-    magick_info=GetMagickInfo(image->magick,exception);
-  return(magick_info);
-}
-
-static void FindFallbackEncoder(const EncodeFallbackInfo *info,
-  const MagickInfo **magick_info,EncodeImageHandler **encoder)
-{
-  ImageInfo
-    *const write_info = info->write_info;
-
-  Image
-    *const image = info->image;
-
-  const char
-    *const filename = info->filename;
-
-  ExceptionInfo
-    *const exception = info->exception;
-
-  *magick_info=GetWriteMagickInfo(write_info,image,exception);
-  *encoder=GetImageEncoder(*magick_info);
-  if (*encoder == (EncodeImageHandler *) NULL)
-    {
-      *magick_info=GetExtensionMagickInfo(image,exception);
-      (void) CopyMagickString(image->filename,filename,
-        MagickPathExtent);
-      *encoder=GetImageEncoder(*magick_info);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        MissingDelegateWarning,"NoEncodeDelegateForThisImageFormat",
-        "`%s'",write_info->magick);
-    }
-  if (*encoder == (EncodeImageHandler *) NULL)
-    {
-      *magick_info=GetMagickInfo(image->magick,exception);
-      *encoder=GetImageEncoder(*magick_info);
-      if (*encoder == (EncodeImageHandler *) NULL)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          MissingDelegateError,"NoEncodeDelegateForThisImageFormat",
-          "`%s'",write_info->magick);
-    }
-}
-
-static MagickBooleanType EncodeImageWithInfo(const MagickInfo *magick_info,
-  EncodeImageHandler *encoder,const EncodeTarget *target)
-{
-  ImageInfo
-    *const write_info = target->write_info;
-
-  Image
-    *const image = target->image;
-
-  ExceptionInfo
-    *const exception = target->exception;
-
-  MagickBooleanType
-    status;
-
-  if (GetMagickEncoderThreadSupport(magick_info) == MagickFalse)
-    LockSemaphoreInfo(magick_info->semaphore);
-  status=IsCoderAuthorized(magick_info->magick_module,magick_info->name,
-    WritePolicyRights,exception);
-  if (status != MagickFalse)
-    status=encoder(write_info,image,exception);
-  if (GetMagickEncoderThreadSupport(magick_info) == MagickFalse)
-    UnlockSemaphoreInfo(magick_info->semaphore);
-  return(status);
-}
-
-static MagickBooleanType CloseSeekableWriteBlob(ImageInfo *write_info,
-  Image *image,MagickBooleanType *temporary)
-{
-  if (IsBlobSeekable(image) == MagickFalse)
-    {
-      /*
-        A seekable stream is required by the encoder.
-      */
-      write_info->adjoin=MagickTrue;
-      (void) CopyMagickString(write_info->filename,image->filename,
-        MagickPathExtent);
-      (void) AcquireUniqueFilename(image->filename);
-      *temporary=MagickTrue;
-    }
-  return(CloseBlob(image));
-}
-
-static MagickBooleanType InvokeLockedWriteDelegate(
-  const DelegateInfo *delegate_info,ImageInfo *write_info,Image *image,
-  ExceptionInfo *exception)
-{
-  MagickBooleanType
-    status;
-
-  if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
-    LockSemaphoreInfo(delegate_info->semaphore);
-  status=InvokeDelegate(write_info,image,(char *) NULL,
-    write_info->magick,exception);
-  if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
-    UnlockSemaphoreInfo(delegate_info->semaphore);
-  return(status);
-}
-
-static void EncodeImageWithFallback(const EncodeFallbackInfo *info,
-  MagickBooleanType *status)
-{
-  ImageInfo
-    *const write_info = info->write_info;
-
-  Image
-    *const image = info->image;
-
-  char
-    *const filename = info->filename;
-
-  ExceptionInfo
-    *const exception = info->exception;
-
-  const DelegateInfo
-    *delegate_info;
-
-  const MagickInfo
-    *magick_info;
-
-  EncodeImageHandler
-    *encoder;
-
-  delegate_info=GetDelegateInfo((char *) NULL,write_info->magick,exception);
-  if (delegate_info != (DelegateInfo *) NULL)
-    {
-      /*
-        Process the image with delegate.
-      */
-      *write_info->filename='\0';
-      (*status)=InvokeLockedWriteDelegate(delegate_info,write_info,image,
-        exception);
-      (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-    }
-  else
-    {
-      FindFallbackEncoder(info,&magick_info,&encoder);
-      if (encoder != (EncodeImageHandler *) NULL)
-        {
-          const EncodeTarget
-            target = { write_info, image, exception };
-
-          /*
-            Call appropriate image writer based on image type.
-          */
-          (*status)=EncodeImageWithInfo(magick_info,encoder,&target);
-        }
-    }
-}
-
-MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
-  Image *image,ExceptionInfo *exception)
-{
-  char
-    filename[MagickPathExtent];
-
-  const char
-    *option;
-
-  const DelegateInfo
-    *delegate_info;
-
-  const MagickInfo
-    *magick_info;
-
-  EncodeImageHandler
-    *encoder;
-
-  ExceptionInfo
-    *sans_exception;
-
-  ImageInfo
-    *write_info;
-
-  MagickBooleanType
-    status,
-    temporary;
-
-  /*
-    Determine image type from filename prefix or suffix (e.g. image.jpg).
-  */
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  sans_exception=AcquireExceptionInfo();
-  write_info=CloneImageInfo(image_info);
-  (void) CopyMagickString(write_info->filename,image->filename,
-    MagickPathExtent);
-  (void) SetImageInfo(write_info,1,sans_exception);
-  if (*write_info->magick == '\0')
-    (void) CopyMagickString(write_info->magick,image->magick,MagickPathExtent);
-  (void) CopyMagickString(filename,image->filename,MagickPathExtent);
-  (void) CopyMagickString(image->filename,write_info->filename,
-    MagickPathExtent);
-  /*
-    Call appropriate image writer based on image type.
-  */
-  magick_info=GetMagickInfo(write_info->magick,sans_exception);
-  if (sans_exception->severity == PolicyError)
-    magick_info=GetMagickInfo(write_info->magick,exception);
-  sans_exception=DestroyExceptionInfo(sans_exception);
-  if (magick_info != (const MagickInfo *) NULL)
-    SyncEndianFromMagickInfo(image_info,image,magick_info);
-  if ((image->ping != MagickFalse) &&
-      (SyncImagePixelCache(image,exception) == MagickFalse))
-    {
-      write_info=DestroyImageInfo(write_info);
-      return(MagickFalse);
-    }
-  SyncImageProfiles(image);
-  DisassociateImageStream(image);
-  option=GetImageOption(image_info,"delegate:bimodal");
-  if (IsSingleImageDelegateCopy(option,write_info,image) != MagickFalse)
-    {
-      delegate_info=GetDelegateInfo(image->magick,write_info->magick,exception);
-      if (IsDirectDelegate(delegate_info,image) != MagickFalse)
-        {
-          /*
-            Process image with bi-modal delegate.
-          */
-          (void) CopyMagickString(image->filename,image->magick_filename,
-            MagickPathExtent);
-          status=InvokeDelegate(write_info,image,image->magick,
-            write_info->magick,exception);
-          write_info=DestroyImageInfo(write_info);
-          (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-          return(status);
-        }
-    }
-  status=MagickFalse;
-  temporary=MagickFalse;
-  if ((magick_info != (const MagickInfo *) NULL) &&
-      (GetMagickEncoderSeekableStream(magick_info) != MagickFalse))
-    {
-      char
-        image_filename[MagickPathExtent];
-
-      (void) CopyMagickString(image_filename,image->filename,MagickPathExtent);
-      status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
-      (void) CopyMagickString(image->filename, image_filename,MagickPathExtent);
-      if ((status != MagickFalse) &&
-          (CloseSeekableWriteBlob(write_info,image,&temporary) == MagickFalse))
-        status=MagickFalse;
-    }
-  encoder=GetImageEncoder(magick_info);
-  if (encoder != (EncodeImageHandler *) NULL)
-    {
-      const EncodeTarget
-        target = { write_info, image, exception };
-
-      /*
-        Call appropriate image writer based on image type.
-      */
-      status=EncodeImageWithInfo(magick_info,encoder,&target);
-    }
-  else
-    {
-      const EncodeFallbackInfo
-        fallback = { write_info, image, filename, exception };
-
-      EncodeImageWithFallback(&fallback,&status);
-    }
-  if (temporary != MagickFalse)
-    status=CopyTemporaryImageFile(write_info,image,exception);
-  if ((LocaleCompare(write_info->magick,"info") != 0) &&
-      (write_info->verbose != MagickFalse))
-    (void) IdentifyImage(image,stdout,MagickFalse,exception);
-  write_info=DestroyImageInfo(write_info);
-  if (GetBlobError(image) != MagickFalse)
-    ThrowWriterException(FileOpenError,"UnableToWriteFile");
-  return(status);
-}
 

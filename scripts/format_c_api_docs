@@ -53,6 +53,7 @@ if ( ! GetOptions(
 	 'composite-image.c',
 	 'constitute.c',
 	 'constitute-codec.c',
+	 'constitute-encode.c',
 	 'constitute-write.c',
 	 'constitute-pixels.c',
 	 'decorate.c',

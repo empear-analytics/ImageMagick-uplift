@@ -28,7 +28,7 @@ MagickCore/geometry-private.h 4e82a0c5b095769d45947062d6790a4f9ab9bf2f  # declar
 MagickCore/linked-list-private.h eb5e90c85edfe3b4ac6a610009ee46ebbf70aae8  # a struct and declarations
 MagickCore/log-private.h 515cfd2f9f1d7f992d335e1b9023f6778ac98ba4  # declarations only
 MagickCore/magic-private.h 64fb0e9ee390eeb0c003b188c2286e6907eae7e2  # declarations only
-MagickCore/matrix-private.h 8fc0968e262684e0900bca6ae93e8f8c9918546a  # declarations only
+MagickCore/matrix-private.h 9ae018f27da6ea8c9dc4897fdb622d4ace1d0596  # declarations only (M142: LeastSquaresSystem typedef added, no function)
 MagickCore/mime-private.h 22f913a538b498ba177cc7eea8b2969f76c39113  # an enum and declarations
 MagickCore/module-private.h 33399b5a22bc3aeeed1f941ad12fad86dcc81829  # declarations only
 MagickCore/monitor-private.h 490149ef77ba41533261fb546176ff70877b3b9c  # declarations only

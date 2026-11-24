@@ -449,6 +449,13 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsListedPolicy(const PolicyInfo *policy,
+  const char *pattern)
+{
+  return((MagickBooleanType) ((policy->stealth == MagickFalse) &&
+    (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse)));
+}
+
 MagickExport const PolicyInfo **GetPolicyInfoList(const char *pattern,
   size_t *number_policies,ExceptionInfo *exception)
 {
@@ -480,8 +487,7 @@ MagickExport const PolicyInfo **GetPolicyInfoList(const char *pattern,
       *policy;
 
     policy=(const PolicyInfo *) p->value;
-    if ((policy->stealth == MagickFalse) &&
-        (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse))
+    if (IsListedPolicy(policy,pattern) != MagickFalse)
       policies[i++]=policy;
     p=p->next;
   }
@@ -576,8 +582,7 @@ MagickExport char **GetPolicyList(const char *pattern,size_t *number_policies,
       *policy;
 
     policy=(const PolicyInfo *) p->value;
-    if ((policy->stealth == MagickFalse) &&
-        (GlobExpression(policy->name,pattern,MagickFalse) != MagickFalse))
+    if (IsListedPolicy(policy,pattern) != MagickFalse)
       policies[i++]=AcquirePolicyString(policy->name,1);
     p=p->next;
   }
@@ -710,17 +715,24 @@ static MagickBooleanType IsPolicyCacheInstantiated(ExceptionInfo *exception)
 %
 */
 
+static inline MagickBooleanType IsPolicyRightDenied(const PolicyRights rights,
+  const PolicyRights effective_rights,const PolicyRights right)
+{
+  return((MagickBooleanType) (((rights & right) != 0) &&
+    ((effective_rights & right) == 0)));
+}
+
 static MagickBooleanType IsEffectiveRightsAuthorized(const PolicyRights rights,
   const PolicyRights effective_rights,MagickBooleanType status)
 {
-  if (((rights & ReadPolicyRights) != 0) &&
-      ((effective_rights & ReadPolicyRights) == 0))
+  if (IsPolicyRightDenied(rights,effective_rights,ReadPolicyRights) !=
+      MagickFalse)
     status=MagickFalse;
-  if (((rights & WritePolicyRights) != 0) &&
-      ((effective_rights & WritePolicyRights) == 0))
+  if (IsPolicyRightDenied(rights,effective_rights,WritePolicyRights) !=
+      MagickFalse)
     status=MagickFalse;
-  if (((rights & ExecutePolicyRights) != 0) &&
-      ((effective_rights & ExecutePolicyRights) == 0))
+  if (IsPolicyRightDenied(rights,effective_rights,ExecutePolicyRights) !=
+      MagickFalse)
     status=MagickFalse;
   return(status);
 }
@@ -798,30 +810,14 @@ static void AcquireCanonicalPaths(const char *pattern,
   *canonical_path=realpath_utf8(pattern);
 }
 
-MagickExport MagickBooleanType IsRightsAuthorizedByName(
-  const PolicyDomain domain,const char *name,const PolicyRights rights,
-  const char *pattern)
+static MagickBooleanType IsPolicyEvaluationRequired(const PolicyDomain domain,
+  const char *name,const PolicyRights rights,const char *pattern)
 {
-  char
-    *canonical_directory = (char *) NULL,
-    *canonical_path = (char *) NULL,
-    *canonical_candidate = (char *) NULL;
-
-  ElementInfo
-    *p;
-
   ExceptionInfo
     *exception;
 
   MagickBooleanType
-    canonical_matched_any = MagickFalse,
-    matched_any = MagickFalse,
-    paths_provisioned = MagickFalse,
     status;
-
-  PolicyRights
-    canonical_allowed_accumulator = AllPolicyRights,
-    effective_rights = AllPolicyRights;
 
   /*
     Load policies.
@@ -841,12 +837,123 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       if ((GetLogEventMask() & PolicyEvent) != 0)
         (void) LogMagickEvent(PolicyEvent,GetMagickModule(),
           "  authorized: true (no security policies found)");
-      return(MagickTrue);
+      return(MagickFalse);
     }
-  /*
-    Evaluate policies in order; the last matching lexical or canonical policy
-    wins.
-  */
+  return(MagickTrue);
+}
+
+typedef struct _PolicyRightsQuery
+{
+  PolicyDomain
+    domain;
+
+  const char
+    *name,
+    *pattern;
+} PolicyRightsQuery;
+
+typedef struct _PolicyRightsTargets
+{
+  MagickBooleanType
+    *matched_any;
+
+  PolicyRights
+    *effective_rights;
+
+  MagickBooleanType
+    *canonical_matched_any;
+
+  PolicyRights
+    *canonical_allowed_accumulator;
+} PolicyRightsTargets;
+
+typedef struct _PolicyPathQuery
+{
+  const PolicyInfo
+    *policy;
+
+  const char
+    *pattern;
+} PolicyPathQuery;
+
+typedef struct _PolicyPathTargets
+{
+  MagickBooleanType
+    *paths_provisioned;
+
+  char
+    **canonical_directory,
+    **canonical_candidate,
+    **canonical_path;
+
+  MagickBooleanType
+    *matched_canonical,
+    *match;
+} PolicyPathTargets;
+
+static void MatchPolicyPath(const PolicyPathQuery *query,
+  const PolicyPathTargets *targets)
+{
+  const PolicyInfo
+    *policy = query->policy;
+
+  const char
+    *pattern = query->pattern;
+
+  MagickBooleanType
+    *const paths_provisioned = targets->paths_provisioned;
+
+  char
+    **const canonical_directory = targets->canonical_directory,
+    **const canonical_candidate = targets->canonical_candidate,
+    **const canonical_path = targets->canonical_path;
+
+  MagickBooleanType
+    *const matched_canonical = targets->matched_canonical,
+    *const match = targets->match;
+
+  if (policy->domain == PathPolicyDomain)
+    {
+      if (*paths_provisioned == MagickFalse)
+        {
+          /*
+            Generate directory, basename, and canonical path.
+          */
+          *paths_provisioned=MagickTrue;
+          AcquireCanonicalPaths(pattern,canonical_directory,
+            canonical_candidate,canonical_path);
+        }
+      /*
+        Match against directory, basename, and canonical path.
+      */
+      *matched_canonical=IsCanonicalMatch(*canonical_path,*canonical_candidate,
+        *canonical_directory,policy->pattern);
+      if (*match == MagickFalse)
+        *match=*matched_canonical;
+    }
+}
+
+static void MatchPolicyRights(const PolicyRightsQuery *query,
+  const PolicyRightsTargets *targets)
+{
+  const PolicyDomain
+    domain = query->domain;
+
+  const char
+    *name = query->name,
+    *pattern = query->pattern;
+
+  char
+    *canonical_directory = (char *) NULL,
+    *canonical_path = (char *) NULL,
+    *canonical_candidate = (char *) NULL;
+
+  ElementInfo
+    *p;
+
+  MagickBooleanType
+    paths_provisioned = MagickFalse;
+
   LockSemaphoreInfo(policy_semaphore);
   ResetLinkedListIterator(policy_cache);
   p=GetHeadElementInLinkedList(policy_cache);
@@ -859,45 +966,68 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       match = MagickFalse,
       matched_canonical = MagickFalse;
 
+    PolicyPathQuery
+      path_query;
+
+    const PolicyPathTargets
+      path_targets = { &paths_provisioned, &canonical_directory,
+        &canonical_candidate, &canonical_path, &matched_canonical, &match };
+
     if (IsPolicyForName(policy,domain,name) == MagickFalse)
       continue;
     match=GlobExpression(pattern,policy->pattern,MagickFalse);
-    if (policy->domain == PathPolicyDomain)
-      {
-        if (paths_provisioned == MagickFalse)
-          {
-            /*
-              Generate directory, basename, and canonical path.
-            */
-            paths_provisioned=MagickTrue;
-            AcquireCanonicalPaths(pattern,&canonical_directory,
-              &canonical_candidate,&canonical_path);
-          }
-        /*
-          Match against directory, basename, and canonical path.
-        */
-        matched_canonical=IsCanonicalMatch(canonical_path,canonical_candidate,
-          canonical_directory,policy->pattern);
-        if (match == MagickFalse)
-          match=matched_canonical;
-      }
+    path_query.policy=policy;
+    path_query.pattern=pattern;
+    MatchPolicyPath(&path_query,&path_targets);
     if (match == MagickFalse)
       continue;
-    matched_any=MagickTrue;
-    effective_rights=policy->rights;
+    *targets->matched_any=MagickTrue;
+    *targets->effective_rights=policy->rights;
     if (matched_canonical != MagickFalse)
       {
         /*
           If this matched a canonical form, retain the last matching rights.
         */
-        canonical_matched_any=MagickTrue;
-        canonical_allowed_accumulator=policy->rights;
+        *targets->canonical_matched_any=MagickTrue;
+        *targets->canonical_allowed_accumulator=policy->rights;
       }
   }
   UnlockSemaphoreInfo(policy_semaphore);
   canonical_directory=DestroyString(canonical_directory);
   canonical_candidate=DestroyString(canonical_candidate);
   canonical_path=DestroyString(canonical_path);
+}
+
+MagickExport MagickBooleanType IsRightsAuthorizedByName(
+  const PolicyDomain domain,const char *name,const PolicyRights rights,
+  const char *pattern)
+{
+  MagickBooleanType
+    canonical_matched_any = MagickFalse,
+    matched_any = MagickFalse,
+    status;
+
+  PolicyRights
+    canonical_allowed_accumulator = AllPolicyRights,
+    effective_rights = AllPolicyRights;
+
+  PolicyRightsQuery
+    query;
+
+  const PolicyRightsTargets
+    targets = { &matched_any, &effective_rights, &canonical_matched_any,
+      &canonical_allowed_accumulator };
+
+  if (IsPolicyEvaluationRequired(domain,name,rights,pattern) == MagickFalse)
+    return(MagickTrue);
+  /*
+    Evaluate policies in order; the last matching lexical or canonical policy
+    wins.
+  */
+  query.domain=domain;
+  query.name=name;
+  query.pattern=pattern;
+  MatchPolicyRights(&query,&targets);
   /*
     Is rights authorized?
   */
@@ -1087,8 +1217,8 @@ static void *DestroyPolicyElement(void *policy_info)
 static inline MagickBooleanType IsIncludeElementOpen(const char *token,
   const char *q)
 {
-  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) (((*token != '/') && (*(token+1) != '>')) &&
+    (*q != '\0')));
 }
 
 static void GetIncludePath(const char *filename,const char *token,
@@ -1532,6 +1662,22 @@ static MagickBooleanType ValidateSecurityPolicy(const char *policy,
   return(MagickTrue);
 }
 
+static void SetUserPolicyValues(LinkedListInfo *user_policies,
+  ExceptionInfo *exception)
+{
+  PolicyInfo
+    *p;
+
+  ResetLinkedListIterator(user_policies);
+  p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
+  while (p != (PolicyInfo *) NULL)
+  {
+    if ((p->name != (char *) NULL) && (p->value != (char *) NULL))
+      (void) SetMagickSecurityPolicyValue(p->domain,p->name,p->value,exception);
+    p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
+  }
+}
+
 MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   ExceptionInfo *exception)
 {
@@ -1540,9 +1686,6 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
 
   LinkedListInfo
     *user_policies;
-
-  PolicyInfo
-    *p;
 
   PolicyLoadTarget policy_target;
   PolicyLoadTarget user_target;
@@ -1574,146 +1717,8 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
       user_policies=DestroyLinkedList(user_policies,DestroyPolicyElement);
       return(MagickFalse);
     }
-  ResetLinkedListIterator(user_policies);
-  p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
-  while (p != (PolicyInfo *) NULL)
-  {
-    if ((p->name != (char *) NULL) && (p->value != (char *) NULL))
-      (void) SetMagickSecurityPolicyValue(p->domain,p->name,p->value,exception);
-    p=(PolicyInfo *) GetNextValueInLinkedList(user_policies);
-  }
+  SetUserPolicyValues(user_policies,exception);
   user_policies=DestroyLinkedList(user_policies,DestroyPolicyElement);
   return(status);
 }
 
-static MagickSizeType GetPolicyLimit(const char *value)
-{
-  MagickSizeType
-    limit;
-
-  limit=MagickResourceInfinity;
-  if (LocaleCompare("unlimited",value) != 0)
-    limit=StringToMagickSizeType(value,100.0);
-  return(limit);
-}
-
-static MagickBooleanType SetCachePolicyValue(const char *name,
-  const char *value)
-{
-  if (LocaleCompare(name,"memory-map") == 0)
-    {
-      if (LocaleCompare(value,"anonymous") != 0)
-        return(MagickFalse);
-      ResetCacheAnonymousMemory();
-      ResetStreamAnonymousMemory();
-      return(MagickTrue);
-    }
-  return(MagickFalse);
-}
-
-static MagickBooleanType SetResourcePolicyValue(const char *name,
-  const char *value)
-{
-  ssize_t
-    type;
-
-  type=ParseCommandOption(MagickResourceOptions,MagickFalse,name);
-  if (type >= 0)
-    {
-      MagickSizeType
-        limit;
-
-      limit=GetPolicyLimit(value);
-      if ((ResourceType) type == TimeResource)
-        limit=(MagickSizeType) ParseMagickTimeToLive(value);
-      return(SetMagickResourceLimit((ResourceType) type,limit));
-    }
-  return(MagickFalse);
-}
-
-static MagickBooleanType SetSystemPolicyValue(const char *name,
-  const char *value)
-{
-  if (LocaleCompare(name,"max-memory-request") == 0)
-    {
-      SetMaxMemoryRequest(GetPolicyLimit(value));
-      return(MagickTrue);
-    }
-  if (LocaleCompare(name,"max-profile-size") == 0)
-    {
-      SetMaxProfileSize(GetPolicyLimit(value));
-      return(MagickTrue);
-    }
-  if (LocaleCompare(name,"memory-map") == 0)
-    {
-      if (LocaleCompare(value,"anonymous") != 0)
-        return(MagickFalse);
-      ResetVirtualAnonymousMemory();
-      return(MagickTrue);
-    }
-  if (LocaleCompare(name,"precision") == 0)
-    {
-      int
-        limit;
-
-      limit=StringToInteger(value);
-      SetMagickPrecision(limit);
-      return(MagickTrue);
-    }
-  return(MagickFalse);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%  S e t M a g i c k S e c u r i t y P o l i c y V a l u e                    %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  SetMagickSecurityPolicyValue() sets a value associated with an ImageMagick
-%  security policy.  For most policies, the value must be less than any value
-%  set by the security policy configuration file (i.e. policy.xml).  It returns
-%  MagickFalse if the policy cannot be modified or if the policy does not parse.
-%
-%  The format of the SetMagickSecurityPolicyValue method is:
-%
-%      MagickBooleanType SetMagickSecurityPolicyValue(
-%        const PolicyDomain domain,const char *name,const char *value,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o domain: the domain of the policy (e.g. system, resource).
-%
-%    o name: the name of the policy.
-%
-%    o value: the value to set the policy to.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport MagickBooleanType SetMagickSecurityPolicyValue(
-  const PolicyDomain domain,const char *name,const char *value,
-  ExceptionInfo *exception)
-{
-  magick_unreferenced(exception);
-  assert(exception != (ExceptionInfo *) NULL);
-  if ((name == (const char *) NULL) || (value == (const char *) NULL))
-    return(MagickFalse);
-  switch (domain)
-  {
-    case CachePolicyDomain:
-      return(SetCachePolicyValue(name,value));
-    case ResourcePolicyDomain:
-      return(SetResourcePolicyValue(name,value));
-    case SystemPolicyDomain:
-      return(SetSystemPolicyValue(name,value));
-    default:
-      break;
-  }
-  return(MagickFalse);
-}

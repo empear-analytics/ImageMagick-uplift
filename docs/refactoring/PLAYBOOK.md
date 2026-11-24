@@ -2066,7 +2066,17 @@ merges code, not parameters.
    tree (MagickCore, MagickWand, coders, utilities, Magick++, `tools/`) lists them, and
    the message names each. A caller in code no build compiles (`coders/dps.c` without
    the DPS delegate, `#if 0`, a commented-out call), or in a file of the other campaign,
-   holds the step: report it. (c) The function is never taken by address and is not
+   holds the step: report it. The owner may release a reported function; its callers in
+   the other campaign's files then change in the same commit (owner 2026-11-24, "If you
+   can do these changes without breaking any test cases, sure", for `LeastSquaresAddTerms`
+   and campaign A's `distort-private.h` and `distort-linear-private.h`). A caller in the
+   oracle driver (`tools/oracle/driver/imdriver.c`) declares the function by hand and is
+   linked against the baseline library too, so it keeps both calls: `driver/build.sh`
+   defines `IMDRIVER_<FUNCTION>` when the build's private header declares the typedef
+   (`grep` of its `_Name`), and the driver's declaration, typedef and call stand in
+   `#if defined(IMDRIVER_<FUNCTION>)`, the old ones in its `#else`. Both builds' drivers
+   then run the case, and a driver case on the function must show 0 diverged uncached
+   (`oracle.py run --filter ... --no-cache`). (c) The function is never taken by address and is not
    listed in `MagickCore/methods.h` with a different arity (that file only renames).
    (d) Object identity per file: the defining file and every file with a changed call,
    compiled with `-fno-inline` against `HEAD`'s and the working tree's headers (both
@@ -6333,6 +6343,12 @@ helper returns a status the caller tests, which here would always lead to the sa
    body). The helper takes `const Name *` first, then the written variables by pointer,
    at most four parameters in all. The fill copies each value where the block read it,
    and the block writes none of them (N's argument), so every read sees what it saw.
+   Two forms that step 7 already has (2026-11-24): the helper may write `name->member` at
+   every use of a member instead of binding it (Recipe N step 4's member form, member by
+   member), and when every member's variable is a plain identifier the fill may take
+   Recipe Z step 5's FB form (no local among the declarations; where the block stood, a
+   compound statement holding `const Name name = { v1, v2, ... };`, a blank line and the
+   call), the initialiser reading each variable where the assignments would have.
 5. Where the block stood, write the call. The `continue;` that followed the block stays,
    directly after the call. Check every argument against its parameter by reading.
 6. A block that is the whole body of a sequential loop, declarations included, whose
@@ -8222,6 +8238,14 @@ Recipe LB (a `break;`, not a `return`).
    constant, the caller may pass `&w` as `T *result` and write `return(w);` in place of
    `return(returned);`, and declare no `returned`: each `return(R);` is still rewritten
    as `(*result)=R;` and `return(MagickTrue);` one for one, the helper's text unchanged.
+   (f) A block in a compiled feature branch (2026-11-24). When the block stands inside an
+   `#if defined(M)` branch with no `#else` that this build compiles (`M` a configure
+   result such as `MAGICKCORE_HAVE_SYMLINK`, not a platform or delegate), the new function
+   stands directly above the caller between its own `#if defined(M)` and `#endif` lines,
+   the same text as the branch's directive. A configuration without `M` drops the helper
+   with the call, as it dropped the block (no undeclared `symlink`, no unused static);
+   check by script that the file with every `#if defined(M)` ... `#endif` region deleted
+   is the same before and after the step, blank lines aside.
 
 **Before:**
 
@@ -11188,7 +11212,7 @@ recipe turns control flow into data.
    gets its own copy of the function and of step 3's table, which stands at file scope
    directly above it, in the header), when step 2 holds for every caller in the tree.
    The labels may instead all be character constants when `n` is a parameter of type
-   `char` (a predicate Recipe EC made), each the value of a member of the basic
+   `char` (a predicate Recipe EC or FD made), each the value of a member of the basic
    character set (C11 5.2.1), so that it is representable in `char` and non-negative.
    When `n` is a parameter of type `int`, the labels may be character constants and
    integer literals mixed (2026-11-13; `geometry-parse.c`'s
@@ -24843,6 +24867,15 @@ leaves through `return` and is moved whole.
    <Helper>` there prints `IDENTICAL` or `MODULO-IDENTICAL`.
 5. `refactor_guard.py`: `OK` (a `NULL` cast added only may `WARN`); `--calls`: `+2` for the
    helper and nothing else.
+6. Predicate and assignment form (2026-11-24). The inner test may be a call `if (Q(v,...)
+   != MagickFalse)` instead of `v != NULL`, when `Q` is a `static` function of the same
+   file whose body is one `return` of a `&&` chain whose first operand is `(v != (const T *)
+   NULL)` (read by hand): on a `NULL` `v`, `Q` evaluates nothing else and yields
+   `MagickFalse`, as the failed guard skipped `B`. And `D` may be an assignment `v=L;` to a
+   local the caller declares at the top of its body and uses nowhere but in `D`, the inner
+   test and `B`: the caller then keeps that declaration and writes `v=Helper(...);` where
+   step 3 writes the declaration. Statements above the guard that come along (step 1) take
+   their locals' declarations into the helper.
 
 **Before:**
 
@@ -26830,6 +26863,152 @@ Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe FD - Fold a Group into the Default Group Behind a Predicate of Its Labels
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` holds,
+besides a `default:` group that does work, groups that do work and then `break;` without
+leaving the function, each under several labels: `constitute-pixels-private.h`'s
+`SetImageTraitsFromMap`, whose loop over a pixel map selects on each character, four
+alpha letters set the alpha trait, eight CMYK letters set the colourspace, `I` and `i`
+set gray, and `default:` sets gray when the map is one letter long (cc 18, fourteen of it
+labels).
+
+**Not covered by:** Recipe LP, whose `switch` has `default: break;` beside the label set;
+Recipes PL and PT, whose peeled groups leave the function (PL's tail form needs the
+`switch` to end a `void` function; here it ends a loop body, and a `break;` then goes to
+the next iteration); Recipe DG, whose other groups return and whose `default:` body moves
+out of the `switch`; Recipes SD, SR and ST, which move groups with their labels, so a new
+function keeps the labels and the bodies. Measured in M138 against the file the function
+then stood in, label peels with the group's body after the `switch` lowered the score
+(9.20 to 9.08 and 9.03); with the test at the head of `default:` the function loses the
+labels and gains one `if`.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region. `e` is a parameter, a local, a
+   member access, `*p` or `a[k]` of a pointer or array `a` and a local `k`, with no call,
+   assignment or increment, and no statement of the `switch` writes `e`, `p`, `a`'s
+   elements or `k`. Its labels are enumeration constants, or character constants when
+   `e` has type `char`. No `#` line stands in the `switch`.
+2. The group `G` to fold has labels `L1 ... Ln`, no `default:`, and a body that is
+   statements `S` followed by its one `break;` (braces around the body are allowed),
+   with no other `break` of this `switch` and no `continue`, `goto`, `return` or label in
+   `S`. The group before `G` ends in `break;` (nothing falls into `G`), and `G` falls
+   into nothing.
+3. The group `D` carries `default:` and no other label; its body is statements `T`
+   followed by its one `break;`, with no other `break` of this `switch` and no
+   `continue`, `goto` or label in `T`.
+4. Write LP step 2's predicate directly above the function: `static MagickBooleanType
+   <Name>(const C x)`, `C` the declared type of `e` (`char` for `a[k]` of a `const char
+   *`), its `switch` holding `L1 ... Ln` one per line in `G`'s order, named for what the
+   labels have in common. A second fold's predicate stands directly below the first.
+5. Delete `G` (its labels, body and `break;`) from the `switch`. In `D`, write `if
+   (<Name>(e) != MagickFalse)` followed by `S` (one statement two columns deeper than the
+   `if`, several braced) and `else` followed by `T` (`else if` when `T` is one `if`
+   statement, which then keeps its own lines; otherwise `T` braced), at the head of `D`'s
+   body, before its `break;`. Nothing else changes.
+6. Check by reading the diff that the predicate's labels are exactly `G`'s, each once,
+   that `S` and `T` are unchanged but for indentation, and that the other groups stand as
+   they were. Run `refactor_guard.py` and `--calls` (+2 for the predicate, nothing else
+   moved) and the oracle on the function; a `char` predicate needs cases reaching each of
+   `G`'s labels or `casemap.py` reach for the function at least as wide as the labels.
+7. The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
+   2026-11-07). Recipe TB's membership form with character labels may make it a table, in
+   a commit of its own.
+
+**Before:**
+
+```c
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      case 'a':
+      case 'A':
+      case 'O':
+      case 'o':
+      {
+        image->alpha_trait=BlendPixelTrait;
+        break;
+      }
+      ...
+      default:
+      {
+        if (length == 1)
+          image->colorspace=GRAYColorspace;
+        break;
+      }
+    }
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsAlphaMapChannel(const char channel)
+{
+  switch (channel)
+  {
+    case 'a':
+    case 'A':
+    case 'O':
+    case 'o':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+...
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      ...
+      default:
+      {
+        if (IsAlphaMapChannel(map[i]) != MagickFalse)
+          image->alpha_trait=BlendPixelTrait;
+        else if (length == 1)
+          image->colorspace=GRAYColorspace;
+        break;
+      }
+    }
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value among `L1 ... Ln`: the original
+  `switch` ran `S` and left the `switch` by `G`'s `break;`. Now no label names it, so it
+  reaches `default:`; the predicate, called on `e` (no side effect, and nothing has run
+  since the `switch` read it), returns `MagickTrue` for exactly `G`'s labels (step 6), so
+  `S` runs and the `else` skips `T`, and `D`'s `break;` leaves the `switch` to the same
+  place. A value that reached `D`: it matched none of the `switch`'s labels, `G`'s
+  included, so the predicate returns `MagickFalse`, `S` is skipped and `T` runs as before,
+  then the same `break;`. A value of any other group selects it by its unchanged labels
+  and never reaches the predicate.
+- The predicate only reads its argument; its parameter has `e`'s own type, so passing
+  converts nothing. For `char`, the labels are the same character constants compared with
+  the same `char` value, whatever `char`'s signedness.
+- `-Wswitch` concerns enumerations: both `switch` statements have `default:`, so it warns
+  about neither. In a private header, the predicate is a `static` function like the one it
+  serves: check that every includer uses it (`-Wunused-function`).
+- The cost is a call and a second read of `e` per value that reaches `default:`; check the
+  callers by reading (not per pixel), and time it as Recipe CF step 7 says otherwise.
+
+**Evidence level:** oracle (the cases that reach the function), with step 6's reading
+and `refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-24, from `constitute-pixels-private.h`'s `SetImageTraitsFromMap`
+(campaign B, M142), after the `ConstituteImage` driver cases brought the function from one
+case to twenty-two. Probed on the file (cs-mcp 1.5.16): 9.5 to 9.58 (alpha group) to 9.68
+(CMYK group, its predicate the file's one *Complex Method*, cc 10) to 10.0 after Recipe TB
+makes the CMYK predicate a table. Added by Claude Code (Claude Opus 5.5) under the mandate
+of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27415,3 +27594,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | AMEND | EM | Step 1, ladder form: a run of `if (Ci) return(MagickTrue);` ending in `return(MagickFalse);`, every `Ci` reading only an `int` parameter with no side effect; its equality tests against literals go into the table, the lookup stands where the first stood, and the other tests (ranges) keep their place; a harness over every value the constants bound checks the two versions agree | `token-private.h`'s `IsUTFSpace` (campaign B, M141): two ranges and ten single code points, cc 15; probe 8.74 to 9.09 | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | HT | Step 6, call form: when each branch ends in `if (G == F) return(F);` with a different call `G` in each and nothing after it, a new local `V` takes each call's result in its branch and one `if (V == F) return(F);` follows the selection | `xml-tree.c`'s `ParseXMLTreeTags` (campaign B, M141): the start-tag and markup arms each end in their own exit test, its two bumps; probe 9.02 to 9.09, adding no function in a file at the function-count limit | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | FM | Step 5, several members: twins that bind several members of one struct parameter at the top of their bodies (`targets->stroke_q` and `targets->q` against `targets->stroke_p` and `targets->p`) fold into one function taking one value per binding, the bindings replaced by the parameters | `draw-primitive.c`'s `TraceArcPointsP` and `TraceArcPointsQ` (campaign B, M141): the two arc loops of `TraceStrokePolygon`, a *Code Duplication* pair; probe 7.22 to 7.44 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | GL | Step 6, predicate and assignment form: the inner test may be `Q(v,...) != MagickFalse` where `Q` is a same-file `static` whose one `return` is a `&&` chain led by `v != NULL`, so a `NULL` `v` evaluates nothing else and fails as the skipped guard did; and `D` may be `v=L;` to a local declared at the caller's top and used only in `D`, the test and `B` | `constitute-encode.c`'s `WriteImage` (campaign B, M142): the bi-modal delegate block (`option`, `IsSingleImageDelegateCopy`, `GetDelegateInfo`, `IsDirectDelegate`) is one of the function's two bumps; probe 8.79 to 8.89, Bumpy Road cleared | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | OC | Step 4, member and FB forms: the helper may read the input struct as `name->member` (N step 4's member form), and the fill may be Z step 5's FB form, a compound statement holding `const Name name = { ... };` and the call, as step 7's struct already may | `type.c`'s `LoadTypeCache` (campaign B, M142): the XML loop's tail (markup skip, include, element) as an OC helper with nine inputs and three written variables; bound locals and a member-by-member fill crossed *Lines of Code in a Single File* (8.81 to 8.54), the member and FB forms score 9.09 | mandate (2026-10-24) |
+| 2026-11-24 | NEW | FD | In a `switch` whose `default:` group `D` does work, a group `G` whose body is statements `S` and its one `break;` (no `return`, `continue` or `goto`) is deleted; `D`'s body becomes `if (<Name>(e) != MagickFalse) S else T` before its `break;`, `<Name>` LP step 2's predicate of `G`'s labels. `e` may be `a[k]` with a local `k`. *Careful* gives the value-by-value argument (`G`'s values now reach `default:` and only they satisfy the predicate). Not LP, PL, PT or DG: `G` does not leave the function and the other groups need not return | `constitute-pixels-private.h`'s `SetImageTraitsFromMap` (M142): probed 9.5 to 9.58 to 9.68 and, with TB on the CMYK predicate, 10.0; label peels after the `switch` measured lower in M138 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | TB | Step 1, character labels: the `char` predicate may also be one Recipe FD made (LP step 2's shape over a character `switch`); nothing else changes, the argument of the 2026-11-10 row applies unchanged | `constitute-pixels-private.h`'s `IsCMYKMapChannel` (M142), eight letters, cc 10, the file's last *Complex Method*; probed 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | RV | Step 6 (new (f)): a block inside a compiled `#if defined(M)` feature branch with no `#else` puts its helper directly above the caller under its own `#if defined(M)` ... `#endif`, so a configuration without `M` drops helper and call together; checked by script that the file with every `M` region deleted is unchanged, blank lines aside | `utility-unique.c`'s `AcquireUniqueSymbolicLink` (M142): the relative-path block calls `getcwd` and `symlink` under `MAGICKCORE_HAVE_SYMLINK`; probed 9.92 to 10.0 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | B | Step 1, MagickPrivate form, condition (b): a function held by a caller in the other campaign's files may be released by the owner, the callers there changing in the same commit; a caller in the oracle driver keeps the old call under `#else` of a macro that `driver/build.sh` defines from the build's own private header, since one driver source links against both the baseline and the candidate library | `matrix.c`'s `LeastSquaresAddTerms` (M142, 6 arguments, the file's last finding): nine calls in campaign A's `distort-private.h` and `distort-linear-private.h` and one in `imdriver.c` (the `matrix gauss N lsq` cases) | owner |

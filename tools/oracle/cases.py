@@ -6374,6 +6374,19 @@ _DRIVER_CASES += [
     ("driver string concat exact fit", _driver("string", "concat", "abcd", "ef", "7")),
     ("driver string concat with room", _driver("string", "concat", "abc", "defgh", "100")),
 ]
+# constitute-pixels.c through imdriver: ConstituteImage, which the command line reaches only from
+# the palm coder, with the map "RGB" and CharPixel. Maps that tell every label of
+# SetImageTraitsFromMap apart (alpha A a O o, CMYK in both cases, intensity I i, a one-letter
+# label against a one-letter unknown map), and every storage type for SetImageDepthFromStorage.
+_DRIVER_CASES += [("driver constitute %s %s" % (_cst_map, _cst_type),
+                   _driver("constitute", _cst_map, _cst_type, "4x3", "out.miff"))
+                  for _cst_map, _cst_type in (
+    ("RGBA", "char"), ("BGRO", "char"), ("rgba", "char"), ("BGRo", "char"), ("CMYK", "char"),
+    ("cmyk", "char"), ("CMYKA", "char"), ("I", "char"), ("i", "char"), ("IA", "char"),
+    ("R", "char"), ("M", "char"), ("k", "char"), ("Y", "char"), ("RGBP", "char"),
+    ("RGB", "double"), ("RGB", "float"), ("RGB", "long"), ("RGB", "longlong"), ("RGB", "short"),
+    ("RGB", "quantum"), ("A", "char"), ("o", "char"), ("C", "char"), ("y", "char"),
+    ("Ka", "char"))]
 GAP_STEP_CASES += [(label, steps, {}) for label, steps in _DRIVER_CASES]
 # ConfigureFileToStringInfo reads a file (it maps it); the case ships one.
 GAP_STEP_CASES += [("driver string configfile", _driver("string", "configfile", "cf.dat"),
