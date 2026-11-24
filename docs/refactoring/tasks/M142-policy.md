@@ -96,8 +96,48 @@ After the policy.c work, the branch took the constitute family (S split of `Writ
   `temporary_resources`). Freeing budget needs the shared-header and accessor rulings.
 - **pixel.c:** `IntensityFromSamples` is an always-inline per-pixel function, and
   `SortImagePixels`' bump is the progress block of an OpenMP loop; both need timing.
-- **constitute-pixels-private.h `SetImageTraitsFromMap`:** label peels were measured lower in
-  M138; now within reach of 22 cases.
+- **constitute-pixels-private.h `SetImageTraitsFromMap`:** taken later, see the next section.
 - **CodeScene C thresholds** (cs-mcp `rules_config_list_thresholds`): *Lines of Code in a
   Single File* warns at 1000, *Overall Code Complexity* at a mean of 4, Complex Method at cc 9,
   Large Method at 70 lines, arguments above 4.
+
+## Label folds and Overall Code Complexity (2026-11-24, evening)
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| constitute-pixels-private.h | 9.5 | 10.0 | FD (alpha), FD (CMYK), TB (`IsCMYKMapChannel`) |
+| delegate.c | 8.81 | 9.38 | E (`FormatDelegateName`), E (`DestroyDelegateCommandList`) |
+| matrix.c | 9.09 | 9.68 | DT (three ternaries), E (`SetMatrixSynchronize`), E (`RelinquishMatrixMemory`) |
+
+- **Recipe FD added** (`731167b0b`), and TB's character form widened to its predicates
+  (`397ca7c23`). FD folds a `switch` group that does work and breaks into the head of the
+  `default:` group, behind an LP-style predicate of its labels. Peeling the groups after the
+  `switch` (PL style, with `continue;`) brought *Bumpy Road* and scored lower (9.4, 9.29, 9.53).
+  With the tests at the head of `default:`, every step rose: 9.5, 9.58, 9.68, 10.0.
+- **Oracle cases:** five more `driver constitute` maps (`cd6bbf3f4`: `A`, `o`, `C`, `y`,
+  `Ka`). A one-letter alpha map must stay sRGB, which tells a correct fold from one that lets
+  the default group's one-letter gray test run. `SetImageTraitsFromMap` reach went from 22 to 27.
+- **Overall Code Complexity, planned by stub probe.** Six cc-1 stubs cleared it in both files
+  and gave the ceiling (delegate.c 9.38, matrix.c 9.68) before any step was taken. The finding
+  cleared earlier than lizard's mean predicted: lizard counts both sides of every `#if`, and
+  delegate.c cleared at a lizard mean of 4.02. matrix.c's three DT steps were object-identical.
+  The Code Duplication finding M141 saw behind matrix.c's helpers did not appear with these two.
+
+### Plateaus recorded
+- **delegate.c (9.38):** *Excess Number of Function Arguments* on `ExternalDelegateCommand`
+  (`MagickExport`, 5 arguments) and *String Heavy Function Arguments*.
+- **matrix.c (9.68):** `LeastSquaresAddTerms` has 6 arguments; all its callers are in campaign
+  A's `distort-private.h` and `distort-linear-private.h`. **Question for the owner/campaign
+  A:** a struct for its `(terms, rank, number_vectors)`-style arguments would touch those files.
+- **log.c (8.81):** at the line limit (1304 code lines), and every public root that Recipe S
+  could split off (the list family, `LogMagickEventList`, the handler setters) uses
+  `log_cache`, `log_semaphore` or the event mask, as resource.c's do. Its two argument
+  findings are `LogMagickEventList` (public, 6) and `TranslateLogFormat` (5).
+- **geometry-parse.c (9.09):** clearing *Overall Code Complexity* needs about 18 extractions
+  (lizard mean 5.19 over 36 functions).
+- **cipher.c (8.81):** the duplication groups pair the `!MAGICKCORE_CIPHER_SUPPORT` stubs
+  (not compiled here) and the per-block `PasskeyEncipherImage`/`PasskeyDecipherImage` twins
+  (a merge would need timing).
+- **magick.c (9.61):** `GetMagickInfo`'s complexity is in `MAGICKCORE_BUILD_MODULES` branches
+  and the signal handlers', so only one side of each is compiled here.
+- **memory-quantum.c (9.63):** `CopyMagickMemory` is a hot `memcpy` path that no case reaches.
