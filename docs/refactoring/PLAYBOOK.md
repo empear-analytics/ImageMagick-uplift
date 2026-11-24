@@ -24843,6 +24843,15 @@ leaves through `return` and is moved whole.
    <Helper>` there prints `IDENTICAL` or `MODULO-IDENTICAL`.
 5. `refactor_guard.py`: `OK` (a `NULL` cast added only may `WARN`); `--calls`: `+2` for the
    helper and nothing else.
+6. Predicate and assignment form (2026-11-24). The inner test may be a call `if (Q(v,...)
+   != MagickFalse)` instead of `v != NULL`, when `Q` is a `static` function of the same
+   file whose body is one `return` of a `&&` chain whose first operand is `(v != (const T *)
+   NULL)` (read by hand): on a `NULL` `v`, `Q` evaluates nothing else and yields
+   `MagickFalse`, as the failed guard skipped `B`. And `D` may be an assignment `v=L;` to a
+   local the caller declares at the top of its body and uses nowhere but in `D`, the inner
+   test and `B`: the caller then keeps that declaration and writes `v=Helper(...);` where
+   step 3 writes the declaration. Statements above the guard that come along (step 1) take
+   their locals' declarations into the helper.
 
 **Before:**
 
@@ -27415,3 +27424,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | AMEND | EM | Step 1, ladder form: a run of `if (Ci) return(MagickTrue);` ending in `return(MagickFalse);`, every `Ci` reading only an `int` parameter with no side effect; its equality tests against literals go into the table, the lookup stands where the first stood, and the other tests (ranges) keep their place; a harness over every value the constants bound checks the two versions agree | `token-private.h`'s `IsUTFSpace` (campaign B, M141): two ranges and ten single code points, cc 15; probe 8.74 to 9.09 | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | HT | Step 6, call form: when each branch ends in `if (G == F) return(F);` with a different call `G` in each and nothing after it, a new local `V` takes each call's result in its branch and one `if (V == F) return(F);` follows the selection | `xml-tree.c`'s `ParseXMLTreeTags` (campaign B, M141): the start-tag and markup arms each end in their own exit test, its two bumps; probe 9.02 to 9.09, adding no function in a file at the function-count limit | mandate (2026-10-24) |
 | 2026-11-21 | AMEND | FM | Step 5, several members: twins that bind several members of one struct parameter at the top of their bodies (`targets->stroke_q` and `targets->q` against `targets->stroke_p` and `targets->p`) fold into one function taking one value per binding, the bindings replaced by the parameters | `draw-primitive.c`'s `TraceArcPointsP` and `TraceArcPointsQ` (campaign B, M141): the two arc loops of `TraceStrokePolygon`, a *Code Duplication* pair; probe 7.22 to 7.44 | mandate (2026-10-24) |
+| 2026-11-24 | AMEND | GL | Step 6, predicate and assignment form: the inner test may be `Q(v,...) != MagickFalse` where `Q` is a same-file `static` whose one `return` is a `&&` chain led by `v != NULL`, so a `NULL` `v` evaluates nothing else and fails as the skipped guard did; and `D` may be `v=L;` to a local declared at the caller's top and used only in `D`, the test and `B` | `constitute-encode.c`'s `WriteImage` (campaign B, M142): the bi-modal delegate block (`option`, `IsSingleImageDelegateCopy`, `GetDelegateInfo`, `IsDirectDelegate`) is one of the function's two bumps; probe 8.79 to 8.89, Bumpy Road cleared | mandate (2026-10-24) |
