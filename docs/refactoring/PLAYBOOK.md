@@ -26845,6 +26845,152 @@ Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe FD - Fold a Group into the Default Group Behind a Predicate of Its Labels
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` holds,
+besides a `default:` group that does work, groups that do work and then `break;` without
+leaving the function, each under several labels: `constitute-pixels-private.h`'s
+`SetImageTraitsFromMap`, whose loop over a pixel map selects on each character, four
+alpha letters set the alpha trait, eight CMYK letters set the colourspace, `I` and `i`
+set gray, and `default:` sets gray when the map is one letter long (cc 18, fourteen of it
+labels).
+
+**Not covered by:** Recipe LP, whose `switch` has `default: break;` beside the label set;
+Recipes PL and PT, whose peeled groups leave the function (PL's tail form needs the
+`switch` to end a `void` function; here it ends a loop body, and a `break;` then goes to
+the next iteration); Recipe DG, whose other groups return and whose `default:` body moves
+out of the `switch`; Recipes SD, SR and ST, which move groups with their labels, so a new
+function keeps the labels and the bodies. Measured in M138 against the file the function
+then stood in, label peels with the group's body after the `switch` lowered the score
+(9.20 to 9.08 and 9.03); with the test at the head of `default:` the function loses the
+labels and gains one `if`.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region. `e` is a parameter, a local, a
+   member access, `*p` or `a[k]` of a pointer or array `a` and a local `k`, with no call,
+   assignment or increment, and no statement of the `switch` writes `e`, `p`, `a`'s
+   elements or `k`. Its labels are enumeration constants, or character constants when
+   `e` has type `char`. No `#` line stands in the `switch`.
+2. The group `G` to fold has labels `L1 ... Ln`, no `default:`, and a body that is
+   statements `S` followed by its one `break;` (braces around the body are allowed),
+   with no other `break` of this `switch` and no `continue`, `goto`, `return` or label in
+   `S`. The group before `G` ends in `break;` (nothing falls into `G`), and `G` falls
+   into nothing.
+3. The group `D` carries `default:` and no other label; its body is statements `T`
+   followed by its one `break;`, with no other `break` of this `switch` and no
+   `continue`, `goto` or label in `T`.
+4. Write LP step 2's predicate directly above the function: `static MagickBooleanType
+   <Name>(const C x)`, `C` the declared type of `e` (`char` for `a[k]` of a `const char
+   *`), its `switch` holding `L1 ... Ln` one per line in `G`'s order, named for what the
+   labels have in common. A second fold's predicate stands directly below the first.
+5. Delete `G` (its labels, body and `break;`) from the `switch`. In `D`, write `if
+   (<Name>(e) != MagickFalse)` followed by `S` (one statement two columns deeper than the
+   `if`, several braced) and `else` followed by `T` (`else if` when `T` is one `if`
+   statement, which then keeps its own lines; otherwise `T` braced), at the head of `D`'s
+   body, before its `break;`. Nothing else changes.
+6. Check by reading the diff that the predicate's labels are exactly `G`'s, each once,
+   that `S` and `T` are unchanged but for indentation, and that the other groups stand as
+   they were. Run `refactor_guard.py` and `--calls` (+2 for the predicate, nothing else
+   moved) and the oracle on the function; a `char` predicate needs cases reaching each of
+   `G`'s labels or `casemap.py` reach for the function at least as wide as the labels.
+7. The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
+   2026-11-07). Recipe TB's membership form with character labels may make it a table, in
+   a commit of its own.
+
+**Before:**
+
+```c
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      case 'a':
+      case 'A':
+      case 'O':
+      case 'o':
+      {
+        image->alpha_trait=BlendPixelTrait;
+        break;
+      }
+      ...
+      default:
+      {
+        if (length == 1)
+          image->colorspace=GRAYColorspace;
+        break;
+      }
+    }
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsAlphaMapChannel(const char channel)
+{
+  switch (channel)
+  {
+    case 'a':
+    case 'A':
+    case 'O':
+    case 'o':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+...
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      ...
+      default:
+      {
+        if (IsAlphaMapChannel(map[i]) != MagickFalse)
+          image->alpha_trait=BlendPixelTrait;
+        else if (length == 1)
+          image->colorspace=GRAYColorspace;
+        break;
+      }
+    }
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value among `L1 ... Ln`: the original
+  `switch` ran `S` and left the `switch` by `G`'s `break;`. Now no label names it, so it
+  reaches `default:`; the predicate, called on `e` (no side effect, and nothing has run
+  since the `switch` read it), returns `MagickTrue` for exactly `G`'s labels (step 6), so
+  `S` runs and the `else` skips `T`, and `D`'s `break;` leaves the `switch` to the same
+  place. A value that reached `D`: it matched none of the `switch`'s labels, `G`'s
+  included, so the predicate returns `MagickFalse`, `S` is skipped and `T` runs as before,
+  then the same `break;`. A value of any other group selects it by its unchanged labels
+  and never reaches the predicate.
+- The predicate only reads its argument; its parameter has `e`'s own type, so passing
+  converts nothing. For `char`, the labels are the same character constants compared with
+  the same `char` value, whatever `char`'s signedness.
+- `-Wswitch` concerns enumerations: both `switch` statements have `default:`, so it warns
+  about neither. In a private header, the predicate is a `static` function like the one it
+  serves: check that every includer uses it (`-Wunused-function`).
+- The cost is a call and a second read of `e` per value that reaches `default:`; check the
+  callers by reading (not per pixel), and time it as Recipe CF step 7 says otherwise.
+
+**Evidence level:** oracle (the cases that reach the function), with step 6's reading
+and `refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-24, from `constitute-pixels-private.h`'s `SetImageTraitsFromMap`
+(campaign B, M142), after the `ConstituteImage` driver cases brought the function from one
+case to twenty-two. Probed on the file (cs-mcp 1.5.16): 9.5 to 9.58 (alpha group) to 9.68
+(CMYK group, its predicate the file's one *Complex Method*, cc 10) to 10.0 after Recipe TB
+makes the CMYK predicate a table. Added by Claude Code (Claude Opus 5.5) under the mandate
+of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27432,3 +27578,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-21 | AMEND | FM | Step 5, several members: twins that bind several members of one struct parameter at the top of their bodies (`targets->stroke_q` and `targets->q` against `targets->stroke_p` and `targets->p`) fold into one function taking one value per binding, the bindings replaced by the parameters | `draw-primitive.c`'s `TraceArcPointsP` and `TraceArcPointsQ` (campaign B, M141): the two arc loops of `TraceStrokePolygon`, a *Code Duplication* pair; probe 7.22 to 7.44 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | GL | Step 6, predicate and assignment form: the inner test may be `Q(v,...) != MagickFalse` where `Q` is a same-file `static` whose one `return` is a `&&` chain led by `v != NULL`, so a `NULL` `v` evaluates nothing else and fails as the skipped guard did; and `D` may be `v=L;` to a local declared at the caller's top and used only in `D`, the test and `B` | `constitute-encode.c`'s `WriteImage` (campaign B, M142): the bi-modal delegate block (`option`, `IsSingleImageDelegateCopy`, `GetDelegateInfo`, `IsDirectDelegate`) is one of the function's two bumps; probe 8.79 to 8.89, Bumpy Road cleared | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | OC | Step 4, member and FB forms: the helper may read the input struct as `name->member` (N step 4's member form), and the fill may be Z step 5's FB form, a compound statement holding `const Name name = { ... };` and the call, as step 7's struct already may | `type.c`'s `LoadTypeCache` (campaign B, M142): the XML loop's tail (markup skip, include, element) as an OC helper with nine inputs and three written variables; bound locals and a member-by-member fill crossed *Lines of Code in a Single File* (8.81 to 8.54), the member and FB forms score 9.09 | mandate (2026-10-24) |
+| 2026-11-24 | NEW | FD | In a `switch` whose `default:` group `D` does work, a group `G` whose body is statements `S` and its one `break;` (no `return`, `continue` or `goto`) is deleted; `D`'s body becomes `if (<Name>(e) != MagickFalse) S else T` before its `break;`, `<Name>` LP step 2's predicate of `G`'s labels. `e` may be `a[k]` with a local `k`. *Careful* gives the value-by-value argument (`G`'s values now reach `default:` and only they satisfy the predicate). Not LP, PL, PT or DG: `G` does not leave the function and the other groups need not return | `constitute-pixels-private.h`'s `SetImageTraitsFromMap` (M142): probed 9.5 to 9.58 to 9.68 and, with TB on the CMYK predicate, 10.0; label peels after the `switch` measured lower in M138 | mandate (2026-10-24) |
