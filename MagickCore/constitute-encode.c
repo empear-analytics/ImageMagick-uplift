@@ -406,14 +406,23 @@ static const MagickInfo *GetEncoderMagickInfo(const ImageInfo *write_info,
   return(magick_info);
 }
 
+static const DelegateInfo *GetBimodalDelegateInfo(const ImageInfo *image_info,
+  const ImageInfo *write_info,const Image *image,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,"delegate:bimodal");
+  if (IsSingleImageDelegateCopy(option,write_info,image) != MagickFalse)
+    return(GetDelegateInfo(image->magick,write_info->magick,exception));
+  return((const DelegateInfo *) NULL);
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
   char
     filename[MagickPathExtent];
-
-  const char
-    *option;
 
   const DelegateInfo
     *delegate_info;
@@ -469,23 +478,19 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
     }
   SyncImageProfiles(image);
   DisassociateImageStream(image);
-  option=GetImageOption(image_info,"delegate:bimodal");
-  if (IsSingleImageDelegateCopy(option,write_info,image) != MagickFalse)
+  delegate_info=GetBimodalDelegateInfo(image_info,write_info,image,exception);
+  if (IsDirectDelegate(delegate_info,image) != MagickFalse)
     {
-      delegate_info=GetDelegateInfo(image->magick,write_info->magick,exception);
-      if (IsDirectDelegate(delegate_info,image) != MagickFalse)
-        {
-          /*
-            Process image with bi-modal delegate.
-          */
-          (void) CopyMagickString(image->filename,image->magick_filename,
-            MagickPathExtent);
-          status=InvokeDelegate(write_info,image,image->magick,
-            write_info->magick,exception);
-          write_info=DestroyImageInfo(write_info);
-          (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-          return(status);
-        }
+      /*
+        Process image with bi-modal delegate.
+      */
+      (void) CopyMagickString(image->filename,image->magick_filename,
+        MagickPathExtent);
+      status=InvokeDelegate(write_info,image,image->magick,
+        write_info->magick,exception);
+      write_info=DestroyImageInfo(write_info);
+      (void) CopyMagickString(image->filename,filename,MagickPathExtent);
+      return(status);
     }
   status=MagickFalse;
   temporary=MagickFalse;
