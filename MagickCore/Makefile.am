@@ -369,6 +369,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/list.c \
   MagickCore/list.h \
   MagickCore/locale.c \
+  MagickCore/locale-options.c \
   MagickCore/locale-format.c \
   MagickCore/locale_.h \
   MagickCore/log.c \
