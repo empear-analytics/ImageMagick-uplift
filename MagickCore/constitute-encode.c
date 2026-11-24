@@ -406,6 +406,14 @@ static const MagickInfo *GetEncoderMagickInfo(const ImageInfo *write_info,
   return(magick_info);
 }
 
+static void IdentifyVerboseWrite(const ImageInfo *write_info,Image *image,
+  ExceptionInfo *exception)
+{
+  if ((LocaleCompare(write_info->magick,"info") != 0) &&
+      (write_info->verbose != MagickFalse))
+    (void) IdentifyImage(image,stdout,MagickFalse,exception);
+}
+
 static const DelegateInfo *GetBimodalDelegateInfo(const ImageInfo *image_info,
   const ImageInfo *write_info,const Image *image,ExceptionInfo *exception)
 {
@@ -527,9 +535,7 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
     }
   if (temporary != MagickFalse)
     status=CopyTemporaryImageFile(write_info,image,exception);
-  if ((LocaleCompare(write_info->magick,"info") != 0) &&
-      (write_info->verbose != MagickFalse))
-    (void) IdentifyImage(image,stdout,MagickFalse,exception);
+  IdentifyVerboseWrite(write_info,image,exception);
   write_info=DestroyImageInfo(write_info);
   if (GetBlobError(image) != MagickFalse)
     ThrowWriterException(FileOpenError,"UnableToWriteFile");
