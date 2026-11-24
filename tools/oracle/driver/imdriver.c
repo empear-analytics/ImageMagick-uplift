@@ -415,6 +415,47 @@ static int Pixels(int argc,char **argv,ExceptionInfo *exception)
   return(0);
 }
 
+static int ConstituteCmd(int argc,char **argv,ExceptionInfo *exception)
+{
+  /* constitute MAP TYPE WxH OUT: ConstituteImage from a filled buffer (the command line reaches
+     it only through the palm coder, with "RGB" and CharPixel); prints the colorspace, alpha
+     trait and depth the map and storage type set, then writes the image */
+  Image *image;
+  ssize_t type, x=0, y=0;
+  size_t width=0, height=0, count, k;
+  void *pixels;
+  int status;
+
+  if (argc != 6)
+    return(Fail(exception,"constitute: MAP TYPE GEOMETRY OUT"));
+  type=ParseCommandOption(MagickStorageOptions,MagickFalse,argv[3]);
+  if (type < 0)
+    return(Fail(exception,"constitute: storage type"));
+  (void) GetGeometry(argv[4],&x,&y,&width,&height);
+  count=width*height*strlen(argv[2]);
+  pixels=AcquireQuantumMemory(count+1,StorageSize((StorageType) type));
+  if (pixels == (void *) NULL)
+    return(Fail(exception,"memory"));
+  for (k=0; k < count; k++)
+    FillElement((StorageType) type,pixels,k);
+  image=ConstituteImage(width,height,argv[2],(StorageType) type,pixels,exception);
+  pixels=RelinquishMagickMemory(pixels);
+  if (image == (Image *) NULL)
+    {
+      (void) printf("refused\n");
+      Report(exception);
+      return(0);
+    }
+  (void) printf("colorspace %s alpha %s depth %.20g\n",
+    CommandOptionToMnemonic(MagickColorspaceOptions,(ssize_t) image->colorspace),
+    CommandOptionToMnemonic(MagickPixelTraitOptions,(ssize_t) image->alpha_trait),
+    (double) image->depth);
+  Report(exception);
+  status=Write(image,argv[5],exception);
+  image=DestroyImage(image);
+  return(status);
+}
+
 /* The containers hold pointers: the same text always maps to the same pointer, so a removal by
    value finds what an earlier step stored. */
 static char *interned[4096];
@@ -2954,6 +2995,7 @@ int main(int argc,char **argv)
   else if (strcmp(argv[1],"list") == 0) status=List(argc,argv,exception);
   else if (strcmp(argv[1],"mime") == 0) status=Mime(argc,argv,exception);
   else if (strcmp(argv[1],"pixels") == 0) status=Pixels(argc,argv,exception);
+  else if (strcmp(argv[1],"constitute") == 0) status=ConstituteCmd(argc,argv,exception);
   else if (strcmp(argv[1],"linkedlist") == 0) status=List2(argc,argv,exception);
   else if (strcmp(argv[1],"splaytree") == 0) status=Tree(argc,argv,exception);
   else if (strcmp(argv[1],"cacheview") == 0) status=View(argc,argv,exception);
