@@ -36,6 +36,21 @@ static void SetImageDepthFromStorage(Image *image,const StorageType storage)
   }
 }
 
+static MagickBooleanType IsAlphaMapChannel(const char channel)
+{
+  switch (channel)
+  {
+    case 'a':
+    case 'A':
+    case 'O':
+    case 'o':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static void SetImageTraitsFromMap(Image *image,const char *map)
 {
   ssize_t
@@ -49,14 +64,6 @@ static void SetImageTraitsFromMap(Image *image,const char *map)
   {
     switch (map[i])
     {
-      case 'a':
-      case 'A':
-      case 'O':
-      case 'o':
-      {
-        image->alpha_trait=BlendPixelTrait;
-        break;
-      }
       case 'C':
       case 'c':
       case 'm':
@@ -77,7 +84,9 @@ static void SetImageTraitsFromMap(Image *image,const char *map)
       }
       default:
       {
-        if (length == 1)
+        if (IsAlphaMapChannel(map[i]) != MagickFalse)
+          image->alpha_trait=BlendPixelTrait;
+        else if (length == 1)
           image->colorspace=GRAYColorspace;
         break;
       }
