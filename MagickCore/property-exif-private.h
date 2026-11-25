@@ -365,6 +365,23 @@ typedef struct _EXIFCursor
     *length;
 } EXIFCursor;
 
+static const int
+  EXIFMarkerBytes[] = { 0x45, 0x78, 0x69, 0x66, 0x00, 0x00 };
+
+static MagickBooleanType MatchEXIFMarker(const unsigned char **exif,
+  size_t *length)
+{
+  size_t
+    j;
+
+  for (j=0; j < (sizeof(EXIFMarkerBytes)/sizeof(*EXIFMarkerBytes)); j++)
+  {
+    if (ReadPropertyByte(exif,length) != EXIFMarkerBytes[j])
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ReadEXIFMarker(const EXIFCursor *cursor,
   MagickBooleanType *broke)
 {
@@ -375,17 +392,7 @@ static MagickBooleanType ReadEXIFMarker(const EXIFCursor *cursor,
     *const length = cursor->length;
 
   (*broke)=MagickFalse;
-  if (ReadPropertyByte(exif,length) != 0x45)
-    return(MagickFalse);
-  if (ReadPropertyByte(exif,length) != 0x78)
-    return(MagickFalse);
-  if (ReadPropertyByte(exif,length) != 0x69)
-    return(MagickFalse);
-  if (ReadPropertyByte(exif,length) != 0x66)
-    return(MagickFalse);
-  if (ReadPropertyByte(exif,length) != 0x00)
-    return(MagickFalse);
-  if (ReadPropertyByte(exif,length) != 0x00)
+  if (MatchEXIFMarker(exif,length) == MagickFalse)
     return(MagickFalse);
   (*broke)=MagickTrue;
   return(MagickTrue);

@@ -12092,6 +12092,13 @@ the caller (a *Bumpy Road Ahead* in `AcquireRidgesKernel`, 3.08 in a probe).
    the same token sequence once one constant at one position (a string literal or a
    numeric literal) is replaced by a name, checked by script. Each copy's only exit is
    `return(R);` inside a selection, with the same text `R` in every copy.
+   *Compared constants* (2026-11-25): the constant may be a numeric literal compared with
+   an expression that is the same in every copy (`if (ReadPropertyByte(exif,length) !=
+   0x45) return(MagickFalse);`); step 4's element type is then the type the comparison
+   brings the literal to under the usual arithmetic conversions (C11 6.3.1.8), `int` for
+   an `int` call result and an `int` literal. The step also serves *Overall Code
+   Complexity*: the caller loses the copies' `n` exits and the helper holds one loop and
+   one `if`, so the file's total falls by `n-3` while it gains one function.
 2. `R` reads only parameters and locals of the caller that no copy writes, so the caller
    evaluating `R` right after the helper returns reads what the copy's `return` would
    have read; any object it reaches through them the copies write only as the helper
@@ -27873,3 +27880,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | NEW | JB | Join a Block to the Struct Fill After It and Extract It Reading the Struct: the statements just before a Recipe FB compound statement that write none of its initialiser's identifiers join the block (the initialiser runs first), and a block of them moves into a helper taking `const Name *` and reading the members for the values the initialiser copied | `annotate-freetype-private.h`'s `RasterizeGlyphRow` (campaign B, M143), cc 9 after DB, E and N: the per-pixel fetch reads `x_offset`, `y_offset` and `active`, members of the `GlyphPixel` fill that follows it; alone it needs five parameters. Probed 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | IC | Step 5, member form: a local initialised with `p->m` (a member read through a parameter pointing to a `const` struct, with nothing assigning `p`), of the member's exact type, read exactly once with no call or write between its declaration and the read, is replaced at its one read by `p->m` and its declarator goes | `property-clippath-private.h`'s `TracePSClippathRecord` and `TraceSVGClippathRecord` (campaign B, M143): after Recipe CF the two wrappers only bound `blob`, `length` and `knot_count` from their state to pass them on, and the bindings were the duplicated text. Probed 9.09 to 9.68, then 10.0 after SD | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
