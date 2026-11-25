@@ -246,6 +246,13 @@ static void LogFreetypeFont(const DrawInfo *draw_info,const char *encoding)
       draw_info->pointsize);
 }
 
+static void DoneFreetypeFace(FT_Face face,FT_Memory memory,FT_Library library,
+  FT_StreamRec *stream)
+{
+  (void) FT_Done_Face(face);
+  FreetypeDone(memory,library,stream);
+}
+
 typedef struct _GlyphRunInfo
 {
   Image
@@ -349,8 +356,7 @@ static MagickBooleanType RenderFreetypeGlyphs(const GlyphRunInfo *run)
     Relinquish resources.
   */
   annotate_info=DestroyDrawInfo(annotate_info);
-  (void) FT_Done_Face(run->face);
-  FreetypeDone(run->memory,run->library,run->stream);
+  DoneFreetypeFace(run->face,run->memory,run->library,run->stream);
   return(status);
 }
 
@@ -426,8 +432,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   FT_Get_First_Char(face,&first_glyph_id);
   if (IsTextWithoutGlyphs(draw_info,first_glyph_id) != MagickFalse)
     {
-      (void) FT_Done_Face(face);
-      FreetypeDone(memory,library,stream);
+      DoneFreetypeFace(face,memory,library,stream);
       return(MagickTrue);
     }
   /*
