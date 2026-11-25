@@ -368,6 +368,105 @@ static void TraceSVGClippathKnot(char *message,PointInfo *last,
     last[i]=point[i];
 }
 
+typedef struct _SVGClippathState
+{
+  const unsigned char
+    **blob;
+
+  size_t
+    *length;
+
+  char
+    **path,
+    **message;
+
+  MagickBooleanType
+    *in_subpath;
+
+  PointInfo
+    *first,
+    *last,
+    *point;
+
+  ssize_t
+    *knot_count;
+
+  size_t
+    columns,
+    rows;
+} SVGClippathState;
+
+static void AddSVGClippathKnot(const SVGClippathState *state)
+{
+  const unsigned char
+    *blob = (*state->blob);
+
+  size_t
+    length = (*state->length);
+
+  char
+    *path = (*state->path);
+
+  char
+    *const message = (*state->message);
+
+  MagickBooleanType
+    in_subpath = (*state->in_subpath);
+
+  PointInfo
+    *const first = state->first,
+    *const last = state->last,
+    *const point = state->point;
+
+  ssize_t
+    knot_count = (*state->knot_count);
+
+  const size_t
+    columns = state->columns,
+    rows = state->rows;
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  /*
+    Add sub-path knot
+  */
+  for (i=0; i < 3; i++)
+  {
+    y=(ssize_t) ReadPropertyMSBLong(&blob,&length);
+    x=(ssize_t) ReadPropertyMSBLong(&blob,&length);
+    point[i].x=(double) x*columns/4096.0/4096.0;
+    point[i].y=(double) y*rows/4096.0/4096.0;
+  }
+  if (in_subpath == MagickFalse)
+    {
+      (void) FormatLocaleString(message,MagickPathExtent,"M %g %g\n",
+        point[1].x,point[1].y);
+      CopyClippathKnot(first,last,point);
+    }
+  else
+    TraceSVGClippathKnot(message,last,point);
+  (void) ConcatenateString(&path,message);
+  in_subpath=MagickTrue;
+  knot_count--;
+  /*
+    Close the subpath if there are no more knots.
+  */
+  if (knot_count == 0)
+    {
+      TraceBezierCurve(message,last,first);
+      (void) ConcatenateString(&path,message);
+      in_subpath=MagickFalse;
+    }
+  (*state->blob)=blob;
+  (*state->length)=length;
+  (*state->path)=path;
+  (*state->in_subpath)=in_subpath;
+  (*state->knot_count)=knot_count;
+}
+
 static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   const size_t columns,const size_t rows)
 {
@@ -384,13 +483,12 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
     point[3];
 
   ssize_t
-    i;
-
-  ssize_t
     knot_count,
-    selector,
-    x,
-    y;
+    selector;
+
+  const SVGClippathState
+    state = { &blob, &length, &path, &message, &in_subpath, first, last,
+      point, &knot_count, columns, rows };
 
   path=AcquireString((char *) NULL);
   if (path == (char *) NULL)
@@ -443,36 +541,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
             SkipClippathBytes(&blob,&length,24);
             break;
           }
-        /*
-          Add sub-path knot
-        */
-        for (i=0; i < 3; i++)
-        {
-          y=(ssize_t) ReadPropertyMSBLong(&blob,&length);
-          x=(ssize_t) ReadPropertyMSBLong(&blob,&length);
-          point[i].x=(double) x*columns/4096.0/4096.0;
-          point[i].y=(double) y*rows/4096.0/4096.0;
-        }
-        if (in_subpath == MagickFalse)
-          {
-            (void) FormatLocaleString(message,MagickPathExtent,"M %g %g\n",
-              point[1].x,point[1].y);
-            CopyClippathKnot(first,last,point);
-          }
-        else
-          TraceSVGClippathKnot(message,last,point);
-        (void) ConcatenateString(&path,message);
-        in_subpath=MagickTrue;
-        knot_count--;
-        /*
-          Close the subpath if there are no more knots.
-        */
-        if (knot_count == 0)
-          {
-            TraceBezierCurve(message,last,first);
-            (void) ConcatenateString(&path,message);
-            in_subpath=MagickFalse;
-          }
+        AddSVGClippathKnot(&state);
         break;
       }
       default:
