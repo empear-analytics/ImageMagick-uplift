@@ -163,3 +163,77 @@ Before a long unattended run, the owner answered four questions (recorded in AGE
 - The ratio findings (*Primitive Obsession*, *String Heavy Function Arguments*) are worked
   toward 10 with Recipe B bundles.
 - `build-oracle/mull-*` may be deleted when disk runs low.
+
+## Afternoon of 2026-11-25: the FreeType headers to 10.0, property.c to 9.68
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| annotate-freetype-render-private.h | 9.38 | 10.0 | SN, N (`RenderFreetypeGlyphs`), FI, H, DI, E; then D, O, E to make room for B |
+| annotate-freetype-private.h | 9.30 | 10.0 | B (`ComplexTextLayout`), DB, E (`SyncGlyphRow`), N (`CompositeGlyphPixel`), JB (`FetchGlyphPixel`) |
+| property.c | 7.6 | 9.68 | OH x9 (mid-file), E (opening block), E (`SetImagePropertyAttribute`) |
+| property-iptc-private.h (new) | - | 10.0 | OH |
+| property-8bim-private.h (new) | - | 9.38 | OH (Primitive Obsession, String Heavy Function Arguments) |
+| property-exif-private.h (new) | - | 9.09 | OH (Overall Code Complexity, Primitive Obsession) |
+| property-icc-private.h (new) | - | 10.0 | OH (the whole LCMS block) |
+| property-xmp-private.h (new) | - | 10.0 | OH |
+| property-clippath-private.h (new) | - | 8.73 | OH (8.41), CS (`TracePSClippathRecord`), CS (`AddSVGClippathKnot`) |
+| property-profile-private.h (new) | - | 10.0 | OH |
+| property-magick-private.h (new) | - | 10.0 | OH (the GetMagickProperty letter handlers, `#if 0` blocks verbatim) |
+| property-interpret-private.h (new) | - | 9.09 | OH (Overall Code Complexity, Primitive Obsession) |
+
+Every property header scores at or above property.c's 7.6 before the chain (the 2026-11-25 bar).
+
+### New recipes and amendments
+
+- **Recipe SN** (sink constant writes to their first reader): SZ for `v=c;` and `v.m=c;`,
+  allowed to cross an unbuilt `#if` branch whose text is read, not edited.
+- **Recipe H**, guarded form: `#if !defined(M)` / `#define M` / `#endif` moves as one run.
+- **Recipe JB** (join a block to the struct fill after it and extract it reading the
+  struct): the per-pixel fetch before `RasterizeGlyphRow`'s `GlyphPixel` block.
+
+### Evidence worth knowing
+
+- **One disclosed `--no-verify`** (`6c3d509ad`, Recipe D on the face release): with few
+  functions, any one new helper raised *Overall Code Complexity* in the render header
+  (10.0 -> 9.38), any two cleared it. Every combination of the chain was scored first;
+  the next commit restored 10.0.
+- **Per-pixel steps were timed.** No valgrind on this Mac, so the rule's wall-clock form:
+  gcc-16 -O2 -fopenmp builds (`build-oracle/omp-t-*`), 16 rotated 900-point `-annotate`
+  draws, 41 alternating rounds, both role orders, beside A/A. N (`CompositeGlyphPixel`):
+  1.0001 / 1.0013 against A/A 1.0002 (1 thread), 0.9963 / 0.9998 against 0.9966 (4
+  threads). JB: 0.9874 / 1.0082 (A/A 0.9977), 0.9944 / 1.0131 (A/A 1.0012). DB and E were
+  object-identical under gcc too. omp_compare at 1 and 4 threads: 0 diverged.
+- **`DI` on arm64.** `tools/obj_sorted.sh` knows x86 stores only and has no `HDRS=1`; the
+  disassembly was compared by hand (one `str wzr, [sp, #0x14c]` moved, sorted lists equal).
+
+### Tooling
+
+- `tools/omp_cases/annotate-freetype.txt` (new), and `tools/omp_compare.sh run` now sets
+  `$root` for case lines. **Defect fixed:** `annotate-postscript.txt`'s third case had an
+  unquoted `#00800080`, which `eval` read as a comment, so both builds failed the same way
+  and the case compared nothing.
+
+### Reported, not fixed
+
+- `Makefile.in` line 439 and 534 (`am__..._SOURCES_DIST`) hold literal `\n` text between
+  file names since the W23 merge of 2026-11-14 (`c6c33b048`). It is the dist-only list, so
+  builds are unaffected; `make dist` would see a file named `\n`.
+- The `#if 0` fragments `property-set-*-private.h` now sit inside the `void`
+  `SetImagePropertyAttribute`; their dead text returns `MagickFalse`, which whoever enables
+  one must adjust (as UB's Careful note says of stale names).
+
+### Next
+
+- **annotate-render-private.h (9.68).** RenderPostscript's 5 arguments: one caller is the
+  `#else` stub of RenderFreetype in annotate.c, compiled only without FreeType. A
+  `--without-freetype` configuration (an available build under the 2026-11-12 ruling)
+  would let Recipe B take it (the group matches `X11TextTarget`).
+- **property.c (9.68).** GetMagickProperty, cc 9: the decisions sit in the LCMS block that
+  uses `WarnNoImageReturn`, a macro with a hidden `return`; needs an EX- or RV-like recipe
+  that keeps the macro's text.
+- **property-clippath-private.h (8.73).** The SVG record loop by CS makes a twin of
+  `TracePSClippathRecord` (*Code Duplication*, probed 8.33). A Recipe CF merge (step 3's
+  `const void *` inputs for the two knot functions) would take both, then SD/SR on the
+  merged record's case groups (cc 10).
+- **property-exif / -interpret / -8bim headers.** Ratio findings: Recipe B bundles
+  (owner 2026-11-25), and E steps for *Overall Code Complexity*.
