@@ -368,9 +368,14 @@ typedef struct _EXIFCursor
 static const int
   EXIFMarkerBytes[] = { 0x45, 0x78, 0x69, 0x66, 0x00, 0x00 };
 
-static MagickBooleanType MatchEXIFMarker(const unsigned char **exif,
-  size_t *length)
+static MagickBooleanType MatchEXIFMarker(const EXIFCursor *cursor)
 {
+  const unsigned char
+    **const exif = cursor->exif;
+
+  size_t
+    *const length = cursor->length;
+
   size_t
     j;
 
@@ -385,14 +390,8 @@ static MagickBooleanType MatchEXIFMarker(const unsigned char **exif,
 static MagickBooleanType ReadEXIFMarker(const EXIFCursor *cursor,
   MagickBooleanType *broke)
 {
-  const unsigned char
-    **const exif = cursor->exif;
-
-  size_t
-    *const length = cursor->length;
-
   (*broke)=MagickFalse;
-  if (MatchEXIFMarker(exif,length) == MagickFalse)
+  if (MatchEXIFMarker(cursor) == MagickFalse)
     return(MagickFalse);
   (*broke)=MagickTrue;
   return(MagickTrue);
