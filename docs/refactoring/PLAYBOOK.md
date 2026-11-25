@@ -7527,6 +7527,12 @@ functions between files. No other recipe changes where a preprocessor line sits.
    that stay are then unchanged, and so is the macro's text, whose free identifiers
    (`output_scaling` in `DistortImage`'s `ScaleFilter`) are resolved where it is used.
    Use it only to unblock an extraction that follows, as step 5 says.
+   A `#define M` wrapped in its own guard, `#if !defined(M)`, the `#define`, `#endif`, with
+   nothing else between the directives (`RenderFreetype`'s `FT_OPEN_PATHNAME` fallback,
+   2026-11-25), is a run of its own under the second form: the three lines move together,
+   verbatim, whether or not the build's headers define `M`. The guard reads `M` only, so the
+   lines mean the same wherever they stand when no token between the old and new position
+   names `M`; step 4's proof checks that.
 2. Move the run, unchanged, to directly above the function's signature: below its
    comment banner and below any helper already placed there. When the helpers above
    the function stand inside a conditional block (`#if !defined(...)` ... `#endif`)
@@ -27009,6 +27015,135 @@ of 2026-10-24.
 
 ---
 
+## Recipe SN - Sink Constant Writes to Their First Reader
+
+**Use when:** CodeScene reports *Large Method* on a function whose tail an extraction would
+take (a loop and the cleanup that ends the function), and that tail reads locals which a few
+statements higher up the function set to constants (`glyph.id=0;`, `last_glyph_id=0;`,
+`origin.x=0;`, `status=MagickTrue;`), separated from the tail by statements that never name
+them (a font load, a canvas setup, the text layout). Moved alone, the tail would carry each
+such local into its new function as an input, and the caller would keep its declaration and
+its write; with the writes sunk to directly above the tail, one extraction takes them with
+it, and each local becomes a temporary the new function declares (Recipe E step 4: written
+before it is read on every path, read by nothing after). `annotate-freetype-render-private.h`'s
+`RenderFreetype` sets `glyph`, `last_glyph_id`, `origin` and `status` before the text
+selection and layout, and reads them only in its glyph loop.
+
+**Not covered by:** Recipe SZ, which sinks zeroing `memset` calls only and does not cross a
+preprocessor line; Recipe DI, which keeps a constant write where it stands and moves it into
+the declaration; Recipe LM step 4, which moves a constant declarator the other way, into a
+statement after the declarations; Recipes E and N, which declare a temporary in the new
+function only when the *block* writes it first.
+
+**How:**
+
+1. The writes. Each is an expression statement `v=c;` or `v.m=c;` in one compound statement
+   `B` of the function, not inside a loop or a selection, where `v` is an automatic local of
+   the function (not a parameter, not `static`, not `volatile`, not an array) and `c` is a
+   constant: an integer literal, an enumeration constant (`MagickTrue`), `NULL` or a cast
+   `(T) NULL`. The writes need not be adjacent; the statements between them are crossed
+   statements as well.
+2. The target `T` is a later statement of `B`, the first one after the last write that
+   names any `v` of the writes, or a statement that names an object holding the address of
+   one (`glyph_targets`, a `const` targets struct initialised with `&glyph`). Taking an
+   address in a declaration's initialiser before the writes is allowed; the struct then
+   counts as naming each `v` it holds.
+3. The crossed statements (every statement between the first write and `T` that is not a
+   write), checked by reading each one and the body of every `static` callee it reaches:
+   none names a `v` or an object holding its address, and none is or holds a label, a `goto`
+   or a `#pragma`. A crossed statement may hold a preprocessor conditional (`#if
+   defined(M)` ... `#endif`) when the text of every branch, built or not, names no `v` and no
+   such object (checked by `grep` over the lines between the first write and `T`); the
+   branches are not edited and the step does not move any of their lines.
+4. Cut each write and paste them, unchanged and in their original order, as one run
+   directly above `T`, at `T`'s indentation. `T` stands in `B`, so the run is entered once on
+   every path that reaches `T`, and neither enters nor leaves a loop.
+5. A path that leaves the function between the old and the new position (a `return`, a
+   throw) no longer runs the writes: nothing on it reads them (step 3), and a local's
+   lifetime ends at the `return`.
+6. Nothing else changes: no declaration moves (the extraction that follows moves them), no
+   comment moves unless it stood inside the run.
+7. Rule 2: the step leaves the function's length and the file's score where they were.
+   Take it only as the first step of a probed chain whose extraction of the run and `T`
+   follows, and name the chain and its probed end score in the message.
+8. Checks: `tools/obj_identical.sh` (the compiler may schedule the stores anywhere, so it
+   often prints `IDENTICAL`; when it does not, the oracle decides), `refactor_guard.py`
+   and `--calls` (no change), the CI and C++ warning checks, and the oracle on the function's
+   cases.
+
+**Before:**
+
+```c
+  LogFreetypeFont(draw_info,encoding);
+  flags=GetFreetypeLoadFlags(draw_info);
+  flags=GetFreetypeHintingFlags(image,flags,exception);
+  glyph.id=0;
+  glyph.image=(FT_Glyph) NULL;
+  last_glyph_id=0;
+  origin.x=0;
+  origin.y=0;
+  affine=GetFreetypeAffine(draw_info);
+  annotate_info=CloneFreetypeAnnotateInfo(draw_info);
+  status=MagickTrue;
+  ...
+#if defined(MAGICKCORE_RAQM_DELEGATE)
+  ...
+#endif
+  length=ComplexTextLayout(draw_info,p,length,face,flags,&grapheme);
+  missing_glyph_id=FT_Get_Char_Index(face,' ');
+```
+
+**After:**
+
+```c
+  LogFreetypeFont(draw_info,encoding);
+  flags=GetFreetypeLoadFlags(draw_info);
+  flags=GetFreetypeHintingFlags(image,flags,exception);
+  affine=GetFreetypeAffine(draw_info);
+  annotate_info=CloneFreetypeAnnotateInfo(draw_info);
+  ...
+#if defined(MAGICKCORE_RAQM_DELEGATE)
+  ...
+#endif
+  length=ComplexTextLayout(draw_info,p,length,face,flags,&grapheme);
+  glyph.id=0;
+  glyph.image=(FT_Glyph) NULL;
+  last_glyph_id=0;
+  origin.x=0;
+  origin.y=0;
+  status=MagickTrue;
+  missing_glyph_id=FT_Get_Char_Index(face,' ');
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A constant write reads nothing and has no effect but the
+  value it stores in its own local. No crossed statement reads or writes that local, or
+  reaches it through an address (step 3): the only address of it, in a `const` struct of the
+  caller, is named by no crossed statement either. So when `T` begins, each local holds the
+  constant whether the write ran before or after the crossed statements, and `T` and
+  everything after it read the same values. The writes keep their order among themselves,
+  and two writes to members of one struct (`origin.x`, `origin.y`) still run in that order.
+- An unbuilt branch is crossed, not touched: its text is read for the names, so the
+  argument holds in every configuration, as for the built text. The step adds no line to the
+  branch and removes none.
+- A callee that a crossed statement reaches cannot see a local whose address it was never
+  given; step 3's reading of the callees is about the address-holding struct.
+- Not a deletion: every write still runs, once, on every path that reads it.
+
+**Evidence level:** oracle (the cases that reach `T`), with step 3's reading quoted in the
+commit message; `refactor_guard.py` and `--calls` see no change.
+
+**Provenance:** 2026-11-25, from `annotate-freetype-render-private.h`'s `RenderFreetype`
+(campaign B, M143): 111 lines after Recipe LB took its glyph loop's body. Its glyph state
+(`glyph`, `last_glyph_id`, `origin`, `status`) is set before the text selection and the
+Raqm layout, an `#if defined(MAGICKCORE_RAQM_DELEGATE)` branch this build does not compile,
+and read only in the glyph loop and the cleanup after it. A probe of the chain (this step,
+Recipe N on the tail, FI, H, DI, E) took the header from 9.38 to 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27600,3 +27735,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-24 | AMEND | TB | Step 1, character labels: the `char` predicate may also be one Recipe FD made (LP step 2's shape over a character `switch`); nothing else changes, the argument of the 2026-11-10 row applies unchanged | `constitute-pixels-private.h`'s `IsCMYKMapChannel` (M142), eight letters, cc 10, the file's last *Complex Method*; probed 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | RV | Step 6 (new (f)): a block inside a compiled `#if defined(M)` feature branch with no `#else` puts its helper directly above the caller under its own `#if defined(M)` ... `#endif`, so a configuration without `M` drops helper and call together; checked by script that the file with every `M` region deleted is unchanged, blank lines aside | `utility-unique.c`'s `AcquireUniqueSymbolicLink` (M142): the relative-path block calls `getcwd` and `symlink` under `MAGICKCORE_HAVE_SYMLINK`; probed 9.92 to 10.0 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | B | Step 1, MagickPrivate form, condition (b): a function held by a caller in the other campaign's files may be released by the owner, the callers there changing in the same commit; a caller in the oracle driver keeps the old call under `#else` of a macro that `driver/build.sh` defines from the build's own private header, since one driver source links against both the baseline and the candidate library | `matrix.c`'s `LeastSquaresAddTerms` (M142, 6 arguments, the file's last finding): nine calls in campaign A's `distort-private.h` and `distort-linear-private.h` and one in `imdriver.c` (the `matrix gauss N lsq` cases) | owner |
+| 2026-11-25 | NEW | SN | Sink Constant Writes to Their First Reader: constant writes `v=c;` or `v.m=c;` to plain locals move, in order, to directly above the first statement that names any of them, past statements (an unbuilt `#if` branch among them, read but not edited) that name none of them or a struct holding their addresses | `annotate-freetype-render-private.h`'s `RenderFreetype` (campaign B, M143): the glyph state set before the text layout and read only in the glyph loop; SZ takes only `memset` and crosses no preprocessor line. Probed chain: 9.38 to 10.0 | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | H | Step 1, guarded form: a `#define M` wrapped in its own `#if !defined(M)` ... `#endif` (nothing else inside) is a run of its own, and moves with its two directive lines, verbatim; `pp_identical.sh` stays the proof | `RenderFreetype`'s `FT_OPEN_PATHNAME` fallback (campaign B, M143), the three lines that kept the function at 70 lines; the macro is named nowhere else, and the guard is false with any FreeType that defines it | mandate (2026-10-24) |
