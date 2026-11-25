@@ -757,6 +757,17 @@ static double GetGlyphPixelOpacity(const GlyphRows *rows,const ssize_t n,
   return(fill_opacity);
 }
 
+static void SyncGlyphRow(CacheView *image_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -785,8 +796,7 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     fill_opacity;
 
   MagickBooleanType
-    active,
-    sync;
+    active;
 
   PixelInfo
     fill_color;
@@ -836,9 +846,7 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
       (*status)=MagickFalse;
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  sync=SyncCacheViewAuthenticPixels(image_view,exception);
-  if (sync == MagickFalse)
-    (*status)=MagickFalse;
+  SyncGlyphRow(image_view,exception,status);
 }
 
 static void SelectFreetypeCharmap(FT_Face face,FT_Encoding encoding_type)
