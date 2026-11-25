@@ -400,19 +400,15 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   GraphemeInfo
     *grapheme;
 
-  FreetypeFaceTargets
-    targets;
-
   size_t
     length;
 
   unsigned char
     *utf8;
 
-  targets.memory=(&memory);
-  targets.library=(&library);
-  targets.stream=(&stream);
-  targets.face=(&face);
+  const FreetypeFaceTargets
+    targets = { (&memory), (&library), (&stream), (&face) };
+
   if (OpenFreetypeFace(target,&targets,exception) == MagickFalse)
     return(MagickFalse);
   SetFreetypeMetrics(face,metrics);
