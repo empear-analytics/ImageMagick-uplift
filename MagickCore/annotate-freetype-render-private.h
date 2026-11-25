@@ -100,6 +100,17 @@ static MagickBooleanType LoadFreetypeGlyph(const GlyphLoadInput *glyph_input,
   return(MagickFalse);
 }
 
+static void LogFreetypeFont(const DrawInfo *draw_info,const char *encoding)
+{
+  if (draw_info->debug != MagickFalse)
+    (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),"Font %s; "
+      "font-encoding %s; text-encoding %s; pointsize %g",
+      draw_info->font != (char *) NULL ? draw_info->font : "none",
+      encoding != (char *) NULL ? encoding : "none",
+      draw_info->encoding != (char *) NULL ? draw_info->encoding : "none",
+      draw_info->pointsize);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -200,13 +211,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   /*
     Compute bounding box.
   */
-  if (draw_info->debug != MagickFalse)
-    (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),"Font %s; "
-      "font-encoding %s; text-encoding %s; pointsize %g",
-      draw_info->font != (char *) NULL ? draw_info->font : "none",
-      encoding != (char *) NULL ? encoding : "none",
-      draw_info->encoding != (char *) NULL ? draw_info->encoding : "none",
-      draw_info->pointsize);
+  LogFreetypeFont(draw_info,encoding);
   flags=GetFreetypeLoadFlags(draw_info);
   flags=GetFreetypeHintingFlags(image,flags,exception);
   glyph.id=0;
