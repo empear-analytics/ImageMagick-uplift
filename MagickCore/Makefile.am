@@ -106,6 +106,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
   MagickCore/annotate-type-private.h \
+  MagickCore/annotate-raqm-private.h \
   MagickCore/annotate-freetype-private.h \
   MagickCore/annotate-freetype-render-private.h \
   MagickCore/annotate-render-private.h \
@@ -766,6 +767,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/animate-window-session-private.h \
   MagickCore/annotate-private.h \
   MagickCore/annotate-type-private.h \
+  MagickCore/annotate-raqm-private.h \
   MagickCore/annotate-freetype-private.h \
   MagickCore/annotate-freetype-render-private.h \
   MagickCore/annotate-render-private.h \

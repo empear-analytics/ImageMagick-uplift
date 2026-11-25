@@ -1310,6 +1310,7 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
 
 #if defined(MAGICKCORE_FREETYPE_DELEGATE)
 
+#include "MagickCore/annotate-raqm-private.h"
 #include "MagickCore/annotate-freetype-private.h"
 
 static FT_Outline_Funcs
