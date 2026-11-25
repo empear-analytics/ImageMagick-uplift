@@ -1210,6 +1210,41 @@ static void PrepareImageProperties(Image *image)
       RelinquishMagickMemory,RelinquishMagickMemory);  /* create splay-tree */
 }
 
+static void SetImagePropertyAttribute(Image *image,const char *property,
+  const char *value,ExceptionInfo *exception)
+{
+  switch (*property)
+  {
+#include "MagickCore/property-set-8bim-private.h"
+    case 'B':
+    case 'b':
+    {
+      if (LocaleCompare("background",property) == 0)
+        {
+          (void) QueryColorCompliance(value,AllCompliance,
+            &image->background_color,exception);
+          /* check for FUTURE: value exception?? */
+          /* also add user input to splay tree */
+        }
+      break; /* not an attribute, add as a property */
+    }
+#include "MagickCore/property-set-exif-fx-private.h"
+    case 'I':
+    case 'i':
+    {
+#include "MagickCore/property-set-iptc-private.h"
+      break; /* not an attribute, add as a property */
+    }
+    case 'P':
+    case 'p':
+    {
+#include "MagickCore/property-set-pixel-private.h"
+      break; /* not an attribute, add as a property */
+    }
+#include "MagickCore/property-set-xmp-private.h"
+  }
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
@@ -1258,36 +1293,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
   handler=GetImagePropertyHandler(property);
   if (handler != (ImagePropertyHandler) NULL)
     return(handler(image,value,exception));
-  switch (*property)
-  {
-#include "MagickCore/property-set-8bim-private.h"
-    case 'B':
-    case 'b':
-    {
-      if (LocaleCompare("background",property) == 0)
-        {
-          (void) QueryColorCompliance(value,AllCompliance,
-            &image->background_color,exception);
-          /* check for FUTURE: value exception?? */
-          /* also add user input to splay tree */
-        }
-      break; /* not an attribute, add as a property */
-    }
-#include "MagickCore/property-set-exif-fx-private.h"
-    case 'I':
-    case 'i':
-    {
-#include "MagickCore/property-set-iptc-private.h"
-      break; /* not an attribute, add as a property */
-    }
-    case 'P':
-    case 'p':
-    {
-#include "MagickCore/property-set-pixel-private.h"
-      break; /* not an attribute, add as a property */
-    }
-#include "MagickCore/property-set-xmp-private.h"
-  }
+  SetImagePropertyAttribute(image,property,value,exception);
   /* Default: not an attribute, add as a property */
   status=AddValueToSplayTree((SplayTreeInfo *) image->properties,
     ConstantString(property),ConstantString(value));
