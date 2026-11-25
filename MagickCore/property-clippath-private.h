@@ -194,6 +194,62 @@ static void AddPSClippathKnot(const PSClippathState *state)
   (*state->knot_count)=knot_count;
 }
 
+static void TracePSClippathRecord(const PSClippathState *state)
+{
+  const unsigned char
+    **blob = state->blob;
+
+  size_t
+    *length = state->length;
+
+  ssize_t
+    *knot_count = state->knot_count;
+
+  ssize_t
+    selector;
+
+  selector=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
+  switch (selector)
+  {
+    case 0:
+    case 3:
+    {
+      if ((*knot_count) != 0)
+        {
+          SkipClippathBytes(&(*blob),&(*length),24);
+          break;
+        }
+      /*
+        Expected subpath length record.
+      */
+      (*knot_count)=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
+      SkipClippathBytes(&(*blob),&(*length),22);
+      break;
+    }
+    case 1:
+    case 2:
+    case 4:
+    case 5:
+    {
+      if ((*knot_count) == 0)
+        {
+          /*
+            Unexpected subpath knot
+          */
+          SkipClippathBytes(&(*blob),&(*length),24);
+          break;
+        }
+      AddPSClippathKnot(state);
+      break;
+    }
+    default:
+    {
+      SkipClippathBytes(&(*blob),&(*length),24);
+      break;
+    }
+  }
+}
+
 static char *TracePSClippath(const unsigned char *blob,size_t length)
 {
   char
@@ -209,8 +265,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
     point[3];
 
   ssize_t
-    knot_count,
-    selector;
+    knot_count;
 
   const PSClippathState
     state = { &blob, &length, &path, &message, &in_subpath, first, last,
@@ -254,48 +309,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
   knot_count=0;
   in_subpath=MagickFalse;
   while (length > 0)
-  {
-    selector=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-    switch (selector)
-    {
-      case 0:
-      case 3:
-      {
-        if (knot_count != 0)
-          {
-            SkipClippathBytes(&blob,&length,24);
-            break;
-          }
-        /*
-          Expected subpath length record.
-        */
-        knot_count=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-        SkipClippathBytes(&blob,&length,22);
-        break;
-      }
-      case 1:
-      case 2:
-      case 4:
-      case 5:
-      {
-        if (knot_count == 0)
-          {
-            /*
-              Unexpected subpath knot
-            */
-            SkipClippathBytes(&blob,&length,24);
-            break;
-          }
-        AddPSClippathKnot(&state);
-        break;
-      }
-      default:
-      {
-        SkipClippathBytes(&blob,&length,24);
-        break;
-      }
-    }
-  }
+    TracePSClippathRecord(&state);
   /*
     Returns an empty PS path if the path has no knots.
   */
