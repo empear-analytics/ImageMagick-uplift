@@ -111,6 +111,19 @@ static inline MagickBooleanType IsInvalid8BIMFieldCount(const ssize_t count)
     MagickFalse);
 }
 
+typedef struct _Match8BIM
+{
+  const char
+    *name;
+
+  char
+    *resource,
+    *macroman_resource;
+
+  ssize_t
+    count;
+} Match8BIM;
+
 static inline MagickBooleanType IsUnrequestedResource(const char *resource,
   const char *macroman_resource,const char *name)
 {
@@ -294,19 +307,6 @@ static MagickBooleanType Skip8BIMResourceHeader(const Range8BIM *range,
     return(MagickTrue);
   return(MagickFalse);
 }
-
-typedef struct _Match8BIM
-{
-  const char
-    *name;
-
-  char
-    *resource,
-    *macroman_resource;
-
-  ssize_t
-    count;
-} Match8BIM;
 
 static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
   const Cursor8BIM *cursor,ssize_t *sub_number)
