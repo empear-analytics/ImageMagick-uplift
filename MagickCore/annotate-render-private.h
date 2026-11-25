@@ -386,9 +386,6 @@ static MagickBooleanType RenderPostscript(Image *image,
     extent,
     resolution;
 
-  PostscriptTransformInfo
-    transform;
-
   /*
     Render label with a Postscript font.
   */
@@ -424,12 +421,12 @@ static MagickBooleanType RenderPostscript(Image *image,
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
   resolution=GetDensityResolution(draw_info);
-  transform.identity=identity;
-  transform.draw_info=draw_info;
-  transform.resolution=resolution;
-  transform.extent=extent;
-  transform.exception=exception;
-  annotate_image=TransformPostscriptImage(&transform,annotate_image);
+  {
+    const PostscriptTransformInfo transform = { identity, draw_info,
+      resolution, extent, exception };
+
+    annotate_image=TransformPostscriptImage(&transform,annotate_image);
+  }
   SetPostscriptMetrics(draw_info,annotate_image,resolution,metrics);
   if (draw_info->render == MagickFalse)
     {
