@@ -144,8 +144,11 @@ static void ReadPSClippathPoints(const unsigned char **blob,size_t *length,
   }
 }
 
-static void AddPSClippathKnot(const PSClippathState *state)
+static void AddPSClippathKnot(const void *arguments)
 {
+  const PSClippathState
+    *state = (const PSClippathState *) arguments;
+
   const unsigned char
     *blob = (*state->blob);
 
@@ -200,16 +203,26 @@ static void AddPSClippathKnot(const PSClippathState *state)
   (*state->knot_count)=knot_count;
 }
 
-static void TracePSClippathRecord(const PSClippathState *state)
+typedef void
+  (*ClippathKnotMethod)(const void *);
+
+typedef struct _ClippathRecordInfo
 {
   const unsigned char
-    **blob = state->blob;
+    **blob;
 
-  size_t
-    *length = state->length;
+  ClippathKnotMethod
+    method;
+} ClippathRecordInfo;
 
-  ssize_t
-    *knot_count = state->knot_count;
+static inline void TraceClippathRecord(const ClippathRecordInfo *record,
+  size_t *length,ssize_t *knot_count,const void *state)
+{
+  const unsigned char
+    **const blob = record->blob;
+
+  const ClippathKnotMethod
+    method = record->method;
 
   ssize_t
     selector;
@@ -245,7 +258,7 @@ static void TracePSClippathRecord(const PSClippathState *state)
           SkipClippathBytes(&(*blob),&(*length),24);
           break;
         }
-      AddPSClippathKnot(state);
+      method(state);
       break;
     }
     default:
@@ -254,6 +267,23 @@ static void TracePSClippathRecord(const PSClippathState *state)
       break;
     }
   }
+}
+
+static void TracePSClippathRecord(const PSClippathState *state)
+{
+  const unsigned char
+    **blob = state->blob;
+
+  size_t
+    *length = state->length;
+
+  ssize_t
+    *knot_count = state->knot_count;
+
+  const ClippathRecordInfo
+    record = { blob, AddPSClippathKnot };
+
+  TraceClippathRecord(&record,length,knot_count,state);
 }
 
 static char *TracePSClippath(const unsigned char *blob,size_t length)
@@ -410,8 +440,11 @@ static void StartSVGClippathSubpath(char *message,PointInfo *first,
   CopyClippathKnot(first,last,point);
 }
 
-static void AddSVGClippathKnot(const SVGClippathState *state)
+static void AddSVGClippathKnot(const void *arguments)
 {
+  const SVGClippathState
+    *state = (const SVGClippathState *) arguments;
+
   const unsigned char
     *blob = (*state->blob);
 
@@ -488,49 +521,10 @@ static void TraceSVGClippathRecord(const SVGClippathState *state)
   ssize_t
     *knot_count = state->knot_count;
 
-  ssize_t
-    selector;
+  const ClippathRecordInfo
+    record = { blob, AddSVGClippathKnot };
 
-  selector=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
-  switch (selector)
-  {
-    case 0:
-    case 3:
-    {
-      if ((*knot_count) != 0)
-        {
-          SkipClippathBytes(&(*blob),&(*length),24);
-          break;
-        }
-      /*
-        Expected subpath length record.
-      */
-      (*knot_count)=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
-      SkipClippathBytes(&(*blob),&(*length),22);
-      break;
-    }
-    case 1:
-    case 2:
-    case 4:
-    case 5:
-    {
-      if ((*knot_count) == 0)
-        {
-          /*
-            Unexpected subpath knot.
-          */
-          SkipClippathBytes(&(*blob),&(*length),24);
-          break;
-        }
-      AddSVGClippathKnot(state);
-      break;
-    }
-    default:
-    {
-      SkipClippathBytes(&(*blob),&(*length),24);
-      break;
-    }
-  }
+  TraceClippathRecord(&record,length,knot_count,state);
 }
 
 static char *TraceSVGClippath(const unsigned char *blob,size_t length,
