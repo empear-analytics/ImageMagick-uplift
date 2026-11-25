@@ -200,6 +200,14 @@ static void SetPostscriptAlphaChannels(Image *image,Image *annotate_image,
       exception);
 }
 
+static void LogPostscriptFont(const DrawInfo *draw_info)
+{
+  if (draw_info->debug != MagickFalse)
+    (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),
+      "Font %s; pointsize %g",draw_info->font != (char *) NULL ?
+      draw_info->font : "none",draw_info->pointsize);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -231,10 +239,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   /*
     Render label with a Postscript font.
   */
-  if (draw_info->debug != MagickFalse)
-    (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),
-      "Font %s; pointsize %g",draw_info->font != (char *) NULL ?
-      draw_info->font : "none",draw_info->pointsize);
+  LogPostscriptFont(draw_info);
   file=(FILE *) NULL;
   unique_file=AcquireUniqueFileResource(filename);
   if (unique_file != -1)
