@@ -778,12 +778,135 @@ static void DestroyAnnotateText(DrawInfo *annotate_info,DrawInfo *annotate,
   text=DestroyString(text);
 }
 
+typedef struct _AnnotateLineInfo
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  DrawInfo
+    *annotate,
+    *annotate_info;
+
+  RectangleInfo
+    geometry;
+
+  GeometryInfo
+    geometry_info;
+
+  char
+    **textlist;
+
+  size_t
+    number_lines;
+
+  ExceptionInfo
+    *exception;
+} AnnotateLineInfo;
+
+typedef struct _AnnotateLineTargets
+{
+  TypeMetric
+    *metrics;
+
+  MagickBooleanType
+    *status;
+} AnnotateLineTargets;
+
+static void AnnotateTextLines(const AnnotateLineInfo *line,
+  const AnnotateLineTargets *targets)
+{
+  TypeMetric
+    *const metrics = targets->metrics;
+
+  MagickBooleanType
+    *const status = targets->status;
+
+  char
+    color[MagickPathExtent],
+    primitive[MagickPathExtent];
+
+  PixelInfo
+    pixel;
+
+  PointInfo
+    offset;
+
+  size_t
+    height;
+
+  ssize_t
+    i;
+
+  for (i=0; line->textlist[i] != (char *) NULL; i++)
+  {
+    const RenderTarget target = { line->image, line->annotate };
+
+    TextDecorationInfo
+      decoration;
+
+    if (*line->textlist[i] == '\0')
+      continue;
+    /*
+      Position text relative to image.
+    */
+    line->annotate_info->affine.tx=line->geometry_info.xi-(double)
+      line->image->page.x;
+    line->annotate_info->affine.ty=line->geometry_info.psi-(double)
+      line->image->page.y;
+    (void) CloneString(&line->annotate->text,line->textlist[i]);
+    if (((*metrics).width == 0) ||
+        (line->annotate->gravity != NorthWestGravity))
+      (void) GetTypeMetrics(line->image,line->annotate,&(*metrics),
+        line->exception);
+    height=GetTextLineHeight(&(*metrics),line->draw_info);
+    {
+      const GravityTextInfo gravity = { line->annotate, line->annotate_info,
+        line->geometry, height, i, (*metrics), line->number_lines };
+
+      GetAnnotateTextOffset(&gravity,&offset);
+    }
+    {
+      const TextAlignInfo text_align = { line->annotate, line->annotate_info,
+        height, i, (*metrics) };
+
+      GetAnnotateAlignOffset(&text_align,&offset);
+    }
+    decoration.image=line->image;
+    decoration.draw_info=line->draw_info;
+    decoration.annotate=line->annotate;
+    decoration.metrics=(*metrics);
+    decoration.primitive=primitive;
+    decoration.exception=line->exception;
+    decoration.height=height;
+    DrawTextUndercolor(&decoration,&offset);
+    line->annotate_info->affine.tx=offset.x;
+    line->annotate_info->affine.ty=offset.y;
+    pixel=GetDecorationColor(line->annotate_info);
+    (void) QueryColorname(line->image,&pixel,AllCompliance,color,
+      line->exception);
+    (void) FormatLocaleString(primitive,MagickPathExtent,"stroke %s "
+      "stroke-width %g line 0,0 %g,0",color,(double)
+      (*metrics).underline_thickness,(double) (*metrics).width);
+    /*
+      Annotate image with text.
+    */
+    DrawTextDecoration(&decoration,line->annotate_info);
+    (*status)=RenderType(&target,&offset,&(*metrics),line->exception);
+    if ((*status) == MagickFalse)
+      break;
+
+    decoration.metrics=(*metrics);
+    DrawTextLineThrough(&decoration,line->annotate_info);
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
   char
-    color[MagickPathExtent],
-    primitive[MagickPathExtent],
     *text,
     **textlist;
 
@@ -797,24 +920,17 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   MagickBooleanType
     status;
 
-  PixelInfo
-    pixel;
-
-  PointInfo
-    offset;
-
   RectangleInfo
     geometry;
 
   size_t
-    height,
     number_lines;
-
-  ssize_t
-    i;
 
   TypeMetric
     metrics;
+
+  const AnnotateLineTargets
+    targets = { &metrics, &status };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -857,61 +973,11 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     (void) SetImageColorspace(image,sRGBColorspace,exception);
   status=MagickTrue;
   (void) memset(&metrics,0,sizeof(metrics));
-  for (i=0; textlist[i] != (char *) NULL; i++)
   {
-    const RenderTarget target = { image, annotate };
+    const AnnotateLineInfo line = { image, draw_info, annotate, annotate_info,
+      geometry, geometry_info, textlist, number_lines, exception };
 
-    TextDecorationInfo
-      decoration;
-
-    if (*textlist[i] == '\0')
-      continue;
-    /*
-      Position text relative to image.
-    */
-    annotate_info->affine.tx=geometry_info.xi-(double) image->page.x;
-    annotate_info->affine.ty=geometry_info.psi-(double) image->page.y;
-    (void) CloneString(&annotate->text,textlist[i]);
-    if ((metrics.width == 0) || (annotate->gravity != NorthWestGravity))
-      (void) GetTypeMetrics(image,annotate,&metrics,exception);
-    height=GetTextLineHeight(&metrics,draw_info);
-    {
-      const GravityTextInfo gravity = { annotate, annotate_info, geometry,
-        height, i, metrics, number_lines };
-
-      GetAnnotateTextOffset(&gravity,&offset);
-    }
-    {
-      const TextAlignInfo text_align = { annotate, annotate_info, height, i,
-        metrics };
-
-      GetAnnotateAlignOffset(&text_align,&offset);
-    }
-    decoration.image=image;
-    decoration.draw_info=draw_info;
-    decoration.annotate=annotate;
-    decoration.metrics=metrics;
-    decoration.primitive=primitive;
-    decoration.exception=exception;
-    decoration.height=height;
-    DrawTextUndercolor(&decoration,&offset);
-    annotate_info->affine.tx=offset.x;
-    annotate_info->affine.ty=offset.y;
-    pixel=GetDecorationColor(annotate_info);
-    (void) QueryColorname(image,&pixel,AllCompliance,color,exception);
-    (void) FormatLocaleString(primitive,MagickPathExtent,"stroke %s "
-      "stroke-width %g line 0,0 %g,0",color,(double)
-      metrics.underline_thickness,(double) metrics.width);
-    /*
-      Annotate image with text.
-    */
-    DrawTextDecoration(&decoration,annotate_info);
-    status=RenderType(&target,&offset,&metrics,exception);
-    if (status == MagickFalse)
-      break;
-
-    decoration.metrics=metrics;
-    DrawTextLineThrough(&decoration,annotate_info);
+    AnnotateTextLines(&line,&targets);
   }
   /*
     Relinquish resources.
