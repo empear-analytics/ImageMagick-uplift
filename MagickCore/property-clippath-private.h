@@ -271,19 +271,10 @@ static inline void TraceClippathRecord(const ClippathRecordInfo *record,
 
 static void TracePSClippathRecord(const PSClippathState *state)
 {
-  const unsigned char
-    **blob = state->blob;
-
-  size_t
-    *length = state->length;
-
-  ssize_t
-    *knot_count = state->knot_count;
-
   const ClippathRecordInfo
-    record = { blob, AddPSClippathKnot };
+    record = { state->blob, AddPSClippathKnot };
 
-  TraceClippathRecord(&record,length,knot_count,state);
+  TraceClippathRecord(&record,state->length,state->knot_count,state);
 }
 
 static char *TracePSClippath(const unsigned char *blob,size_t length)
@@ -512,19 +503,10 @@ static void AddSVGClippathKnot(const void *arguments)
 
 static void TraceSVGClippathRecord(const SVGClippathState *state)
 {
-  const unsigned char
-    **blob = state->blob;
-
-  size_t
-    *length = state->length;
-
-  ssize_t
-    *knot_count = state->knot_count;
-
   const ClippathRecordInfo
-    record = { blob, AddSVGClippathKnot };
+    record = { state->blob, AddSVGClippathKnot };
 
-  TraceClippathRecord(&record,length,knot_count,state);
+  TraceClippathRecord(&record,state->length,state->knot_count,state);
 }
 
 static char *TraceSVGClippath(const unsigned char *blob,size_t length,

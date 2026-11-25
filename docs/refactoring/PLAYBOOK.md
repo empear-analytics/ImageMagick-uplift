@@ -17092,6 +17092,17 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
   value used more than once, not a conversion.
 - The object code is the compiler's to judge; step 4 is the proof.
 
+5. *Member form* (2026-11-25). A local `v` may instead be declared with the initialiser
+   `p->m`, where `p` is a parameter of type pointer to a `const`-qualified struct type
+   that nothing in the function assigns, and `v` is declared with exactly the declared
+   type of member `m` (its own `const` on the pointer itself aside). Step 1 holds
+   otherwise: nothing assigns `v`, its address is never taken, and it is read exactly
+   once, as a whole argument of a call or a whole initialiser of a struct member; and
+   no statement or initialiser between `v`'s declaration and that read calls a
+   function or writes anything. Step 2 replaces the read by `p->m`, character for
+   character, and deletes `v`'s declarator (a type line left with no name under it
+   goes, with its blank line).
+
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
 
@@ -27851,3 +27862,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | NEW | SN | Sink Constant Writes to Their First Reader: constant writes `v=c;` or `v.m=c;` to plain locals move, in order, to directly above the first statement that names any of them, past statements (an unbuilt `#if` branch among them, read but not edited) that name none of them or a struct holding their addresses | `annotate-freetype-render-private.h`'s `RenderFreetype` (campaign B, M143): the glyph state set before the text layout and read only in the glyph loop; SZ takes only `memset` and crosses no preprocessor line. Probed chain: 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | H | Step 1, guarded form: a `#define M` wrapped in its own `#if !defined(M)` ... `#endif` (nothing else inside) is a run of its own, and moves with its two directive lines, verbatim; `pp_identical.sh` stays the proof | `RenderFreetype`'s `FT_OPEN_PATHNAME` fallback (campaign B, M143), the three lines that kept the function at 70 lines; the macro is named nowhere else, and the guard is false with any FreeType that defines it | mandate (2026-10-24) |
 | 2026-11-25 | NEW | JB | Join a Block to the Struct Fill After It and Extract It Reading the Struct: the statements just before a Recipe FB compound statement that write none of its initialiser's identifiers join the block (the initialiser runs first), and a block of them moves into a helper taking `const Name *` and reading the members for the values the initialiser copied | `annotate-freetype-private.h`'s `RasterizeGlyphRow` (campaign B, M143), cc 9 after DB, E and N: the per-pixel fetch reads `x_offset`, `y_offset` and `active`, members of the `GlyphPixel` fill that follows it; alone it needs five parameters. Probed 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | IC | Step 5, member form: a local initialised with `p->m` (a member read through a parameter pointing to a `const` struct, with nothing assigning `p`), of the member's exact type, read exactly once with no call or write between its declaration and the read, is replaced at its one read by `p->m` and its declarator goes | `property-clippath-private.h`'s `TracePSClippathRecord` and `TraceSVGClippathRecord` (campaign B, M143): after Recipe CF the two wrappers only bound `blob`, `length` and `knot_count` from their state to pass them on, and the bindings were the duplicated text. Probed 9.09 to 9.68, then 10.0 after SD | mandate (2026-10-24) |
