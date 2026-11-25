@@ -1452,8 +1452,8 @@ static void PopEXIFDirectory(const EXIFWalkTargets *targets,
 static inline MagickBooleanType IsEXIFDirectoryOutside(
   const unsigned char *directory,const unsigned char *exif,const size_t length)
 {
-  return(((directory < exif) || (directory > (exif+length-2))) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((directory < exif) ||
+    (directory > (exif+length-2))));
 }
 
 static void GetEXIFProperty(const Image *image,const char *property,
