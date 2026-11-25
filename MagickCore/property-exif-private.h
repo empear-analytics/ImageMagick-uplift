@@ -740,6 +740,19 @@ static char *AcquireEXIFTagValue(const EXIFWalkInfo *walk,
   return(value);
 }
 
+static void FormatEXIFDescriptionKey(const TagInfo *EXIFTag,
+  const size_t tag_value,const ssize_t level,char **key)
+{
+  const char
+    *description;
+
+  description=GetEXIFTagDescription(EXIFTag,tag_value);
+  (void) FormatLocaleString((*key),MagickPathExtent,"%s",
+    description);
+  if (level == 2)
+    (void) SubstituteString(key,"exif:","exif:Thumbnail.");
+}
+
 static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
   const size_t tag_value,const ssize_t level,char *value)
 {
@@ -766,14 +779,7 @@ static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
   {
     case 1:
     {
-      const char
-        *description;
-
-      description=GetEXIFTagDescription(EXIFTag,tag_value);
-      (void) FormatLocaleString(key,MagickPathExtent,"%s",
-        description);
-      if (level == 2)
-        (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
+      FormatEXIFDescriptionKey(EXIFTag,tag_value,level,&key);
       break;
     }
     case 2:
