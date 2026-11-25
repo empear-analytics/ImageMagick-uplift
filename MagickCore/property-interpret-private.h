@@ -28,8 +28,7 @@ static inline MagickBooleanType IsNonEmptyImage(const Image *image)
 
 static inline MagickBooleanType IsEscapeEnd(const char *p)
 {
-  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((*p == '\0') || (*p == '\'') || (*p == '"')));
 }
 
 static void TruncatePatternForMessage(char *pattern,const ssize_t offset)
