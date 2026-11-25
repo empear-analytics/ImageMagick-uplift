@@ -801,8 +801,8 @@ static void LogInterpretImageProperties(const ImageInfo *image_info,
 static inline MagickBooleanType IsOwnedInterpretImage(const Image *image,
   const Image *property_image)
 {
-  return(((property_image != image) && (property_image != (Image *) NULL)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((property_image != image) &&
+    (property_image != (Image *) NULL)));
 }
 
 static void DestroyInterpretSources(const ImageInfo *image_info,
