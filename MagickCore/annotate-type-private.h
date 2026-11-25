@@ -134,6 +134,84 @@ static MagickBooleanType RenderTargetFreetype(const RenderTarget *target,
   return(status);
 }
 
+typedef struct _RenderTypeFont
+{
+  const RenderTarget
+    *target;
+
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  const PointInfo
+    *offset;
+
+  TypeMetric
+    *metrics;
+
+  ExceptionInfo
+    *exception;
+
+  const TypeInfo
+    **type_info;
+} RenderTypeFont;
+
+static MagickBooleanType RenderTypeByFont(const RenderTypeFont *font_info,
+  MagickBooleanType *result)
+{
+  const RenderTarget
+    *const target = font_info->target;
+
+  Image
+    *const image = font_info->image;
+
+  const DrawInfo
+    *const draw_info = font_info->draw_info;
+
+  const PointInfo
+    *const offset = font_info->offset;
+
+  TypeMetric
+    *const metrics = font_info->metrics;
+
+  ExceptionInfo
+    *const exception = font_info->exception;
+
+  const TypeInfo
+    **const type_info = font_info->type_info;
+
+  if (draw_info->font != (char *) NULL)
+    {
+      if (*draw_info->font == '@')
+        {
+          (*result)=RenderTargetFreetype(target,offset,metrics,exception);
+          return(MagickTrue);
+        }
+      if (*draw_info->font == '-')
+        {
+          (*result)=RenderX11(image,draw_info,offset,metrics,exception);
+          return(MagickTrue);
+        }
+      if (*draw_info->font == '^')
+        {
+          (*result)=RenderPostscript(image,draw_info,offset,metrics,exception);
+          return(MagickTrue);
+        }
+      if (IsPathAccessible(draw_info->font) != MagickFalse)
+        {
+          (*result)=RenderTargetFreetype(target,offset,metrics,exception);
+          return(MagickTrue);
+        }
+      (*type_info)=GetTypeInfo(draw_info->font,exception);
+      if ((*type_info) == (const TypeInfo *) NULL)
+        (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
+          "UnableToReadFont","`%s'",draw_info->font);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -155,24 +233,24 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   MagickBooleanType
     status;
 
+  MagickBooleanType
+    returned;
+
+  RenderTypeFont
+    font_info;
+
   FreetypeTarget freetype;
 
   type_info=(const TypeInfo *) NULL;
-  if (draw_info->font != (char *) NULL)
-    {
-      if (*draw_info->font == '@')
-        return(RenderTargetFreetype(target,offset,metrics,exception));
-      if (*draw_info->font == '-')
-        return(RenderX11(image,draw_info,offset,metrics,exception));
-      if (*draw_info->font == '^')
-        return(RenderPostscript(image,draw_info,offset,metrics,exception));
-      if (IsPathAccessible(draw_info->font) != MagickFalse)
-        return(RenderTargetFreetype(target,offset,metrics,exception));
-      type_info=GetTypeInfo(draw_info->font,exception);
-      if (type_info == (const TypeInfo *) NULL)
-        (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
-          "UnableToReadFont","`%s'",draw_info->font);
-    }
+  font_info.target=target;
+  font_info.image=image;
+  font_info.draw_info=draw_info;
+  font_info.offset=offset;
+  font_info.metrics=metrics;
+  font_info.exception=exception;
+  font_info.type_info=(&type_info);
+  if (RenderTypeByFont(&font_info,&returned) != MagickFalse)
+    return(returned);
   if ((type_info == (const TypeInfo *) NULL) &&
       (draw_info->family != (const char *) NULL))
     type_info=GetFamilyTypeInfo(draw_info,type_info,exception);
