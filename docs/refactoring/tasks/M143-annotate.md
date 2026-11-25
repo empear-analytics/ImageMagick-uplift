@@ -80,7 +80,8 @@ the chain (the 2026-11-18 bar). The headers are campaign B files now and stay on
 
 Whole catalogue at `484300881` (working-tree candidate): 16,005 cases, 1 diverged, the known
 `gaps/c5651ffad8` logcfg tie-break. Again at the TransformPostscriptImage step, with the five
-PostScript-font cases added: 16,010 cases, 1 diverged, the same case. Each step ran its function's cases: RenderType 218,
+PostScript-font cases added: 16,010 cases, 1 diverged, the same case. Again after the
+xml-tree.c chain: 16,010 cases, 1 diverged, the same case. Each step ran its function's cases: RenderType 218,
 RenderFreetype 198, RenderX11 20, AnnotateImage 177, all 0 diverged.
 
 ## Traps seen
@@ -122,13 +123,43 @@ RenderFreetype 198, RenderX11 20, AnnotateImage 177, all 0 diverged.
 - **annotate-raqm-private.h (8.38).** Raqm-only, not compiled here: a plateau unless a
   Raqm build becomes available.
 
+## xml-tree.c to 10.0
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| xml-tree.c | 9.09 | 10.0 | OH x3 (mid-file) |
+| xml-tree-text-private.h (new) | - | 9.38 | WriteUTF8Bytes to the EntityCheckInfo typedef |
+| xml-tree-declarations-private.h (new) | - | 9.09 | ValidateEntities to the entity declarations |
+| xml-tree-markup-private.h (new) | - | 9.68 | ParseDoctypeDeclaration to ParseXMLTreeTags |
+
+- **Finding the cut by search.** The parser statics run from GetXMLTreeTag to NewXMLTree.
+  No two-header cut kept both headers at 9.09 or above: all 62 function starts in the
+  stretch were tried. Every header holding lines 1291-1560 whole with the tail was flagged
+  for *Overall Code Complexity*. A three-header search with the first cut at 1291 found
+  seven partitions. The one taken (cuts at ValidateEntities and ParseDoctypeDeclaration)
+  rises at every step, 9.09 -> 9.09 -> 9.38 -> 10.0, so no step needed `--no-verify`.
+- The NewXMLTree banner stood at the top of the first run and moved to directly above
+  NewXMLTree. A form-feed line at the run's edge stays in xml-tree.c. The markup run names
+  the kept `sentinel`. All three carves were pp- and object-IDENTICAL.
+- **What holds the headers below 10.** They carry only file-level ratio findings:
+  - *Primitive Obsession*: CodeScene warns at 60% primitive arguments, and counts more as
+    primitive than a plain type reading does.
+  - *String Heavy Function Arguments*: 52% string arguments in the text header.
+  - *Overall Code Complexity*: in the declarations header.
+  A probe that rewrote signatures to one struct argument, the widest functions first,
+  cleared *Primitive Obsession* in the markup header only at 25 of its 45 functions (20 was
+  not enough). Each would be a Recipe B step, and only where the arguments travel together.
+
 ## Probed elsewhere, not taken
 
-- **xml-tree.c (9.09, Number of Functions).** Its parser statics run from after
-  GetXMLTreeTag to NewXMLTree (lines 836-3222). Any OH carve of the whole run leaves
-  xml-tree.c at 10.0. But lines 1103-1807 (entity and doctype parsing, lizard mean cc about
-  4.7) score 8.81 in any header, from *Overall Code Complexity*, *Primitive Obsession* and
-  *String Heavy Function Arguments*. That is below the file's 9.09 bar, and runs must start
-  after a kept item, so that stretch cannot be skipped. The leading UTF run alone
-  (836-1102, header 9.38) leaves xml-tree.c at 9.09. Taking that stretch's complexity down
-  first adds functions to a file already flagged for its function count.
+- xml-tree.c: first probed as not taken (two-header cuts only); taken later, see above.
+
+## Owner answers (2026-11-25)
+
+Before a long unattended run, the owner answered four questions (recorded in AGENTS.md):
+- A stub-probed chain may take intermediate drops with `--no-verify`, each disclosed.
+- The bar for a header carved out of an already-carved file is the file's score before its
+  first carve (draw-primitive.c 3.92).
+- The ratio findings (*Primitive Obsession*, *String Heavy Function Arguments*) are worked
+  toward 10 with Recipe B bundles.
+- `build-oracle/mull-*` may be deleted when disk runs low.
