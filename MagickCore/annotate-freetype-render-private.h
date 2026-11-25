@@ -100,6 +100,141 @@ static MagickBooleanType LoadFreetypeGlyph(const GlyphLoadInput *glyph_input,
   return(MagickFalse);
 }
 
+typedef struct _GlyphLoopInfo
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  FT_Face
+    face;
+
+  FT_Int32
+    flags;
+
+  DrawInfo
+    *annotate_info;
+
+  FT_Matrix
+    affine;
+
+  TypeMetric
+    *metrics;
+
+  const PointInfo
+    *offset;
+
+  ExceptionInfo
+    *exception;
+
+  GraphemeInfo
+    *grapheme;
+
+  char
+    *p;
+
+  FT_UInt
+    missing_glyph_id;
+
+  ssize_t
+    last_character;
+} GlyphLoopInfo;
+
+typedef struct _GlyphLoopTargets
+{
+  GlyphInfo
+    *glyph;
+
+  FT_Vector
+    *origin;
+
+  MagickBooleanType
+    *status;
+
+  FT_UInt
+    *last_glyph_id;
+
+  ssize_t
+    *code;
+} GlyphLoopTargets;
+
+static MagickBooleanType RenderFreetypeGlyph(const GlyphLoopInfo *loop,
+  const ssize_t i,const GlyphLoopTargets *targets)
+{
+  const DrawInfo
+    *const draw_info = loop->draw_info;
+
+  GraphemeInfo
+    *const grapheme = loop->grapheme;
+
+  GlyphInfo
+    *const glyph = targets->glyph;
+
+  FT_Vector
+    *const origin = targets->origin;
+
+  MagickBooleanType
+    *const status = targets->status;
+
+  FT_UInt
+    *const last_glyph_id = targets->last_glyph_id;
+
+  ssize_t
+    *const code = targets->code;
+
+  FT_BBox
+    bounds;
+
+  FT_BitmapGlyph
+    bitmap;
+
+  PointInfo
+    point;
+
+  /*
+    Render UTF-8 sequence.
+  */
+  (*glyph).id=GetFreetypeGlyphId(grapheme+i,loop->missing_glyph_id);
+  if (((*glyph).id != 0) && ((*last_glyph_id) != 0))
+    (*origin).x+=(FT_Pos) (64.0*draw_info->kerning);
+  (*glyph).origin=(*origin);
+  (*glyph).origin.x+=(FT_Pos) grapheme[i].x_offset;
+  (*glyph).origin.y+=(FT_Pos) grapheme[i].y_offset;
+  {
+    const GlyphLoadInput
+      glyph_input = { loop->face, loop->flags, draw_info, (*status),
+        loop->annotate_info, loop->affine, loop->metrics };
+
+    if (LoadFreetypeGlyph(&glyph_input,&(*glyph),&bounds) != MagickFalse)
+      return(MagickFalse);
+  }
+  bitmap=(FT_BitmapGlyph) (*glyph).image;
+  point=GetGlyphBitmapPoint(loop->offset,bitmap,(*origin));
+  if (draw_info->render != MagickFalse)
+    {
+      const GlyphBitmapTarget
+        glyph_target = { loop->image, draw_info, bitmap, point,
+          loop->annotate_info, loop->offset, loop->exception };
+
+      (*status)=RasterizeGlyphBitmap(&glyph_target,(*status));
+    }
+  if (IsInterwordSpace(draw_info,loop->p+grapheme[i].cluster,(*code)) !=
+      MagickFalse)
+    (*origin).x+=(FT_Pos) (64.0*draw_info->interword_spacing);
+  else
+    if (i == loop->last_character)
+      (*origin).x+=MagickMax((FT_Pos) grapheme[i].x_advance,bounds.xMax);
+    else
+      (*origin).x+=(FT_Pos) grapheme[i].x_advance;
+  (*origin).y+=(FT_Pos) grapheme[i].y_advance;
+  SetFreetypeMetricsOrigin(loop->metrics,(*origin));
+  (*last_glyph_id)=(*glyph).id;
+  (*code)=GetUTFCode(loop->p+grapheme[i].cluster);
+  return(MagickTrue);
+}
+
 static void LogFreetypeFont(const DrawInfo *draw_info,const char *encoding)
 {
   if (draw_info->debug != MagickFalse)
@@ -132,12 +267,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   DrawInfo
     *annotate_info;
-
-  FT_BBox
-    bounds;
-
-  FT_BitmapGlyph
-    bitmap;
 
   FT_Face
     face;
@@ -177,9 +306,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   MagickBooleanType
     status;
 
-  PointInfo
-    point;
-
   ssize_t
     i;
 
@@ -192,6 +318,9 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   unsigned char
     *utf8;
+
+  const GlyphLoopTargets
+    glyph_targets = { &glyph, &origin, &status, &last_glyph_id, &code };
 
   targets.memory=(&memory);
   targets.library=(&library);
@@ -240,44 +369,12 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   last_character=(ssize_t) length-1;
   for (i=0; i < (ssize_t) length; i++)
   {
-    /*
-      Render UTF-8 sequence.
-    */
-    glyph.id=GetFreetypeGlyphId(grapheme+i,missing_glyph_id);
-    if ((glyph.id != 0) && (last_glyph_id != 0))
-      origin.x+=(FT_Pos) (64.0*draw_info->kerning);
-    glyph.origin=origin;
-    glyph.origin.x+=(FT_Pos) grapheme[i].x_offset;
-    glyph.origin.y+=(FT_Pos) grapheme[i].y_offset;
-    {
-      const GlyphLoadInput
-        glyph_input = { face, flags, draw_info, status, annotate_info, affine,
-          metrics };
+    const GlyphLoopInfo
+      loop = { image, draw_info, face, flags, annotate_info, affine, metrics,
+        offset, exception, grapheme, p, missing_glyph_id, last_character };
 
-      if (LoadFreetypeGlyph(&glyph_input,&glyph,&bounds) != MagickFalse)
-        continue;
-    }
-    bitmap=(FT_BitmapGlyph) glyph.image;
-    point=GetGlyphBitmapPoint(offset,bitmap,origin);
-    if (draw_info->render != MagickFalse)
-      {
-        const GlyphBitmapTarget
-          glyph_target = { image, draw_info, bitmap, point, annotate_info,
-            offset, exception };
-
-        status=RasterizeGlyphBitmap(&glyph_target,status);
-      }
-    if (IsInterwordSpace(draw_info,p+grapheme[i].cluster,code) != MagickFalse)
-      origin.x+=(FT_Pos) (64.0*draw_info->interword_spacing);
-    else
-      if (i == last_character)
-        origin.x+=MagickMax((FT_Pos) grapheme[i].x_advance,bounds.xMax);
-      else
-        origin.x+=(FT_Pos) grapheme[i].x_advance;
-    origin.y+=(FT_Pos) grapheme[i].y_advance;
-    SetFreetypeMetricsOrigin(metrics,origin);
-    last_glyph_id=glyph.id;
-    code=GetUTFCode(p+grapheme[i].cluster);
+    if (RenderFreetypeGlyph(&loop,i,&glyph_targets) == MagickFalse)
+      continue;
   }
   RelinquishFreetypeText(grapheme,utf8);
   glyph.image=DestroyFreetypeGlyph(glyph.image);
