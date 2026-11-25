@@ -138,9 +138,18 @@ typedef struct _AttributeInfo8BIM
     *exception;
 } AttributeInfo8BIM;
 
-static char *Trace8BIMClippath(const Image *image,const char *format,
-  char *attribute,const ssize_t count)
+static char *Trace8BIMClippath(const AttributeInfo8BIM *attribute_info,
+  char *attribute)
 {
+  const Image
+    *const image = attribute_info->image;
+
+  const char
+    *const format = attribute_info->format;
+
+  const ssize_t
+    count = attribute_info->count;
+
   char
     *path;
 
@@ -203,11 +212,7 @@ static void Set8BIMAttribute(const AttributeInfo8BIM *attribute_info,
   const char
     *const key = attribute_info->key;
 
-  char
-    *const format = attribute_info->format;
-
   const ssize_t
-    count = attribute_info->count,
     id = attribute_info->id;
 
   ExceptionInfo
@@ -221,7 +226,7 @@ static void Set8BIMAttribute(const AttributeInfo8BIM *attribute_info,
       char
         *path;
 
-      path=Trace8BIMClippath(image,format,attribute,count);
+      path=Trace8BIMClippath(attribute_info,attribute);
       (void) SetImageProperty((Image *) image,key,(const char *) path,
         exception);
       path=DestroyString(path);
