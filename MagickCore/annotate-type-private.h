@@ -191,7 +191,10 @@ static MagickBooleanType RenderTypeByFont(const RenderTypeFont *font_info,
         }
       if (*draw_info->font == '-')
         {
-          (*result)=RenderX11(image,draw_info,offset,metrics,exception);
+          const X11TextTarget
+            x11_text = { draw_info, offset, metrics };
+
+          (*result)=RenderX11(image,&x11_text,exception);
           return(MagickTrue);
         }
       if (*draw_info->font == '^')

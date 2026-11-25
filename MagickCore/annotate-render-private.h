@@ -377,9 +377,18 @@ static MagickBooleanType RenderPostscript(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType RenderX11(Image *image,const DrawInfo *draw_info,
-  const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+static MagickBooleanType RenderX11(Image *image,const X11TextTarget *x11_text,
+  ExceptionInfo *exception)
 {
+  const DrawInfo
+    *draw_info = x11_text->draw_info;
+
+  const PointInfo
+    *offset = x11_text->offset;
+
+  TypeMetric
+    *metrics = x11_text->metrics;
+
   const XRenderText
     text = { draw_info, offset, metrics };
 

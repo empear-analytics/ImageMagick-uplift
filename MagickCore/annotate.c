@@ -151,6 +151,18 @@ typedef struct _RenderTarget
   const DrawInfo
     *draw_info;
 } RenderTarget;
+
+typedef struct _X11TextTarget
+{
+  const DrawInfo
+    *draw_info;
+
+  const PointInfo
+    *offset;
+
+  TypeMetric
+    *metrics;
+} X11TextTarget;
 
 /*
   Annotate semaphores.
@@ -168,8 +180,7 @@ static MagickBooleanType
     ExceptionInfo *),
   RenderFreetype(const FreetypeTarget *,const PointInfo *,TypeMetric *,
     ExceptionInfo *),
-  RenderX11(Image *,const DrawInfo *,const PointInfo *,TypeMetric *,
-    ExceptionInfo *);
+  RenderX11(Image *,const X11TextTarget *,ExceptionInfo *);
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
