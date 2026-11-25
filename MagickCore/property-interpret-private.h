@@ -44,7 +44,7 @@ static void TruncatePatternForMessage(char *pattern,const ssize_t offset)
 
 static inline MagickBooleanType IsEscapedPatternCharacter(const char *p)
 {
-  return(((*p == '\\') && (*(p+1) != '\0')) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((*p == '\\') && (*(p+1) != '\0')));
 }
 
 static void ScanBracedPattern(char *pattern,ssize_t *offset,ssize_t *depth,
