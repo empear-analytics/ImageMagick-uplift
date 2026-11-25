@@ -806,6 +806,15 @@ static void CompositeGlyphPixel(const GlyphRows *rows,const GlyphPixel *pixel,
     (*status)=MagickFalse;
 }
 
+static Quantum *FetchGlyphPixel(const GlyphRows *rows,const GlyphPixel *pixel,
+  Quantum *magick_restrict q)
+{
+  if (pixel->active == MagickFalse)
+    q=GetCacheViewAuthenticPixels(rows->image_view,pixel->x_offset,
+      pixel->y_offset,1,1,rows->exception);
+  return(q);
+}
+
 static void SyncGlyphRow(CacheView *image_view,ExceptionInfo *exception,
   MagickBooleanType *status)
 {
@@ -867,15 +876,13 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
         continue;
       }
     fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
-    if (active == MagickFalse)
-      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
-        exception);
-    if (q == (Quantum *) NULL)
-      continue;
     {
       const GlyphPixel
         pixel = { x_offset, y_offset, fill_opacity, active };
 
+      q=FetchGlyphPixel(rows,&pixel,q);
+      if (q == (Quantum *) NULL)
+        continue;
       CompositeGlyphPixel(rows,&pixel,q,status);
     }
     q+=(ptrdiff_t) GetPixelChannels(image);
