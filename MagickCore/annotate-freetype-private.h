@@ -757,6 +757,55 @@ static double GetGlyphPixelOpacity(const GlyphRows *rows,const ssize_t n,
   return(fill_opacity);
 }
 
+typedef struct _GlyphPixel
+{
+  ssize_t
+    x_offset,
+    y_offset;
+
+  double
+    fill_opacity;
+
+  MagickBooleanType
+    active;
+} GlyphPixel;
+
+static void CompositeGlyphPixel(const GlyphRows *rows,const GlyphPixel *pixel,
+  Quantum *magick_restrict q,MagickBooleanType *status)
+{
+  Image
+    *const image = rows->image;
+
+  const DrawInfo
+    *const draw_info = rows->draw_info;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  const ssize_t
+    x_offset = pixel->x_offset,
+    y_offset = pixel->y_offset;
+
+  double
+    fill_opacity = pixel->fill_opacity;
+
+  PixelInfo
+    fill_color;
+
+  if (rows->transparent_fill == MagickFalse)
+    {
+      GetPixelInfo(image,&fill_color);
+      GetFillColor(draw_info,x_offset,y_offset,&fill_color,exception);
+      fill_opacity=fill_opacity*fill_color.alpha;
+      CompositePixelOver(image,&fill_color,fill_opacity,q,
+        GetPixelAlpha(image,q),q);
+    }
+  else
+    BlendGlyphAlpha(image,fill_opacity,q);
+  if (SyncGlyphPixel(pixel->active,rows->image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SyncGlyphRow(CacheView *image_view,ExceptionInfo *exception,
   MagickBooleanType *status)
 {
@@ -783,12 +832,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   const PointInfo
     point = rows->point;
 
-  const MagickBooleanType
-    transparent_fill = rows->transparent_fill;
-
-  const DrawInfo
-    *const draw_info = rows->draw_info;
-
   ExceptionInfo
     *const exception = rows->exception;
 
@@ -797,9 +840,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
 
   MagickBooleanType
     active;
-
-  PixelInfo
-    fill_color;
 
   Quantum
     *magick_restrict q;
@@ -832,18 +872,12 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
         exception);
     if (q == (Quantum *) NULL)
       continue;
-    if (transparent_fill == MagickFalse)
-      {
-        GetPixelInfo(image,&fill_color);
-        GetFillColor(draw_info,x_offset,y_offset,&fill_color,exception);
-        fill_opacity=fill_opacity*fill_color.alpha;
-        CompositePixelOver(image,&fill_color,fill_opacity,q,
-          GetPixelAlpha(image,q),q);
-      }
-    else
-      BlendGlyphAlpha(image,fill_opacity,q);
-    if (SyncGlyphPixel(active,image_view,exception) == MagickFalse)
-      (*status)=MagickFalse;
+    {
+      const GlyphPixel
+        pixel = { x_offset, y_offset, fill_opacity, active };
+
+      CompositeGlyphPixel(rows,&pixel,q,status);
+    }
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
   SyncGlyphRow(image_view,exception,status);
