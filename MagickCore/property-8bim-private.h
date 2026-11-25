@@ -255,9 +255,19 @@ static inline MagickBooleanType Is8BIMResourceName(const char *name)
   return(((*name != '\0') && (*name != '#')) ? MagickTrue : MagickFalse);
 }
 
-static void Release8BIMResourceNames(char **resource,
-  char **macroman_resource)
+typedef struct _Names8BIM
 {
+  char
+    **resource,
+    **macroman_resource;
+} Names8BIM;
+
+static void Release8BIMResourceNames(const Names8BIM *names)
+{
+  char
+    **const resource = names->resource,
+    **const macroman_resource = names->macroman_resource;
+
   if ((*macroman_resource) != (char *) NULL)
     (*macroman_resource)=DestroyString((*macroman_resource));
   if ((*resource) != (char *) NULL)
@@ -456,6 +466,9 @@ static void Get8BIMResources(const Request8BIM *request)
   const Cursor8BIM
     cursor = { &info, &length };
 
+  const Names8BIM
+    names = { &resource, &macroman_resource };
+
   status=MagickFalse;
   length=GetStringInfoLength(request->profile);
   info=GetStringInfoDatum(request->profile);
@@ -474,7 +487,7 @@ static void Get8BIMResources(const Request8BIM *request)
     range.stop=request->stop;
     if (Skip8BIMResourceHeader(&range,&cursor,&id) != MagickFalse)
       continue;
-    Release8BIMResourceNames(&resource,&macroman_resource);
+    Release8BIMResourceNames(&names);
     Read8BIMResourceBlock(&count,&resource,&cursor);
     if (IsInvalid8BIMResourceCount(count,length) != MagickFalse)
       {
@@ -500,7 +513,7 @@ static void Get8BIMResources(const Request8BIM *request)
     attribute_info.exception=request->exception;
     Set8BIMResource(&attribute_info,&cursor,&status);
   }
-  Release8BIMResourceNames(&resource,&macroman_resource);
+  Release8BIMResourceNames(&names);
 }
 
 static void Get8BIMProperty(const Image *image,const char *key,
