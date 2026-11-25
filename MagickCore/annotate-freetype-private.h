@@ -795,9 +795,7 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     *magick_restrict q;
 
   ssize_t
-    x;
-
-  ssize_t
+    x,
     n,
     x_offset,
     y_offset;
