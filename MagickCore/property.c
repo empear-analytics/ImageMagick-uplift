@@ -408,61 +408,7 @@ MagickExport MagickBooleanType FormatImageProperty(Image *image,
 
 #include "MagickCore/property-clippath-private.h"
 
-static void GetProfileProperty(const Image *image,const char *property,
-  ExceptionInfo *exception)
-{
-  if (LocaleNCompare("8bim:",property,5) == 0)
-    Get8BIMProperty(image,property,exception);
-  else if (LocaleNCompare("exif:",property,5) == 0)
-    GetEXIFProperty(image,property,exception);
-  else if ((LocaleNCompare("icc:",property,4) == 0) ||
-           (LocaleNCompare("icm:",property,4) == 0))
-    {
-#if defined(MAGICKCORE_LCMS_DELEGATE)
-      GetICCProperty(image,exception);
-#endif
-    }
-  else if (LocaleNCompare("iptc:",property,5) == 0)
-    GetIPTCProperty(image,property,exception);
-  else if (LocaleNCompare("xmp:",property,4) == 0)
-    GetXMPProperty(image,property);
-}
-
-static inline MagickBooleanType IsWildcardProperty(const char *property,
-  const size_t property_length)
-{
-  return(((property_length > 2) && (*(property+(property_length-2)) == ':') &&
-    (*(property+(property_length-1)) == '*')) ? MagickTrue : MagickFalse);
-}
-
-static MagickBooleanType GetStoredImageProperty(const Image *image,
-  const char *property,const MagickBooleanType read_from_properties,
-  const char **result)
-{
-  const char
-    *p;
-
-  if (read_from_properties != MagickFalse)
-    {
-      p=(const char *) NULL;
-      if (image->properties != (void *) NULL)
-        {
-          p=(const char *) GetValueFromSplayTree((SplayTreeInfo *)
-            image->properties,property);
-          if (p != (const char *) NULL)
-            {
-              (*result)=p;
-              return(MagickTrue);
-            }
-        }
-      if (strchr(property,':') == (char *) NULL)
-        {
-          (*result)=p;
-          return(MagickTrue);
-        }
-    }
-  return(MagickFalse);
-}
+#include "MagickCore/property-profile-private.h"
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
