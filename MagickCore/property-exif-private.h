@@ -1439,13 +1439,18 @@ static const TagInfo
     { 0x00000, "" }
   };  /* https://cipa.jp/std/documents/download_e.html?DC-008-Translation-2019-E */
 
+static void SkipEXIFPropertySpaces(const char **property)
+{
+  while (isspace((int) ((unsigned char) *(*property))) != 0)
+    (*property)++;
+}
+
 static MagickBooleanType ParseEXIFPropertyRequest(const char **property,
   ssize_t *all,size_t *tag)
 {
   if (((*property) == (const char *) NULL) || (*(*property) == '\0'))
     return(MagickFalse);
-  while (isspace((int) ((unsigned char) *(*property))) != 0)
-    (*property)++;
+  SkipEXIFPropertySpaces(property);
   if (strlen((*property)) <= 5)
     return(MagickFalse);
   if (ParseEXIFTagRequest(EXIFTag,property,all,tag) == MagickFalse)
