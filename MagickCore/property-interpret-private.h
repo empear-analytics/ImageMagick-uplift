@@ -22,8 +22,8 @@
 
 static inline MagickBooleanType IsNonEmptyImage(const Image *image)
 {
-  return(((image != (Image *) NULL) && (image->columns != 0) &&
-    (image->rows != 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((image != (Image *) NULL) &&
+    (image->columns != 0) && (image->rows != 0)));
 }
 
 static inline MagickBooleanType IsEscapeEnd(const char *p)
