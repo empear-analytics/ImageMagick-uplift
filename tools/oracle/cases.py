@@ -3038,6 +3038,18 @@ GAP_COMMANDS += [
     "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -encoding None -annotate +5+20 'Enc'",
     "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -encoding AppleRoman -annotate +5+20 'Enc'",
 ]
+# annotate.c: a font name starting with '^' sends RenderType to RenderPostscript, which writes
+# the text as PostScript and reads it back through Ghostscript (external programs allowed by the
+# owner, 2026-10-03; where gs is missing the read fails alike in every run): the identity
+# affine (cropped to the bounding box), a rotation (TransformImage "0x0"), a fill of none (no
+# fill pass), a label (metrics only, render off) and a name that is not a PostScript font name.
+GAP_COMMANDS += [
+    "{C}/rose.miff -font ^Helvetica -pointsize 20 -annotate +5+25 'Hi'",
+    "{C}/rose.miff -font ^Helvetica -pointsize 16 -fill red -annotate 20x20+5+30 'Tilt'",
+    "{C}/rose.miff -font ^Courier -pointsize 18 -fill none -annotate +5+25 'None'",
+    "-font ^Times-Roman -pointsize 18 label:'Label'",
+    "{C}/rose.miff -font '^Bad Name!' -pointsize 18 -annotate +5+25 'Bad'",
+]
 # vision.c: a few distinct blobs through every connected-components define, and
 # -integral
 GAP_COMMANDS += [
