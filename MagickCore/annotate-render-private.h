@@ -208,13 +208,67 @@ static void LogPostscriptFont(const DrawInfo *draw_info)
       draw_info->font : "none",draw_info->pointsize);
 }
 
+typedef struct _PostscriptTransformInfo
+{
+  MagickBooleanType
+    identity;
+
+  const DrawInfo
+    *draw_info;
+
+  PointInfo
+    resolution,
+    extent;
+
+  ExceptionInfo
+    *exception;
+} PostscriptTransformInfo;
+
+static Image *TransformPostscriptImage(const PostscriptTransformInfo *transform,
+  Image *annotate_image)
+{
+  const MagickBooleanType
+    identity = transform->identity;
+
+  const DrawInfo
+    *const draw_info = transform->draw_info;
+
+  const PointInfo
+    resolution = transform->resolution,
+    extent = transform->extent;
+
+  ExceptionInfo
+    *const exception = transform->exception;
+
+  char
+    geometry[MagickPathExtent];
+
+  if (identity == MagickFalse)
+    (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
+  else
+    {
+      RectangleInfo
+        crop_info;
+
+      crop_info=GetImageBoundingBox(annotate_image,exception);
+      crop_info.height=(size_t) ((resolution.y/DefaultResolution)*
+        ExpandAffine(&draw_info->affine)*draw_info->pointsize+0.5);
+      crop_info.y=CastDoubleToSsizeT(ceil((resolution.y/DefaultResolution)*
+        extent.y/8.0-0.5));
+      (void) FormatLocaleString(geometry,MagickPathExtent,
+        "%.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
+        crop_info.height,(double) crop_info.x,(double) crop_info.y);
+      (void) TransformImage(&annotate_image,geometry,(char *) NULL,exception);
+    }
+  return(annotate_image);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
 {
   char
-    filename[MagickPathExtent],
-    geometry[MagickPathExtent];
+    filename[MagickPathExtent];
 
   FILE
     *file;
@@ -232,6 +286,9 @@ static MagickBooleanType RenderPostscript(Image *image,
   PointInfo
     extent,
     resolution;
+
+  PostscriptTransformInfo
+    transform;
 
   ssize_t
     y;
@@ -271,23 +328,12 @@ static MagickBooleanType RenderPostscript(Image *image,
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
   resolution=GetDensityResolution(draw_info);
-  if (identity == MagickFalse)
-    (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
-  else
-    {
-      RectangleInfo
-        crop_info;
-
-      crop_info=GetImageBoundingBox(annotate_image,exception);
-      crop_info.height=(size_t) ((resolution.y/DefaultResolution)*
-        ExpandAffine(&draw_info->affine)*draw_info->pointsize+0.5);
-      crop_info.y=CastDoubleToSsizeT(ceil((resolution.y/DefaultResolution)*
-        extent.y/8.0-0.5));
-      (void) FormatLocaleString(geometry,MagickPathExtent,
-        "%.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-        crop_info.height,(double) crop_info.x,(double) crop_info.y);
-      (void) TransformImage(&annotate_image,geometry,(char *) NULL,exception);
-    }
+  transform.identity=identity;
+  transform.draw_info=draw_info;
+  transform.resolution=resolution;
+  transform.extent=extent;
+  transform.exception=exception;
+  annotate_image=TransformPostscriptImage(&transform,annotate_image);
   SetPostscriptMetrics(draw_info,annotate_image,resolution,metrics);
   if (draw_info->render == MagickFalse)
     {
