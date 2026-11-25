@@ -27144,6 +27144,119 @@ Recipe N on the tail, FI, H, DI, E) took the header from 9.38 to 10.0. Added by 
 
 ---
 
+## Recipe JB - Join a Block to the Struct Fill After It and Extract It Reading the Struct
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function whose loop
+body ends in a Recipe FB compound statement, `{ const Name name = { e1, ..., en }; F(&name,
+...); }`, and whose statements just before it hold a decision that reads the values the
+initialiser copies plus one or two more: `annotate-freetype-private.h`'s `RasterizeGlyphRow`,
+whose column loop fetches the pixel when the row was not fetched whole (`if (active ==
+MagickFalse) q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,exception);`)
+and skips a missing pixel, directly before the block that fills `GlyphPixel pixel = {
+x_offset, y_offset, fill_opacity, active }` for `CompositeGlyphPixel`. Moved alone, the fetch
+would take `rows`, `active`, `x_offset`, `y_offset` and `q`, five parameters.
+
+**Not covered by:** Recipe SM, whose block passes `&s` to a callee itself and so already lies
+after the struct's initialisation; Recipe N step 8, whose later block reads only the members
+after the struct's own helper ran; Recipe RF, which deletes a repeated fill; Recipes FU and
+FB, which turn assignments into an initialiser and move no other statement; Recipe SN, which
+moves constant writes, not an initialiser.
+
+**How:**
+
+1. `C` is a compound statement of Recipe FB's form: its first item is the declaration
+   `const Name name = { e1, ..., en };`, every `ei` a plain identifier (a local or
+   parameter of the function), and nothing else in `C` writes any `ei` or takes its
+   address. `P` is the run of statements directly before `C` in the same statement list,
+   from a chosen first statement to the statement before `C`.
+2. Nothing in `P` (checked by reading, every callee included) writes an `ei` or takes the
+   address of one, and `P` holds no label, no `#` line and no `#pragma`. `P` may hold a
+   `continue` or `break` of the enclosing loop, or a `return`.
+3. Move `C`'s opening brace and its declaration (with the blank line after it) up to
+   directly before `P`; `P` follows, unchanged except for two more columns of indentation,
+   then `C`'s other statements. Nothing else moves.
+4. In the joined block, a block `E` of `P` that meets Recipe E steps 1 and 3 to 7 (at most
+   one written variable, which it returns), and that reads, besides the values of
+   `name`'s members (each `ei` it reads stands for `name.mi`), at most two variables, moves
+   into a new `static` function directly above the caller (with the helpers of the same
+   chain), taking `const Name *name` and those variables, at most four parameters in all.
+   Its body reads each such value as `name->mi`; a variable the caller binds from a
+   struct parameter it passes on (Recipe N's pass-through form) is read through that
+   parameter in the same way. The call passes `&name`.
+5. Every other statement of `P` stays as it is in the joined block, the `continue`s
+   included: a `continue` or `break` leaves the compound statement and the loop body as
+   before, and a `return` leaves the function; the struct's lifetime ends there either
+   way, and nothing outside `C` names it.
+6. One block per commit, with the joined `P`. Run `refactor_guard.py` (literals `OK`) and
+   `--calls` (the new function only), the CI and C++ warning checks, and the oracle on the
+   function's cases.
+7. A function that runs per pixel or per row is timed as the timing rule asks (the
+   initialiser now runs before `P`, also on the paths where `P` leaves the iteration:
+   stores of values already in registers, which may change the object code); an OpenMP
+   region's function takes the region checks (write set read by hand, `omp_compare` at 1
+   and 4 threads).
+
+**Before:**
+
+```c
+    fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
+    if (active == MagickFalse)
+      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
+        exception);
+    if (q == (Quantum *) NULL)
+      continue;
+    {
+      const GlyphPixel
+        pixel = { x_offset, y_offset, fill_opacity, active };
+
+      CompositeGlyphPixel(rows,&pixel,q,status);
+    }
+```
+
+**After:**
+
+```c
+    fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
+    {
+      const GlyphPixel
+        pixel = { x_offset, y_offset, fill_opacity, active };
+
+      q=FetchGlyphPixel(rows,&pixel,q);
+      if (q == (Quantum *) NULL)
+        continue;
+      CompositeGlyphPixel(rows,&pixel,q,status);
+    }
+```
+
+with `static Quantum *FetchGlyphPixel(const GlyphRows *rows,const GlyphPixel *pixel,Quantum
+*magick_restrict q)` returning `q`, after `if (pixel->active == MagickFalse)
+q=GetCacheViewAuthenticPixels(rows->image_view,pixel->x_offset,pixel->y_offset,1,1,
+rows->exception);`.
+
+**Careful:**
+
+- Why the behaviour is the same. The initialiser reads only plain variables that `P` does
+  not write (step 2), so evaluated before `P` it stores the values it stored after `P`; it
+  has no side effect, so running it on a path where `P` then leaves the iteration changes
+  nothing anyone reads. In the joined block each member holds the value of its variable
+  from the declaration to the block's end, so the new function's `name->mi` reads what the
+  block's `ei` read. The statements of `P` run in their order, with the same arguments.
+- `P` crossing the declaration is a C11 6.8p3 matter only for a `goto` into the block,
+  which step 2 excludes (no label).
+- The extracted block returns its one written variable as Recipe E does; the struct is
+  read through a pointer to `const`, so nothing writes it.
+
+**Evidence level:** oracle (the function's cases), with steps 2 and 4 read by hand and
+quoted in the message; timing and OpenMP checks as step 7 says.
+
+**Provenance:** 2026-11-25, from `annotate-freetype-private.h`'s `RasterizeGlyphRow`
+(campaign B, M143): after Recipes DB, E and N it stood at cc 9, one decision above the bar,
+and the per-pixel fetch was the decision left that the `GlyphPixel` fill could carry. A
+probe of this step took the header from 9.68 to 10.0. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27737,3 +27850,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-24 | AMEND | B | Step 1, MagickPrivate form, condition (b): a function held by a caller in the other campaign's files may be released by the owner, the callers there changing in the same commit; a caller in the oracle driver keeps the old call under `#else` of a macro that `driver/build.sh` defines from the build's own private header, since one driver source links against both the baseline and the candidate library | `matrix.c`'s `LeastSquaresAddTerms` (M142, 6 arguments, the file's last finding): nine calls in campaign A's `distort-private.h` and `distort-linear-private.h` and one in `imdriver.c` (the `matrix gauss N lsq` cases) | owner |
 | 2026-11-25 | NEW | SN | Sink Constant Writes to Their First Reader: constant writes `v=c;` or `v.m=c;` to plain locals move, in order, to directly above the first statement that names any of them, past statements (an unbuilt `#if` branch among them, read but not edited) that name none of them or a struct holding their addresses | `annotate-freetype-render-private.h`'s `RenderFreetype` (campaign B, M143): the glyph state set before the text layout and read only in the glyph loop; SZ takes only `memset` and crosses no preprocessor line. Probed chain: 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | H | Step 1, guarded form: a `#define M` wrapped in its own `#if !defined(M)` ... `#endif` (nothing else inside) is a run of its own, and moves with its two directive lines, verbatim; `pp_identical.sh` stays the proof | `RenderFreetype`'s `FT_OPEN_PATHNAME` fallback (campaign B, M143), the three lines that kept the function at 70 lines; the macro is named nowhere else, and the guard is false with any FreeType that defines it | mandate (2026-10-24) |
+| 2026-11-25 | NEW | JB | Join a Block to the Struct Fill After It and Extract It Reading the Struct: the statements just before a Recipe FB compound statement that write none of its initialiser's identifiers join the block (the initialiser runs first), and a block of them moves into a helper taking `const Name *` and reading the members for the values the initialiser copied | `annotate-freetype-private.h`'s `RasterizeGlyphRow` (campaign B, M143), cc 9 after DB, E and N: the per-pixel fetch reads `x_offset`, `y_offset` and `active`, members of the `GlyphPixel` fill that follows it; alone it needs five parameters. Probed 9.68 to 10.0 | mandate (2026-10-24) |
