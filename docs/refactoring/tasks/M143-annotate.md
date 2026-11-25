@@ -109,10 +109,14 @@ RenderFreetype 198, RenderX11 20, AnnotateImage 177, all 0 diverged.
 
 ## Next
 
-- **annotate-freetype-render-private.h (9.21).** RenderFreetype is cc 13 and 143 lines (after
-  LogFreetypeFont), about 70 of them declarations. A probe that moved the glyph loop and the debug log scored 9.08
-  (still 114 lines, the loop helper cc 9). It needs a longer chain, after which
-  ComplexTextLayout's B step can follow.
+- **annotate-freetype-render-private.h (9.21).** RenderFreetype is cc 13 and 143 lines (about
+  70 of them declarations). A realistic Z probe moved the glyph loop and its prelude into
+  RenderFreetypeGlyphs (twelve inputs in an FB struct, glyph, origin, status and
+  last_glyph_id as const targets, the temporaries declared in the helper). It scored 8.99:
+  the helper is cc 9 and 87 lines, and RenderFreetype is still 100 lines. Reaching 10 needs a
+  stub-probed chain through intermediate drops (the long-flat-chain lane of 2026-11-16), and
+  after it ComplexTextLayout's B step. B probed at 9.30 -> 9.59 for its own header but 9.21 ->
+  9.20 (one-line block form) or 9.16 (two-line form) for this one.
 - **annotate-freetype-private.h (9.30).** RasterizeGlyphRow (cc 12, 72 lines) is per pixel,
   so its steps need callgrind Ir.
 - **annotate-raqm-private.h (8.38).** Raqm-only, not compiled here: a plateau unless a
