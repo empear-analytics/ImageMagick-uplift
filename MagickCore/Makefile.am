@@ -621,6 +621,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree-file.c \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
+  MagickCore/xml-tree-text-private.h \
   MagickCore/xwindow.c \
   MagickCore/xwindow-image.c \
   MagickCore/xwindow-annotate.c \
@@ -970,6 +971,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/widget-list-entries-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
+  MagickCore/xml-tree-text-private.h \
   MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-import-private.h \
   MagickCore/xwindow-import-image-window-private.h \
