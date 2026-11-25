@@ -477,6 +477,62 @@ static void AddSVGClippathKnot(const SVGClippathState *state)
   (*state->knot_count)=knot_count;
 }
 
+static void TraceSVGClippathRecord(const SVGClippathState *state)
+{
+  const unsigned char
+    **blob = state->blob;
+
+  size_t
+    *length = state->length;
+
+  ssize_t
+    *knot_count = state->knot_count;
+
+  ssize_t
+    selector;
+
+  selector=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
+  switch (selector)
+  {
+    case 0:
+    case 3:
+    {
+      if ((*knot_count) != 0)
+        {
+          SkipClippathBytes(&(*blob),&(*length),24);
+          break;
+        }
+      /*
+        Expected subpath length record.
+      */
+      (*knot_count)=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
+      SkipClippathBytes(&(*blob),&(*length),22);
+      break;
+    }
+    case 1:
+    case 2:
+    case 4:
+    case 5:
+    {
+      if ((*knot_count) == 0)
+        {
+          /*
+            Unexpected subpath knot.
+          */
+          SkipClippathBytes(&(*blob),&(*length),24);
+          break;
+        }
+      AddSVGClippathKnot(state);
+      break;
+    }
+    default:
+    {
+      SkipClippathBytes(&(*blob),&(*length),24);
+      break;
+    }
+  }
+}
+
 static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   const size_t columns,const size_t rows)
 {
@@ -493,8 +549,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
     point[3];
 
   ssize_t
-    knot_count,
-    selector;
+    knot_count;
 
   const SVGClippathState
     state = { &blob, &length, &path, &message, &in_subpath, first, last,
@@ -519,48 +574,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   knot_count=0;
   in_subpath=MagickFalse;
   while (length != 0)
-  {
-    selector=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-    switch (selector)
-    {
-      case 0:
-      case 3:
-      {
-        if (knot_count != 0)
-          {
-            SkipClippathBytes(&blob,&length,24);
-            break;
-          }
-        /*
-          Expected subpath length record.
-        */
-        knot_count=(ssize_t) ReadPropertyMSBShort(&blob,&length);
-        SkipClippathBytes(&blob,&length,22);
-        break;
-      }
-      case 1:
-      case 2:
-      case 4:
-      case 5:
-      {
-        if (knot_count == 0)
-          {
-            /*
-              Unexpected subpath knot.
-            */
-            SkipClippathBytes(&blob,&length,24);
-            break;
-          }
-        AddSVGClippathKnot(&state);
-        break;
-      }
-      default:
-      {
-        SkipClippathBytes(&blob,&length,24);
-        break;
-      }
-    }
-  }
+    TraceSVGClippathRecord(&state);
   /*
     Return an empty SVG image if the path does not have knots.
   */
