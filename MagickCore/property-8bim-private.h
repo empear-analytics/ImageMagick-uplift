@@ -348,8 +348,14 @@ static void Set8BIMResource(const AttributeInfo8BIM *attribute_info,
 }
 
 static void Read8BIMResourceBlock(ssize_t *count,char **resource,
-  const unsigned char **info,size_t *length)
+  const Cursor8BIM *cursor)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   (*count)=(ssize_t) ReadPropertyByte(info,length);
   Read8BIMResourceName(resource,info,length,(*count));
   if (((*count) & 0x01) == 0)
@@ -447,7 +453,7 @@ static void Get8BIMResources(const Request8BIM *request)
     if (Skip8BIMResourceHeader(&range,&cursor,&id) != MagickFalse)
       continue;
     Release8BIMResourceNames(&resource,&macroman_resource);
-    Read8BIMResourceBlock(&count,&resource,&info,&length);
+    Read8BIMResourceBlock(&count,&resource,&cursor);
     if (IsInvalid8BIMResourceCount(count,length) != MagickFalse)
       {
         length=0;
