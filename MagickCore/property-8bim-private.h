@@ -233,9 +233,14 @@ static void Release8BIMResourceNames(char **resource,
     (*resource)=DestroyString((*resource));
 }
 
-static void Skip8BIMResourceData(const unsigned char **info,size_t *length,
-  const ssize_t count)
+static void Skip8BIMResourceData(const Cursor8BIM *cursor,const ssize_t count)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   (*info)+=count;
   (*length)=(size_t) ((ssize_t) (*length)-MagickMin(count,(ssize_t) (*length)));
 }
@@ -292,12 +297,6 @@ typedef struct _Match8BIM
 static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
   const Cursor8BIM *cursor,ssize_t *sub_number)
 {
-  const unsigned char
-    **const info = cursor->info;
-
-  size_t
-    *const length = cursor->length;
-
   const char
     *const name = match->name;
 
@@ -314,7 +313,7 @@ static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
       /*
         No name match, scroll forward and try next.
       */
-      Skip8BIMResourceData(info,length,count);
+      Skip8BIMResourceData(cursor,count);
       return(MagickTrue);
     }
   if ((*name == '#') && ((*sub_number) != 1))
@@ -323,7 +322,7 @@ static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
         No numbered match, scroll forward and try next.
       */
       (*sub_number)--;
-      Skip8BIMResourceData(info,length,count);
+      Skip8BIMResourceData(cursor,count);
       return(MagickTrue);
     }
   return(MagickFalse);
@@ -334,9 +333,6 @@ static void Set8BIMResource(const AttributeInfo8BIM *attribute_info,
 {
   const unsigned char
     **const info = cursor->info;
-
-  size_t
-    *const length = cursor->length;
 
   char
     *attribute;
@@ -352,7 +348,7 @@ static void Set8BIMResource(const AttributeInfo8BIM *attribute_info,
     {
       (void) memcpy(attribute,(char *) (*info),(size_t) count);
       attribute[count]='\0';
-      Skip8BIMResourceData(info,length,count);
+      Skip8BIMResourceData(cursor,count);
       Set8BIMAttribute(attribute_info,attribute);
       attribute=DestroyString(attribute);
       (*status)=MagickTrue;
