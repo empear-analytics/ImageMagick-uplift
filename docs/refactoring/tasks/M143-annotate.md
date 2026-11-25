@@ -17,9 +17,10 @@ allowed in any file").
 | --- | --- | --- | --- |
 | annotate.c | 5.86 | 9.68 | OH x4 (mid-file), Z, E |
 | annotate-type-private.h (new) | - | 10.0 | OH (8.90: the type lookup, RenderType, the density parsers), then RV (`RenderTypeByFont`) |
-| annotate-freetype-private.h (new) | - | 8.05 | OH: the FreeType helpers, Raqm block included |
-| annotate-freetype-render-private.h (new) | - | 9.18 | OH: the glyph loader and RenderFreetype |
-| annotate-render-private.h (new) | - | 8.46 | OH: RenderPostscript and RenderX11 |
+| annotate-freetype-private.h (new) | - | 9.30 | OH: the FreeType helpers, Raqm block included (8.05); OH again: the Raqm block to its own header |
+| annotate-raqm-private.h (new) | - | 8.38 | OH: the Raqm text layout (not compiled here) |
+| annotate-freetype-render-private.h (new) | - | 9.21 | OH: the glyph loader and RenderFreetype (9.18); E (`LogFreetypeFont`) |
+| annotate-render-private.h (new) | - | 9.07 | OH: RenderPostscript and RenderX11 (8.46); B (`RenderX11`), E (`LogPostscriptFont`), N (`TransformPostscriptImage`) |
 
 annotate.c keeps only *Excess Number of Function Arguments* on `FormatMagickCaption`
 (`MagickExport`, 6 arguments), its plateau. Each header scores above the file's 5.86 before
@@ -51,10 +52,25 @@ the chain (the 2026-11-18 bar). The headers are campaign B files now and stay on
   pointer go in one `const RenderTypeFont`. The header went from 8.90 to 10.0, and
   *Overall Code Complexity* cleared with it.
 
+- **The Raqm block in its own header.** annotate-freetype-private.h opened with the unbuilt
+  Raqm block, which no recipe may touch here. Recipe OH's "carved again" form moved it out
+  whole: the helper header went to 9.30 and the Raqm header scored 8.38, both above the 8.05
+  bar. annotate.c compiled against HEAD's headers (HDRS=1) is object-IDENTICAL, and its
+  preprocessed unit differs only in the `__FILE__` path.
+- **New oracle cases for RenderPostscript** (`tools: oracle cases for annotate's PostScript
+  fonts`). A font name starting with `^` renders through Ghostscript (allowed since
+  2026-10-03). Five gap commands, each byte-stable over three runs, put RenderPostscript and
+  ReadPostscriptImage at 5 cases and the fill pass (`SetPostscriptAlphaChannels`) at 4. With
+  them, RenderPostscript took E and N at the oracle level.
+- **RenderX11 by Recipe B.** Its draw_info, offset and metrics (what it hands to
+  XRenderImage) became `const X11TextTarget *`. The typedef stands in annotate.c, ahead of
+  the forward declaration. The score was flat, as a step of the probed chain to 9.68.
+
 ## Oracle
 
 Whole catalogue at `484300881` (working-tree candidate): 16,005 cases, 1 diverged, the known
-`gaps/c5651ffad8` logcfg tie-break. Each step ran its function's cases: RenderType 218,
+`gaps/c5651ffad8` logcfg tie-break. Again at the TransformPostscriptImage step, with the five
+PostScript-font cases added: 16,010 cases, 1 diverged, the same case. Each step ran its function's cases: RenderType 218,
 RenderFreetype 198, RenderX11 20, AnnotateImage 177, all 0 diverged.
 
 ## Traps seen
@@ -67,14 +83,40 @@ RenderFreetype 198, RenderX11 20, AnnotateImage 177, all 0 diverged.
 - **`tools/ci_linux_warnings.sh` does not run on the Mac.** It needs campaign A's Linux
   configurations (`configure failed` for every `ci-*` directory, and a bash
   `cache[@]: unbound variable`).
-- **Reach.** No case executes `RenderPostscript` (the non-FreeType path). Its carve rests on
-  the whole-object IDENTICAL result. Further work on it is guard-level (E, G, P).
+- **ComplexTextLayout by Recipe B costs the other header.** Bundling draw_info, face and
+  flags raised annotate-freetype-private.h to 9.59, but the call's block lengthens
+  RenderFreetype, still a Large Method, and its header dropped 9.18 to 9.16. The gate refuses
+  that, so the step waits until RenderFreetype is below 70 lines. The call is the `else` body
+  of a Raqm `#if`, so it needs B's block form, not a fill at the function's top.
+- **Possible upstream data race (report, not fixed).** In RenderPostscript's fill pass,
+  `MagickBooleanType sync` is declared outside the `#pragma omp parallel for` and is not
+  private, yet every thread assigns it from SyncCacheViewAuthenticPixels and tests it.
 
 ## Next
 
-- **annotate-freetype-render-private.h (9.18):** RenderFreetype (cc 17, 149 lines).
-- **annotate-render-private.h (8.46):** RenderPostscript is unreached. The argument findings
-  are on two statics with 5 parameters each, which Recipe B could bundle.
-- **annotate-freetype-private.h (8.05):** RasterizeGlyphRow (cc 12, 72 lines) and
-  ComplexTextLayout (6 arguments) are reachable. ComplexRaqmTextLayout and
-  ContainsRaqmParagraphSeparator are Raqm-only, which this build does not compile.
+- **annotate-render-private.h (9.07, ceiling 9.68).** RenderPostscript (cc 15, 105 lines)
+  clears only if its fill pass leaves. The pass holds an OpenMP parallel loop, so the step
+  needs the 2026-11-15 checks (by-hand write set, omp_compare at 1 and 4 threads, with a case
+  large enough to start threads). A probe of the whole pass as one N helper scored 9.01 (the
+  helper cc 9). Move only the body under the `fill.alpha` test, then take P on the
+  file-open condition. RenderPostscript's own 5 arguments stay, because the non-FreeType
+  RenderFreetype stub calls it in a branch this build does not compile.
+- **annotate-freetype-render-private.h (9.21).** RenderFreetype is cc 13 and 143 lines (after
+  LogFreetypeFont), about 70 of them declarations. A probe that moved the glyph loop and the debug log scored 9.08
+  (still 114 lines, the loop helper cc 9). It needs a longer chain, after which
+  ComplexTextLayout's B step can follow.
+- **annotate-freetype-private.h (9.30).** RasterizeGlyphRow (cc 12, 72 lines) is per pixel,
+  so its steps need callgrind Ir.
+- **annotate-raqm-private.h (8.38).** Raqm-only, not compiled here: a plateau unless a
+  Raqm build becomes available.
+
+## Probed elsewhere, not taken
+
+- **xml-tree.c (9.09, Number of Functions).** Its parser statics run from after
+  GetXMLTreeTag to NewXMLTree (lines 836-3222). Any OH carve of the whole run leaves
+  xml-tree.c at 10.0. But lines 1103-1807 (entity and doctype parsing, lizard mean cc about
+  4.7) score 8.81 in any header, from *Overall Code Complexity*, *Primitive Obsession* and
+  *String Heavy Function Arguments*. That is below the file's 9.09 bar, and runs must start
+  after a kept item, so that stretch cannot be skipped. The leading UTF run alone
+  (836-1102, header 9.38) leaves xml-tree.c at 9.09. Taking that stretch's complexity down
+  first adds functions to a file already flagged for its function count.
