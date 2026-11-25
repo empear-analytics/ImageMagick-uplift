@@ -783,6 +783,14 @@ static void FormatEXIFDescriptionKey(const TagInfo *EXIFTag,
     (void) SubstituteString(key,"exif:","exif:Thumbnail.");
 }
 
+static void SetEXIFImageProperty(const Image *image,char *key,
+  char *value,ExceptionInfo *exception)
+{
+  if ((image->properties == (void *) NULL) ||
+      (GetValueFromSplayTree((SplayTreeInfo *) image->properties,key) == (const void *) NULL))
+    (void) SetImageProperty((Image *) image,key,value,exception);
+}
+
 static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
   const size_t tag_value,const ssize_t level,char *value)
 {
@@ -823,9 +831,7 @@ static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
         (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
     }
   }
-  if ((image->properties == (void *) NULL) ||
-      (GetValueFromSplayTree((SplayTreeInfo *) image->properties,key) == (const void *) NULL))
-    (void) SetImageProperty((Image *) image,key,value,exception);
+  SetEXIFImageProperty(image,key,value,exception);
   value=DestroyString(value);
   key=DestroyString(key);
 }
