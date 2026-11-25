@@ -214,9 +214,8 @@ static inline MagickBooleanType IsGPSFractionTag(const size_t tag_value)
 
 static inline MagickBooleanType IsSubdirectoryTag(const size_t tag_value)
 {
-  return(((tag_value == TAG_EXIF_OFFSET) ||
-    (tag_value == TAG_INTEROP_OFFSET) || (tag_value == TAG_GPS_OFFSET)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((tag_value == TAG_EXIF_OFFSET) ||
+    (tag_value == TAG_INTEROP_OFFSET) || (tag_value == TAG_GPS_OFFSET)));
 }
 
 static inline MagickBooleanType IsNextIFDOffset(const ssize_t tag_offset1,
