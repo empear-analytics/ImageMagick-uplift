@@ -515,6 +515,13 @@ static MagickBooleanType AppendPrefixedProperty(
   return(AppendInterpretString(text,string));
 }
 
+static void ClearMagickPropertyHints(Image *property_image,
+  ImageInfo *property_info)
+{
+  (void) DeleteImageArtifact(property_image,"magick-property");
+  (void) DeleteImageOption(property_info,"magick-property");
+}
+
 static MagickBooleanType AppendUnprefixedValue(
   const InterpretSources *sources,const InterpretText *text,
   const BracedPattern *braced)
@@ -545,8 +552,7 @@ static MagickBooleanType AppendUnprefixedValue(
     {
       if (AppendInterpretString(text,string) == MagickFalse)
         return(MagickFalse);
-      (void) DeleteImageArtifact(property_image,"magick-property");
-      (void) DeleteImageOption(property_info,"magick-property");
+      ClearMagickPropertyHints(property_image,property_info);
       return(MagickTrue);
     }
   if (IsGlob(pattern) != MagickFalse)
