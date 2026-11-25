@@ -208,8 +208,8 @@ static inline unsigned short ReadPropertyUnsignedShort(const EndianType endian,
 
 static inline MagickBooleanType IsGPSFractionTag(const size_t tag_value)
 {
-  return(((tag_value == GPS_LATITUDE) || (tag_value == GPS_LONGITUDE) ||
-    (tag_value == GPS_TIMESTAMP)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((tag_value == GPS_LATITUDE) ||
+    (tag_value == GPS_LONGITUDE) || (tag_value == GPS_TIMESTAMP)));
 }
 
 static inline MagickBooleanType IsSubdirectoryTag(const size_t tag_value)
