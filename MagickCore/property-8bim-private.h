@@ -119,6 +119,25 @@ static inline MagickBooleanType IsUnrequestedResource(const char *resource,
     (LocaleCompare(name,macroman_resource) != 0))) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _AttributeInfo8BIM
+{
+  const Image
+    *image;
+
+  const char
+    *key;
+
+  char
+    *format;
+
+  ssize_t
+    count,
+    id;
+
+  ExceptionInfo
+    *exception;
+} AttributeInfo8BIM;
+
 static char *Trace8BIMClippath(const Image *image,const char *format,
   char *attribute,const ssize_t count)
 {
@@ -174,25 +193,6 @@ static void Read8BIMResourceName(char **resource,const Cursor8BIM *cursor,
         Read8BIMResourceBytes(resource,cursor,count);
     }
 }
-
-typedef struct _AttributeInfo8BIM
-{
-  const Image
-    *image;
-
-  const char
-    *key;
-
-  char
-    *format;
-
-  ssize_t
-    count,
-    id;
-
-  ExceptionInfo
-    *exception;
-} AttributeInfo8BIM;
 
 static void Set8BIMAttribute(const AttributeInfo8BIM *attribute_info,
   char *attribute)
