@@ -290,8 +290,14 @@ typedef struct _Match8BIM
 } Match8BIM;
 
 static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
-  const unsigned char **info,size_t *length,ssize_t *sub_number)
+  const Cursor8BIM *cursor,ssize_t *sub_number)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   const char
     *const name = match->name;
 
@@ -464,7 +470,7 @@ static void Get8BIMResources(const Request8BIM *request)
     match.resource=resource;
     match.macroman_resource=macroman_resource;
     match.count=count;
-    if (Skip8BIMUnmatchedResource(&match,&info,&length,&sub_number) !=
+    if (Skip8BIMUnmatchedResource(&match,&cursor,&sub_number) !=
         MagickFalse)
       continue;
     /*
