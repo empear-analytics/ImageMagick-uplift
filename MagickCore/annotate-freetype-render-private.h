@@ -465,7 +465,12 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       exception);
   else
 #endif
-  length=ComplexTextLayout(draw_info,p,length,face,flags,&grapheme);
+  {
+    const TextLayoutInfo
+      layout = { draw_info, face, flags };
+
+    length=ComplexTextLayout(&layout,p,length,&grapheme);
+  }
   {
     const GlyphRunInfo
       run = { image, draw_info, face, flags, annotate_info, affine, metrics,

@@ -26,10 +26,30 @@ static inline MagickBooleanType IsKernedGrapheme(const ssize_t index,
   return(((index != 0) && (last_glyph != 0)) ? MagickTrue : MagickFalse);
 }
 
-static size_t ComplexTextLayout(const DrawInfo *draw_info,const char *text,
-  const size_t length,const FT_Face face,const FT_Int32 flags,
-  GraphemeInfo **grapheme)
+typedef struct _TextLayoutInfo
 {
+  const DrawInfo
+    *draw_info;
+
+  FT_Face
+    face;
+
+  FT_Int32
+    flags;
+} TextLayoutInfo;
+
+static size_t ComplexTextLayout(const TextLayoutInfo *layout,const char *text,
+  const size_t length,GraphemeInfo **grapheme)
+{
+  const DrawInfo
+    *const draw_info = layout->draw_info;
+
+  const FT_Face
+    face = layout->face;
+
+  const FT_Int32
+    flags = layout->flags;
+
   const char
     *p;
 
