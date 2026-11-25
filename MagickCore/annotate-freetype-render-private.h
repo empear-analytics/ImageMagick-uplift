@@ -354,6 +354,10 @@ static MagickBooleanType RenderFreetypeGlyphs(const GlyphRunInfo *run)
   return(status);
 }
 
+#if !defined(FT_OPEN_PATHNAME)
+#define FT_OPEN_PATHNAME  ft_open_pathname
+#endif
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -365,10 +369,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   const char
     *encoding = target->encoding;
-
-#if !defined(FT_OPEN_PATHNAME)
-#define FT_OPEN_PATHNAME  ft_open_pathname
-#endif
 
   char
     *p;
