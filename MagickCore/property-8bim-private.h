@@ -330,8 +330,14 @@ static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
 }
 
 static void Set8BIMResource(const AttributeInfo8BIM *attribute_info,
-  const unsigned char **info,size_t *length,MagickBooleanType *status)
+  const Cursor8BIM *cursor,MagickBooleanType *status)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   char
     *attribute;
 
@@ -482,7 +488,7 @@ static void Get8BIMResources(const Request8BIM *request)
     attribute_info.count=count;
     attribute_info.id=id;
     attribute_info.exception=request->exception;
-    Set8BIMResource(&attribute_info,&info,&length,&status);
+    Set8BIMResource(&attribute_info,&cursor,&status);
   }
   Release8BIMResourceNames(&resource,&macroman_resource);
 }
