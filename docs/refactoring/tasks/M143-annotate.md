@@ -280,6 +280,10 @@ chain was probed first and ordered so that no commit dropped.
 - **Recipe D was not used** for the second `magick-property` hint clearing in the interpret
   header: CodeScene reports no duplication there, so D has no finding to act on. One copy
   went by E.
+- **Whole catalogue at the evening tip:** 16,010 cases, 2 diverged: the known
+  `gaps/c5651ffad8` (logcfg) and `resize/b41fd3fe32` (rose write-mask `-scale 150%`), which
+  passed three times alone with `--filter resize/b41fd3fe32 --no-cache`: the write-mask
+  load flake M123 recorded for `resize/6ee45e9cfa`. No property code runs in it.
 - The oracle runs on `IsNonEmptyImage`, `LogInterpretImageProperties` and
   `GetEXIFProperty` take 10 to 12 minutes each (12,000 to 15,000 cases).
 
