@@ -237,3 +237,9 @@ Every property header scores at or above property.c's 7.6 before the chain (the 
   merged record's case groups (cc 10).
 - **property-exif / -interpret / -8bim headers.** Ratio findings: Recipe B bundles
   (owner 2026-11-25), and E steps for *Overall Code Complexity*.
+- **token-glob.c (8.42), probed, not taken.** Recipe E step 7 on GlobExpression_'s `{` case
+  (every path returns) took the function from cc 46 to 32, but the file fell to 6.99: the
+  new GlobBraceAlternatives carries Deep, Nested Complexity, two bumps and a Complex
+  Conditional of its own. A chain would also need its alternative-try block (an early
+  return, a `continue` and three writes) out; probe that end state first.
+
