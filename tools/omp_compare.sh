@@ -53,6 +53,10 @@ case "$mode" in
     ;;
   run)
     base=$2; cand=$3; cases=$4
+    # A case line is run with eval from a temporary directory: it may name a file of
+    # the repository as "$root"/..., and must quote a colour such as '#00800080',
+    # which eval would otherwise read as the start of a comment.
+    root=$(git rev-parse --show-toplevel)
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
     runs=0; bad=0

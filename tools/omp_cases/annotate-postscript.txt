@@ -1,4 +1,4 @@
 # Large-image cases for tools/omp_compare.sh: annotate-render-private.h's RenderPostscript fill pass (CompositePostscriptFill), reached with a '^' PostScript font through Ghostscript. The rendered text image, not the base image, is the region's extent: (length+2)*pointsize by 2*pointsize uncropped under a rotation, the text's bounding box under the identity; each above GetMagickNumberThreads' one-thread limit (262144 pixels).
 -size 400x300 xc:white -font ^Helvetica -pointsize 300 -fill red -annotate 5x5+10+250 Wide -format %# info:
 -size 400x300 xc:white -font ^Helvetica -pointsize 600 -fill navy -annotate +10+500 'Hello World' -format %# info:
--size 400x300 xc:white -font ^Times-Roman -pointsize 400 -fill #00800080 -annotate 0x15+0+300 Tilt -format %# info:
+-size 400x300 xc:white -font ^Times-Roman -pointsize 400 -fill '#00800080' -annotate 0x15+0+300 Tilt -format %# info:
