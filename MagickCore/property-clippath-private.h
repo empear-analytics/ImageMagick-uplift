@@ -127,6 +127,23 @@ typedef struct _PSClippathState
     *knot_count;
 } PSClippathState;
 
+static void ReadPSClippathPoints(const unsigned char **blob,size_t *length,
+  PointInfo *point)
+{
+  ssize_t
+    i,
+    x,
+    y;
+
+  for (i=0; i < 3; i++)
+  {
+    y=(ssize_t) ReadPropertyMSBLong(blob,length);
+    x=(ssize_t) ReadPropertyMSBLong(blob,length);
+    point[i].x=(double) x/4096.0/4096.0;
+    point[i].y=1.0-(double) y/4096.0/4096.0;
+  }
+}
+
 static void AddPSClippathKnot(const PSClippathState *state)
 {
   const unsigned char
@@ -152,21 +169,10 @@ static void AddPSClippathKnot(const PSClippathState *state)
   ssize_t
     knot_count = (*state->knot_count);
 
-  ssize_t
-    i,
-    x,
-    y;
-
   /*
     Add sub-path knot
   */
-  for (i=0; i < 3; i++)
-  {
-    y=(ssize_t) ReadPropertyMSBLong(&blob,&length);
-    x=(ssize_t) ReadPropertyMSBLong(&blob,&length);
-    point[i].x=(double) x/4096.0/4096.0;
-    point[i].y=1.0-(double) y/4096.0/4096.0;
-  }
+  ReadPSClippathPoints(&blob,&length,point);
   if (in_subpath == MagickFalse)
     StartPSClippathSubpath(message,first,last,point);
   else
