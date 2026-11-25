@@ -836,6 +836,17 @@ static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
   key=DestroyString(key);
 }
 
+static void SetEXIFTagValue(const EXIFWalkInfo *walk,
+  const EXIFTagInfo *exif_tag,const size_t tag_value,const ssize_t level)
+{
+  char
+    *value;
+
+  value=AcquireEXIFTagValue(walk,exif_tag);
+  if (value != (char *) NULL)
+    SetEXIFTagProperty(walk,tag_value,level,value);
+}
+
 static MagickBooleanType GetEXIFTagProperty(const EXIFWalkInfo *walk,
   const EXIFTagInfo *exif_tag,const ssize_t level)
 {
@@ -860,14 +871,9 @@ static MagickBooleanType GetEXIFTagProperty(const EXIFWalkInfo *walk,
 
   if ((all != 0) || (tag == (size_t) tag_value))
     {
-      char
-        *value;
-
       if ((p < exif) || (p > (exif+length-tag_bytes[format])))
         return(MagickFalse);
-      value=AcquireEXIFTagValue(walk,exif_tag);
-      if (value != (char *) NULL)
-        SetEXIFTagProperty(walk,tag_value,level,value);
+      SetEXIFTagValue(walk,exif_tag,tag_value,level);
     }
   return(MagickTrue);
 }
