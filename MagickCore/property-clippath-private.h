@@ -215,19 +215,9 @@ typedef struct _ClippathRecordInfo
     method;
 } ClippathRecordInfo;
 
-static inline void TraceClippathRecord(const ClippathRecordInfo *record,
-  size_t *length,ssize_t *knot_count,const void *state)
+static void TraceClippathLengthRecord(const ssize_t selector,
+  const unsigned char **blob,size_t *length,ssize_t *knot_count)
 {
-  const unsigned char
-    **const blob = record->blob;
-
-  const ClippathKnotMethod
-    method = record->method;
-
-  ssize_t
-    selector;
-
-  selector=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
   switch (selector)
   {
     case 0:
@@ -245,6 +235,29 @@ static inline void TraceClippathRecord(const ClippathRecordInfo *record,
       SkipClippathBytes(&(*blob),&(*length),22);
       break;
     }
+    default:
+    {
+      SkipClippathBytes(&(*blob),&(*length),24);
+      break;
+    }
+  }
+}
+
+static inline void TraceClippathRecord(const ClippathRecordInfo *record,
+  size_t *length,ssize_t *knot_count,const void *state)
+{
+  const unsigned char
+    **const blob = record->blob;
+
+  const ClippathKnotMethod
+    method = record->method;
+
+  ssize_t
+    selector;
+
+  selector=(ssize_t) ReadPropertyMSBShort(&(*blob),&(*length));
+  switch (selector)
+  {
     case 1:
     case 2:
     case 4:
@@ -263,7 +276,7 @@ static inline void TraceClippathRecord(const ClippathRecordInfo *record,
     }
     default:
     {
-      SkipClippathBytes(&(*blob),&(*length),24);
+      TraceClippathLengthRecord(selector,blob,length,knot_count);
       break;
     }
   }
