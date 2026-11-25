@@ -124,9 +124,13 @@ typedef struct _Match8BIM
     count;
 } Match8BIM;
 
-static inline MagickBooleanType IsUnrequestedResource(const char *resource,
-  const char *macroman_resource,const char *name)
+static inline MagickBooleanType IsUnrequestedResource(const Match8BIM *match)
 {
+  const char
+    *const resource = match->resource,
+    *const macroman_resource = match->macroman_resource,
+    *const name = match->name;
+
   return(((resource == (char *) NULL) || (macroman_resource == (char *) NULL) ||
     ((LocaleCompare(name,resource) != 0) &&
     (LocaleCompare(name,macroman_resource) != 0))) ? MagickTrue : MagickFalse);
@@ -314,15 +318,11 @@ static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
   const char
     *const name = match->name;
 
-  char
-    *const resource = match->resource,
-    *const macroman_resource = match->macroman_resource;
-
   const ssize_t
     count = match->count;
 
   if ((Is8BIMResourceName(name) != MagickFalse) &&
-      (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse))
+      (IsUnrequestedResource(match) != MagickFalse))
     {
       /*
         No name match, scroll forward and try next.
