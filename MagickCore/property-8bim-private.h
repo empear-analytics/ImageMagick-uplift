@@ -153,9 +153,15 @@ static void Read8BIMResourceBytes(char **resource,const unsigned char **info,
   (*resource)[count]='\0';
 }
 
-static void Read8BIMResourceName(char **resource,const unsigned char **info,
-  size_t *length,const ssize_t count)
+static void Read8BIMResourceName(char **resource,const Cursor8BIM *cursor,
+  const ssize_t count)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   if ((count != 0) && ((size_t) count <= (*length)))
     {
       if (~((size_t) count) >= (MagickPathExtent-1))
@@ -365,7 +371,7 @@ static void Read8BIMResourceBlock(ssize_t *count,char **resource,
     *const length = cursor->length;
 
   (*count)=(ssize_t) ReadPropertyByte(info,length);
-  Read8BIMResourceName(resource,info,length,(*count));
+  Read8BIMResourceName(resource,cursor,(*count));
   if (((*count) & 0x01) == 0)
     (void) ReadPropertyByte(info,length);
   (*count)=(ssize_t) ReadPropertyMSBLong(info,length);
