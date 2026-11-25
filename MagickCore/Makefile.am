@@ -461,6 +461,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/property.c \
   MagickCore/property.h \
   MagickCore/property-iptc-private.h \
+  MagickCore/property-8bim-private.h \
   MagickCore/profile.c \
   MagickCore/profile-sync.c \
   MagickCore/profile.h \
@@ -894,6 +895,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/property-set-pixel-private.h \
   MagickCore/property-set-xmp-private.h \
   MagickCore/property-iptc-private.h \
+  MagickCore/property-8bim-private.h \
   MagickCore/image-private.h \
   MagickCore/image-filename-private.h \
   MagickCore/layer-frames-bounds-private.h \
