@@ -243,3 +243,50 @@ Every property header scores at or above property.c's 7.6 before the chain (the 
   Conditional of its own. A chain would also need its alternative-try block (an early
   return, a `continue` and three writes) out; probe that end state first.
 
+## Evening of 2026-11-25: every property header at 10.0
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| property-clippath-private.h | 8.73 | 10.0 | O (`ReadPSClippathPoints`), E (`StartSVGClippathSubpath`), CS (`TraceSVGClippathRecord`), CF (`TraceClippathRecord`), IC (member form), SD (`TraceClippathLengthRecord`) |
+| property-8bim-private.h | 9.38 | 10.0 | BP x4 (`Cursor8BIM`, address form), IP x3, IP step 7 typedef moves x2, IP x2 (`AttributeInfo8BIM`, `Match8BIM`), BP (`Names8BIM`) |
+| property-interpret-private.h | 9.09 | 10.0 | DT x3, E x2, P+DT x2 |
+| property-exif-private.h | 9.09 | 10.0 | DT x4, O, BP+IP x3 (`EXIFCursor`), RT (`MatchEXIFMarker`), IP, E x5, N x2 (pass-through) |
+
+property.c stays at 9.68 (GetMagickProperty, below). No `--no-verify` this evening: every
+chain was probed first and ordered so that no commit dropped.
+
+### New recipe amendments
+
+- **Recipe IC, step 5 (member form):** a local initialised with `p->m` through a `const`
+  struct parameter, read once with nothing between, is replaced by `p->m`. It cleared the
+  two record wrappers that CF left repeating their bindings.
+- **Recipe BP, step 6 (address form):** a group of addresses of one caller's locals is
+  filled once, as a `const` declaration, and shared by every call in that block.
+- **Recipe RT, step 1 (compared constants):** the copies' constant may be a literal
+  compared with a common expression; the step also serves *Overall Code Complexity*
+  (`n-3` off the file's total).
+
+### Evidence worth knowing
+
+- **CF's merged function inlines.** `TraceClippathRecord` is `static inline` and gets its
+  method as a designator; the property.c object stayed IDENTICAL, so there is no indirect
+  call.
+- **Primitive Obsession sits at a knife edge in the exif header.** One helper with two
+  primitive arguments (RT's `MatchEXIFMarker(exif,length)`, or `SetEXIFImageProperty`)
+  brought it back at 9.09. The cursor bundle first (four steps) gave the room; RT and the
+  helpers followed without a drop.
+- **Overall Code Complexity by count.** Lizard means matched CodeScene again: the exif
+  header cleared between 3.93 and 3.86 (lizard), as the 2026-11-23 note says.
+- **Recipe D was not used** for the second `magick-property` hint clearing in the interpret
+  header: CodeScene reports no duplication there, so D has no finding to act on. One copy
+  went by E.
+- The oracle runs on `IsNonEmptyImage`, `LogInterpretImageProperties` and
+  `GetEXIFProperty` take 10 to 12 minutes each (12,000 to 15,000 cases).
+
+### Next
+
+- **property.c (9.68):** GetMagickProperty cc 9, unchanged (see the afternoon's Next).
+- **annotate-render-private.h (9.68):** RenderPostscript, unchanged.
+- **token-glob.c, utility.c (7.84), profile.c (8.19), stream.c (7.32), module.c (6.63):**
+  the campaign's other low files; not started this evening.
+
