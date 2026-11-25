@@ -354,6 +354,17 @@ static MagickBooleanType RenderFreetypeGlyphs(const GlyphRunInfo *run)
   return(status);
 }
 
+static FT_Int32 GetFreetypeFlags(Image *image,const DrawInfo *draw_info,
+  ExceptionInfo *exception)
+{
+  FT_Int32
+    flags;
+
+  flags=GetFreetypeLoadFlags(draw_info);
+  flags=GetFreetypeHintingFlags(image,flags,exception);
+  return(flags);
+}
+
 #if !defined(FT_OPEN_PATHNAME)
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
@@ -423,8 +434,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     Compute bounding box.
   */
   LogFreetypeFont(draw_info,encoding);
-  flags=GetFreetypeLoadFlags(draw_info);
-  flags=GetFreetypeHintingFlags(image,flags,exception);
+  flags=GetFreetypeFlags(image,draw_info,exception);
   affine=GetFreetypeAffine(draw_info);
   annotate_info=CloneFreetypeAnnotateInfo(draw_info);
   if (draw_info->render != MagickFalse)
