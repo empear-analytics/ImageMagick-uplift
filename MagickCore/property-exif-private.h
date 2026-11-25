@@ -221,8 +221,8 @@ static inline MagickBooleanType IsSubdirectoryTag(const size_t tag_value)
 static inline MagickBooleanType IsNextIFDOffset(const ssize_t tag_offset1,
   const size_t length,const ssize_t level)
 {
-  return(((tag_offset1 != 0) && ((size_t) tag_offset1 < length) &&
-    (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((tag_offset1 != 0) &&
+    ((size_t) tag_offset1 < length) && (level < (MaxDirectoryStack-2))));
 }
 
 typedef struct _DirectoryInfo
