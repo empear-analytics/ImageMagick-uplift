@@ -1199,6 +1199,17 @@ static ImagePropertyHandler GetImagePropertyHandler(const char *property)
   return((ImagePropertyHandler) NULL);
 }
 
+static void PrepareImageProperties(Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (image->properties == (void *) NULL)
+    image->properties=NewSplayTree(CompareSplayTreeString,
+      RelinquishMagickMemory,RelinquishMagickMemory);  /* create splay-tree */
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
@@ -1211,13 +1222,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
   size_t
     property_length;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->properties == (void *) NULL)
-    image->properties=NewSplayTree(CompareSplayTreeString,
-      RelinquishMagickMemory,RelinquishMagickMemory);  /* create splay-tree */
+  PrepareImageProperties(image);
   if (value == (const char *) NULL)
     return(DeleteImageProperty(image,property));  /* delete if NULL */
   if (strlen(property) <= 1)
