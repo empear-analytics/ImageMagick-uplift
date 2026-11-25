@@ -356,6 +356,15 @@ static void FormatEXIFTagIdKey(char *key,const size_t tag_value)
 static int
   tag_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
 
+typedef struct _EXIFCursor
+{
+  const unsigned char
+    **exif;
+
+  size_t
+    *length;
+} EXIFCursor;
+
 static MagickBooleanType ReadEXIFMarker(const unsigned char **exif,
   size_t *length,MagickBooleanType *broke)
 {
@@ -1420,8 +1429,14 @@ static MagickBooleanType ParseEXIFPropertyRequest(const char **property,
 }
 
 static MagickBooleanType ReadEXIFProfileHeader(const StringInfo *profile,
-  const unsigned char **exif,size_t *length,EndianType *endian)
+  const EXIFCursor *cursor,EndianType *endian)
 {
+  const unsigned char
+    **const exif = cursor->exif;
+
+  size_t
+    *const length = cursor->length;
+
   (*length)=GetStringInfoLength(profile);
   if ((*length) < 6)
     return(MagickFalse);
@@ -1498,6 +1513,9 @@ static void GetEXIFProperty(const Image *image,const char *property,
   const EXIFWalkTargets
     targets = { &level, &entry, directory_stack };
 
+  const EXIFCursor
+    cursor = { &exif, &length };
+
   /*
     If EXIF data exists, then try to parse the request for a tag.
   */
@@ -1506,7 +1524,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
     return;
   if (ParseEXIFPropertyRequest(&property,&all,&tag) == MagickFalse)
     return;
-  if (ReadEXIFProfileHeader(profile,&exif,&length,&endian) == MagickFalse)
+  if (ReadEXIFProfileHeader(profile,&cursor,&endian) == MagickFalse)
     return;
   /*
     This the offset to the first IFD.
