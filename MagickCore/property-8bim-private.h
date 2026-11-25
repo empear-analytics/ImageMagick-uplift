@@ -142,9 +142,15 @@ typedef struct _Cursor8BIM
     *length;
 } Cursor8BIM;
 
-static void Read8BIMResourceBytes(char **resource,const unsigned char **info,
-  size_t *length,const ssize_t count)
+static void Read8BIMResourceBytes(char **resource,const Cursor8BIM *cursor,
+  const ssize_t count)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   ssize_t
     i;
 
@@ -156,9 +162,6 @@ static void Read8BIMResourceBytes(char **resource,const unsigned char **info,
 static void Read8BIMResourceName(char **resource,const Cursor8BIM *cursor,
   const ssize_t count)
 {
-  const unsigned char
-    **const info = cursor->info;
-
   size_t
     *const length = cursor->length;
 
@@ -168,7 +171,7 @@ static void Read8BIMResourceName(char **resource,const Cursor8BIM *cursor,
         *resource=(char *) AcquireQuantumMemory((size_t) count+
           MagickPathExtent,sizeof(*(*resource)));
       if (*resource != (char *) NULL)
-        Read8BIMResourceBytes(resource,info,length,count);
+        Read8BIMResourceBytes(resource,cursor,count);
     }
 }
 
