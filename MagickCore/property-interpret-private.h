@@ -320,12 +320,25 @@ static MagickBooleanType AppendHexValue(const InterpretText *text,
   return(MagickTrue);
 }
 
-static MagickBooleanType AppendPixelValue(const InterpretText *text,
-  Image *property_image,const char *pattern,ExceptionInfo *exception)
+static void ApplyPixelCompliance(Image *property_image,const PixelInfo *pixel,
+  char *name,ExceptionInfo *exception)
 {
   const char
     *string;
 
+  string=GetImageArtifact(property_image,"pixel:compliance");
+  if (string != (char *) NULL)
+    {
+      ComplianceType compliance=(ComplianceType) ParseCommandOption(
+        MagickComplianceOptions,MagickFalse,string);
+      (void) QueryColorname(property_image,pixel,compliance,name,
+        exception);
+    }
+}
+
+static MagickBooleanType AppendPixelValue(const InterpretText *text,
+  Image *property_image,const char *pattern,ExceptionInfo *exception)
+{
   FxInfo
     *fx_info;
 
@@ -351,14 +364,7 @@ static MagickBooleanType AppendPixelValue(const InterpretText *text,
         name[MagickPathExtent];
 
       GetColorTuple(&pixel,MagickFalse,name);
-      string=GetImageArtifact(property_image,"pixel:compliance");
-      if (string != (char *) NULL)
-        {
-          ComplianceType compliance=(ComplianceType) ParseCommandOption(
-            MagickComplianceOptions,MagickFalse,string);
-          (void) QueryColorname(property_image,&pixel,compliance,name,
-            exception);
-        }
+      ApplyPixelCompliance(property_image,&pixel,name,exception);
       if (AppendInterpretString(text,name) == MagickFalse)
         return(MagickFalse);
     }
