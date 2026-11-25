@@ -343,14 +343,8 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   LogFreetypeFont(draw_info,encoding);
   flags=GetFreetypeLoadFlags(draw_info);
   flags=GetFreetypeHintingFlags(image,flags,exception);
-  glyph.id=0;
-  glyph.image=(FT_Glyph) NULL;
-  last_glyph_id=0;
-  origin.x=0;
-  origin.y=0;
   affine=GetFreetypeAffine(draw_info);
   annotate_info=CloneFreetypeAnnotateInfo(draw_info);
-  status=MagickTrue;
   if (draw_info->render != MagickFalse)
     SetFreetypeCanvas(image,exception);
   p=FindInvalidUTFCode(draw_info);
@@ -367,6 +361,12 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   missing_glyph_id=FT_Get_Char_Index(face,' ');
   code=0;
   last_character=(ssize_t) length-1;
+  glyph.id=0;
+  glyph.image=(FT_Glyph) NULL;
+  last_glyph_id=0;
+  origin.x=0;
+  origin.y=0;
+  status=MagickTrue;
   for (i=0; i < (ssize_t) length; i++)
   {
     const GlyphLoopInfo
