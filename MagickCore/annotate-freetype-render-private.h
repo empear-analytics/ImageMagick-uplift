@@ -379,6 +379,13 @@ static void SelectFreetypeLayoutText(const DrawInfo *draw_info,char **p,
   *length=strlen(*p);
 }
 
+static void PrepareFreetypeCanvas(Image *image,const DrawInfo *draw_info,
+  ExceptionInfo *exception)
+{
+  if (draw_info->render != MagickFalse)
+    SetFreetypeCanvas(image,exception);
+}
+
 #if !defined(FT_OPEN_PATHNAME)
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
@@ -450,8 +457,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   flags=GetFreetypeFlags(image,draw_info,exception);
   affine=GetFreetypeAffine(draw_info);
   annotate_info=CloneFreetypeAnnotateInfo(draw_info);
-  if (draw_info->render != MagickFalse)
-    SetFreetypeCanvas(image,exception);
+  PrepareFreetypeCanvas(image,draw_info,exception);
   SelectFreetypeLayoutText(draw_info,&p,&utf8,&length);
 #if defined(MAGICKCORE_RAQM_DELEGATE)
   if (ContainsRaqmParagraphSeparator((const unsigned char *) p,length) == MagickFalse)
