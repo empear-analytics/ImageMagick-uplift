@@ -468,6 +468,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/property-clippath-private.h \
   MagickCore/property-profile-private.h \
   MagickCore/property-magick-private.h \
+  MagickCore/property-interpret-private.h \
   MagickCore/profile.c \
   MagickCore/profile-sync.c \
   MagickCore/profile.h \
@@ -908,6 +909,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/property-clippath-private.h \
   MagickCore/property-profile-private.h \
   MagickCore/property-magick-private.h \
+  MagickCore/property-interpret-private.h \
   MagickCore/image-private.h \
   MagickCore/image-filename-private.h \
   MagickCore/layer-frames-bounds-private.h \
