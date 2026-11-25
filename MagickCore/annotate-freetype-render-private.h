@@ -246,6 +246,114 @@ static void LogFreetypeFont(const DrawInfo *draw_info,const char *encoding)
       draw_info->pointsize);
 }
 
+typedef struct _GlyphRunInfo
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  FT_Face
+    face;
+
+  FT_Int32
+    flags;
+
+  DrawInfo
+    *annotate_info;
+
+  FT_Matrix
+    affine;
+
+  TypeMetric
+    *metrics;
+
+  const PointInfo
+    *offset;
+
+  ExceptionInfo
+    *exception;
+
+  GraphemeInfo
+    *grapheme;
+
+  char
+    *p;
+
+  size_t
+    length;
+
+  unsigned char
+    *utf8;
+
+  FT_Memory
+    memory;
+
+  FT_Library
+    library;
+
+  FT_StreamRec
+    *stream;
+} GlyphRunInfo;
+
+static MagickBooleanType RenderFreetypeGlyphs(const GlyphRunInfo *run)
+{
+  DrawInfo
+    *annotate_info = run->annotate_info;
+
+  FT_UInt
+    last_glyph_id,
+    missing_glyph_id;
+
+  FT_Vector
+    origin;
+
+  GlyphInfo
+    glyph;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    code,
+    i,
+    last_character;
+
+  const GlyphLoopTargets
+    glyph_targets = { &glyph, &origin, &status, &last_glyph_id, &code };
+
+  glyph.id=0;
+  glyph.image=(FT_Glyph) NULL;
+  last_glyph_id=0;
+  origin.x=0;
+  origin.y=0;
+  status=MagickTrue;
+  missing_glyph_id=FT_Get_Char_Index(run->face,' ');
+  code=0;
+  last_character=(ssize_t) run->length-1;
+  for (i=0; i < (ssize_t) run->length; i++)
+  {
+    const GlyphLoopInfo
+      loop = { run->image, run->draw_info, run->face, run->flags,
+        annotate_info, run->affine, run->metrics, run->offset, run->exception,
+        run->grapheme, run->p, missing_glyph_id, last_character };
+
+    if (RenderFreetypeGlyph(&loop,i,&glyph_targets) == MagickFalse)
+      continue;
+  }
+  RelinquishFreetypeText(run->grapheme,run->utf8);
+  glyph.image=DestroyFreetypeGlyph(glyph.image);
+  ScaleFreetypeMetrics(run->metrics);
+  /*
+    Relinquish resources.
+  */
+  annotate_info=DestroyDrawInfo(annotate_info);
+  (void) FT_Done_Face(run->face);
+  FreetypeDone(run->memory,run->library,run->stream);
+  return(status);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -287,15 +395,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     *stream;
 
   FT_UInt
-    first_glyph_id,
-    last_glyph_id,
-    missing_glyph_id;
-
-  FT_Vector
-    origin;
-
-  GlyphInfo
-    glyph;
+    first_glyph_id;
 
   GraphemeInfo
     *grapheme;
@@ -303,24 +403,11 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   FreetypeFaceTargets
     targets;
 
-  MagickBooleanType
-    status;
-
-  ssize_t
-    i;
-
   size_t
     length;
 
-  ssize_t
-    code,
-    last_character;
-
   unsigned char
     *utf8;
-
-  const GlyphLoopTargets
-    glyph_targets = { &glyph, &origin, &status, &last_glyph_id, &code };
 
   targets.memory=(&memory);
   targets.library=(&library);
@@ -358,34 +445,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   else
 #endif
   length=ComplexTextLayout(draw_info,p,length,face,flags,&grapheme);
-  missing_glyph_id=FT_Get_Char_Index(face,' ');
-  code=0;
-  last_character=(ssize_t) length-1;
-  glyph.id=0;
-  glyph.image=(FT_Glyph) NULL;
-  last_glyph_id=0;
-  origin.x=0;
-  origin.y=0;
-  status=MagickTrue;
-  for (i=0; i < (ssize_t) length; i++)
   {
-    const GlyphLoopInfo
-      loop = { image, draw_info, face, flags, annotate_info, affine, metrics,
-        offset, exception, grapheme, p, missing_glyph_id, last_character };
+    const GlyphRunInfo
+      run = { image, draw_info, face, flags, annotate_info, affine, metrics,
+        offset, exception, grapheme, p, length, utf8, memory, library,
+        stream };
 
-    if (RenderFreetypeGlyph(&loop,i,&glyph_targets) == MagickFalse)
-      continue;
+    return(RenderFreetypeGlyphs(&run));
   }
-  RelinquishFreetypeText(grapheme,utf8);
-  glyph.image=DestroyFreetypeGlyph(glyph.image);
-  ScaleFreetypeMetrics(metrics);
-  /*
-    Relinquish resources.
-  */
-  annotate_info=DestroyDrawInfo(annotate_info);
-  (void) FT_Done_Face(face);
-  FreetypeDone(memory,library,stream);
-  return(status);
 }
 
 #endif
