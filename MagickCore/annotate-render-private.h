@@ -435,15 +435,10 @@ static MagickBooleanType RenderPostscript(Image *image,
     }
   if (draw_info->fill.alpha != (MagickRealType) TransparentAlpha)
     {
-      PostscriptFillInfo
-        fill;
+      const PostscriptFillInfo
+        fill = { image, annotate_image, draw_info, offset, metrics,
+          exception };
 
-      fill.image=image;
-      fill.annotate_image=annotate_image;
-      fill.draw_info=draw_info;
-      fill.offset=offset;
-      fill.metrics=metrics;
-      fill.exception=exception;
       CompositePostscriptFill(&fill);
     }
   annotate_image=DestroyImage(annotate_image);
