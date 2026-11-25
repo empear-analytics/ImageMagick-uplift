@@ -780,8 +780,8 @@ static MagickBooleanType InterpretEscapeCharacter(
 
 static inline MagickBooleanType IsLoggedInterpretImage(const Image *image)
 {
-  return(((image != (Image *) NULL) && (IsEventLogging() != MagickFalse)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((image != (Image *) NULL) &&
+    (IsEventLogging() != MagickFalse)));
 }
 
 static void LogInterpretImageProperties(const ImageInfo *image_info,
