@@ -20,7 +20,7 @@ allowed in any file").
 | annotate-freetype-private.h (new) | - | 9.30 | OH: the FreeType helpers, Raqm block included (8.05); OH again: the Raqm block to its own header |
 | annotate-raqm-private.h (new) | - | 8.38 | OH: the Raqm text layout (not compiled here) |
 | annotate-freetype-render-private.h (new) | - | 9.21 | OH: the glyph loader and RenderFreetype (9.18); E (`LogFreetypeFont`) |
-| annotate-render-private.h (new) | - | 9.07 | OH: RenderPostscript and RenderX11 (8.46); B (`RenderX11`), E (`LogPostscriptFont`), N (`TransformPostscriptImage`) |
+| annotate-render-private.h (new) | - | 9.68 | OH: RenderPostscript and RenderX11 (8.46); B (`RenderX11`), E (`LogPostscriptFont`), N (`TransformPostscriptImage`), N (`CompositePostscriptFill`, an OpenMP region), FB, FI. Ceiling: RenderPostscript's own 5 arguments |
 
 annotate.c keeps only *Excess Number of Function Arguments* on `FormatMagickCaption`
 (`MagickExport`, 6 arguments), its plateau. Each header scores above the file's 5.86 before
@@ -66,6 +66,16 @@ the chain (the 2026-11-18 bar). The headers are campaign B files now and stay on
   XRenderImage) became `const X11TextTarget *`. The typedef stands in annotate.c, ahead of
   the forward declaration. The score was flat, as a step of the probed chain to 9.68.
 
+- **RenderPostscript's fill pass, an OpenMP region, moved by Recipe N.** Only the body under
+  the `fill.alpha` test moved; the whole pass as one helper had scored 9.01 in a probe. The
+  ruling's write set, read by hand: status is still `shared(status)`; y, x and q are private;
+  `sync` and `fill_color` are shared as before (see the data-race note). In gcc-16 -O2 OpenMP
+  builds the outlined region has the same 128 instructions; only labels and two offsets into
+  the captured-variable block differ. `tools/omp_compare.sh` at 1 and 4 threads on
+  `tools/omp_cases/annotate-postscript.txt` (text images above the one-thread limit): 0
+  diverged, A/A 0. FB on `transform` and FI on `fill` (both object-IDENTICAL) then took
+  RenderPostscript from 75 to under 70 lines: 9.68.
+
 ## Oracle
 
 Whole catalogue at `484300881` (working-tree candidate): 16,005 cases, 1 diverged, the known
@@ -88,19 +98,17 @@ RenderFreetype 198, RenderX11 20, AnnotateImage 177, all 0 diverged.
   RenderFreetype, still a Large Method, and its header dropped 9.18 to 9.16. The gate refuses
   that, so the step waits until RenderFreetype is below 70 lines. The call is the `else` body
   of a Raqm `#if`, so it needs B's block form, not a fill at the function's top.
+- **`tools/omp_compare.sh` needs absolute paths.** It runs each case after cd into a temporary
+  directory. With relative BASE and CAND paths both sides fail, and the two "not found"
+  messages differ by path, so base against candidate reports every run as diverged while an
+  A/A run passes.
 - **Possible upstream data race (report, not fixed).** In RenderPostscript's fill pass,
   `MagickBooleanType sync` is declared outside the `#pragma omp parallel for` and is not
-  private, yet every thread assigns it from SyncCacheViewAuthenticPixels and tests it.
+  private, yet every thread assigns it from SyncCacheViewAuthenticPixels and tests it. The same
+  holds for `PixelInfo fill_color`, which every thread fills through GetFillColor.
 
 ## Next
 
-- **annotate-render-private.h (9.07, ceiling 9.68).** RenderPostscript (cc 15, 105 lines)
-  clears only if its fill pass leaves. The pass holds an OpenMP parallel loop, so the step
-  needs the 2026-11-15 checks (by-hand write set, omp_compare at 1 and 4 threads, with a case
-  large enough to start threads). A probe of the whole pass as one N helper scored 9.01 (the
-  helper cc 9). Move only the body under the `fill.alpha` test, then take P on the
-  file-open condition. RenderPostscript's own 5 arguments stay, because the non-FreeType
-  RenderFreetype stub calls it in a branch this build does not compile.
 - **annotate-freetype-render-private.h (9.21).** RenderFreetype is cc 13 and 143 lines (after
   LogFreetypeFont), about 70 of them declarations. A probe that moved the glyph loop and the debug log scored 9.08
   (still 114 lines, the loop helper cc 9). It needs a longer chain, after which
