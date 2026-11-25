@@ -903,6 +903,14 @@ static void AnnotateTextLines(const AnnotateLineInfo *line,
   }
 }
 
+static void LogAnnotateImage(const Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -932,10 +940,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   const AnnotateLineTargets
     targets = { &metrics, &status };
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  LogAnnotateImage(image);
   assert(draw_info != (DrawInfo *) NULL);
   assert(draw_info->signature == MagickCoreSignature);
   if (draw_info->text == (char *) NULL)
