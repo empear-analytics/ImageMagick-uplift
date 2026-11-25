@@ -399,9 +399,15 @@ static void SkipToEXIFHeader(const unsigned char **exif,size_t *length)
   }
 }
 
-static MagickBooleanType ReadEXIFHeader(const unsigned char **exif,
-  size_t *length,EndianType *endian)
+static MagickBooleanType ReadEXIFHeader(const EXIFCursor *cursor,
+  EndianType *endian)
 {
+  const unsigned char
+    **const exif = cursor->exif;
+
+  size_t
+    *const length = cursor->length;
+
   ssize_t
     id;
 
@@ -1441,7 +1447,7 @@ static MagickBooleanType ReadEXIFProfileHeader(const StringInfo *profile,
   if ((*length) < 6)
     return(MagickFalse);
   (*exif)=GetStringInfoDatum(profile);
-  if (ReadEXIFHeader(exif,length,endian) == MagickFalse)
+  if (ReadEXIFHeader(cursor,endian) == MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
 }
