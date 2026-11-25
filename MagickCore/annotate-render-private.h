@@ -263,6 +263,106 @@ static Image *TransformPostscriptImage(const PostscriptTransformInfo *transform,
   return(annotate_image);
 }
 
+typedef struct _PostscriptFillInfo
+{
+  Image
+    *image,
+    *annotate_image;
+
+  const DrawInfo
+    *draw_info;
+
+  const PointInfo
+    *offset;
+
+  TypeMetric
+    *metrics;
+
+  ExceptionInfo
+    *exception;
+} PostscriptFillInfo;
+
+static void CompositePostscriptFill(const PostscriptFillInfo *fill)
+{
+  Image
+    *const image = fill->image,
+    *const annotate_image = fill->annotate_image;
+
+  const DrawInfo
+    *const draw_info = fill->draw_info;
+
+  const PointInfo
+    *const offset = fill->offset;
+
+  TypeMetric
+    *const metrics = fill->metrics;
+
+  ExceptionInfo
+    *const exception = fill->exception;
+
+  CacheView
+    *annotate_view;
+
+  MagickBooleanType
+    sync;
+
+  PixelInfo
+    fill_color;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  /*
+    Render fill color.
+  */
+  SetPostscriptAlphaChannels(image,annotate_image,exception);
+  fill_color=draw_info->fill;
+  status=MagickTrue;
+  annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(annotate_image,annotate_image,annotate_image->rows,4)
+#endif
+  for (y=0; y < (ssize_t) annotate_image->rows; y++)
+  {
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(annotate_view,0,y,annotate_image->columns,
+      1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    for (x=0; x < (ssize_t) annotate_image->columns; x++)
+    {
+      GetFillColor(draw_info,x,y,&fill_color,exception);
+      SetPixelAlpha(annotate_image,ClampToQuantum((((double) QuantumScale*
+        GetPixelIntensity(annotate_image,q)*fill_color.alpha))),q);
+      SetPixelRed(annotate_image,(const Quantum) fill_color.red,q);
+      SetPixelGreen(annotate_image,(const Quantum) fill_color.green,q);
+      SetPixelBlue(annotate_image,(const Quantum) fill_color.blue,q);
+      q+=(ptrdiff_t) GetPixelChannels(annotate_image);
+    }
+    sync=SyncCacheViewAuthenticPixels(annotate_view,exception);
+    if (sync == MagickFalse)
+      status=MagickFalse;
+  }
+  annotate_view=DestroyCacheView(annotate_view);
+  (void) CompositeImage(image,annotate_image,OverCompositeOp,MagickTrue,
+    (ssize_t) ceil(offset->x-0.5),(ssize_t) ceil(offset->y-(metrics->ascent+
+    metrics->descent)-0.5),exception);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -280,8 +380,7 @@ static MagickBooleanType RenderPostscript(Image *image,
     unique_file;
 
   MagickBooleanType
-    identity,
-    status;
+    identity;
 
   PointInfo
     extent,
@@ -289,9 +388,6 @@ static MagickBooleanType RenderPostscript(Image *image,
 
   PostscriptTransformInfo
     transform;
-
-  ssize_t
-    y;
 
   /*
     Render label with a Postscript font.
@@ -342,61 +438,16 @@ static MagickBooleanType RenderPostscript(Image *image,
     }
   if (draw_info->fill.alpha != (MagickRealType) TransparentAlpha)
     {
-      CacheView
-        *annotate_view;
+      PostscriptFillInfo
+        fill;
 
-      MagickBooleanType
-        sync;
-
-      PixelInfo
-        fill_color;
-
-      /*
-        Render fill color.
-      */
-      SetPostscriptAlphaChannels(image,annotate_image,exception);
-      fill_color=draw_info->fill;
-      status=MagickTrue;
-      annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(annotate_image,annotate_image,annotate_image->rows,4)
-#endif
-      for (y=0; y < (ssize_t) annotate_image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(annotate_view,0,y,annotate_image->columns,
-          1,exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) annotate_image->columns; x++)
-        {
-          GetFillColor(draw_info,x,y,&fill_color,exception);
-          SetPixelAlpha(annotate_image,ClampToQuantum((((double) QuantumScale*
-            GetPixelIntensity(annotate_image,q)*fill_color.alpha))),q);
-          SetPixelRed(annotate_image,(const Quantum) fill_color.red,q);
-          SetPixelGreen(annotate_image,(const Quantum) fill_color.green,q);
-          SetPixelBlue(annotate_image,(const Quantum) fill_color.blue,q);
-          q+=(ptrdiff_t) GetPixelChannels(annotate_image);
-        }
-        sync=SyncCacheViewAuthenticPixels(annotate_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
-      }
-      annotate_view=DestroyCacheView(annotate_view);
-      (void) CompositeImage(image,annotate_image,OverCompositeOp,MagickTrue,
-        (ssize_t) ceil(offset->x-0.5),(ssize_t) ceil(offset->y-(metrics->ascent+
-        metrics->descent)-0.5),exception);
+      fill.image=image;
+      fill.annotate_image=annotate_image;
+      fill.draw_info=draw_info;
+      fill.offset=offset;
+      fill.metrics=metrics;
+      fill.exception=exception;
+      CompositePostscriptFill(&fill);
     }
   annotate_image=DestroyImage(annotate_image);
   return(MagickTrue);
