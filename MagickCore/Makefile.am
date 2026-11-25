@@ -108,6 +108,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/annotate-type-private.h \
   MagickCore/annotate-freetype-private.h \
   MagickCore/annotate-freetype-render-private.h \
+  MagickCore/annotate-render-private.h \
   MagickCore/artifact.c \
   MagickCore/artifact.h \
   MagickCore/attribute.c \
@@ -767,6 +768,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/annotate-type-private.h \
   MagickCore/annotate-freetype-private.h \
   MagickCore/annotate-freetype-render-private.h \
+  MagickCore/annotate-render-private.h \
   MagickCore/blob-private.h \
   MagickCore/cache-private.h \
   MagickCore/cache-private.h \
