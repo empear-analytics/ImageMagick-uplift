@@ -385,8 +385,14 @@ static MagickBooleanType ReadEXIFMarker(const unsigned char **exif,
   return(MagickTrue);
 }
 
-static void SkipToEXIFHeader(const unsigned char **exif,size_t *length)
+static void SkipToEXIFHeader(const EXIFCursor *cursor)
 {
+  const unsigned char
+    **const exif = cursor->exif;
+
+  size_t
+    *const length = cursor->length;
+
   MagickBooleanType
     broke = MagickFalse;
 
@@ -411,7 +417,7 @@ static MagickBooleanType ReadEXIFHeader(const EXIFCursor *cursor,
   ssize_t
     id;
 
-  SkipToEXIFHeader(exif,length);
+  SkipToEXIFHeader(cursor);
   if ((*length) < 16)
     return(MagickFalse);
   id=(ssize_t) ReadPropertySignedShort(LSBEndian,(*exif));
