@@ -24776,6 +24776,15 @@ parameter the callee can read from another.
    --campaign-a`, and the oracle on the function's cases; score the file and its
    includers (no drop, or a stub-probed chain whose last step raises the file). Check by
    reading whether any caller runs per pixel, per row or per kernel element; if so, Ir first.
+6. *Address form* (2026-11-25). When every member of the group is the address `&v` of a
+   plain local `v` of one caller (a cursor and its remaining length, `&info,&length`), that
+   caller may instead declare the struct once, `const Name name = { &a, &b };`, as the last
+   declaration at the top of the block that declares the last of those locals, and every
+   call in that block, this step's and later steps' of the same group, passes `&name`. An
+   address does not change while its object lives, so the one fill holds at every call the
+   values a per-call fill would; the object is `const` and read only by those calls (Recipe
+   I step 2's exception), so each member is the only pointer to its local in use while the
+   callee runs, as `&v` was.
 
 **Why it behaves the same.** Each member is initialised from the argument expression the
 call passed, directly before the call, with nothing between: the callee's local holds the
@@ -27863,3 +27872,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | H | Step 1, guarded form: a `#define M` wrapped in its own `#if !defined(M)` ... `#endif` (nothing else inside) is a run of its own, and moves with its two directive lines, verbatim; `pp_identical.sh` stays the proof | `RenderFreetype`'s `FT_OPEN_PATHNAME` fallback (campaign B, M143), the three lines that kept the function at 70 lines; the macro is named nowhere else, and the guard is false with any FreeType that defines it | mandate (2026-10-24) |
 | 2026-11-25 | NEW | JB | Join a Block to the Struct Fill After It and Extract It Reading the Struct: the statements just before a Recipe FB compound statement that write none of its initialiser's identifiers join the block (the initialiser runs first), and a block of them moves into a helper taking `const Name *` and reading the members for the values the initialiser copied | `annotate-freetype-private.h`'s `RasterizeGlyphRow` (campaign B, M143), cc 9 after DB, E and N: the per-pixel fetch reads `x_offset`, `y_offset` and `active`, members of the `GlyphPixel` fill that follows it; alone it needs five parameters. Probed 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | IC | Step 5, member form: a local initialised with `p->m` (a member read through a parameter pointing to a `const` struct, with nothing assigning `p`), of the member's exact type, read exactly once with no call or write between its declaration and the read, is replaced at its one read by `p->m` and its declarator goes | `property-clippath-private.h`'s `TracePSClippathRecord` and `TraceSVGClippathRecord` (campaign B, M143): after Recipe CF the two wrappers only bound `blob`, `length` and `knot_count` from their state to pass them on, and the bindings were the duplicated text. Probed 9.09 to 9.68, then 10.0 after SD | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |

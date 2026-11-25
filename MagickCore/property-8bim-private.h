@@ -133,6 +133,15 @@ static char *Trace8BIMClippath(const Image *image,const char *format,
   return(path);
 }
 
+typedef struct _Cursor8BIM
+{
+  const unsigned char
+    **info;
+
+  size_t
+    *length;
+} Cursor8BIM;
+
 static void Read8BIMResourceBytes(char **resource,const unsigned char **info,
   size_t *length,const ssize_t count)
 {
@@ -239,8 +248,14 @@ typedef struct _Range8BIM
 } Range8BIM;
 
 static MagickBooleanType Skip8BIMResourceHeader(const Range8BIM *range,
-  const unsigned char **info,size_t *length,ssize_t *id)
+  const Cursor8BIM *cursor,ssize_t *id)
 {
+  const unsigned char
+    **const info = cursor->info;
+
+  size_t
+    *const length = cursor->length;
+
   const long
     start = range->start,
     stop = range->stop;
@@ -410,6 +425,9 @@ static void Get8BIMResources(const Request8BIM *request)
     id,
     sub_number = request->sub_number;
 
+  const Cursor8BIM
+    cursor = { &info, &length };
+
   status=MagickFalse;
   length=GetStringInfoLength(request->profile);
   info=GetStringInfoDatum(request->profile);
@@ -426,7 +444,7 @@ static void Get8BIMResources(const Request8BIM *request)
 
     range.start=request->start;
     range.stop=request->stop;
-    if (Skip8BIMResourceHeader(&range,&info,&length,&id) != MagickFalse)
+    if (Skip8BIMResourceHeader(&range,&cursor,&id) != MagickFalse)
       continue;
     Release8BIMResourceNames(&resource,&macroman_resource);
     Read8BIMResourceBlock(&count,&resource,&info,&length);
