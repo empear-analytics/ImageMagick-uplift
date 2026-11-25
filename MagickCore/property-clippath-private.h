@@ -402,6 +402,14 @@ typedef struct _SVGClippathState
     rows;
 } SVGClippathState;
 
+static void StartSVGClippathSubpath(char *message,PointInfo *first,
+  PointInfo *last,PointInfo *point)
+{
+  (void) FormatLocaleString(message,MagickPathExtent,"M %g %g\n",
+    point[1].x,point[1].y);
+  CopyClippathKnot(first,last,point);
+}
+
 static void AddSVGClippathKnot(const SVGClippathState *state)
 {
   const unsigned char
@@ -447,11 +455,7 @@ static void AddSVGClippathKnot(const SVGClippathState *state)
     point[i].y=(double) y*rows/4096.0/4096.0;
   }
   if (in_subpath == MagickFalse)
-    {
-      (void) FormatLocaleString(message,MagickPathExtent,"M %g %g\n",
-        point[1].x,point[1].y);
-      CopyClippathKnot(first,last,point);
-    }
+    StartSVGClippathSubpath(message,first,last,point);
   else
     TraceSVGClippathKnot(message,last,point);
   (void) ConcatenateString(&path,message);
