@@ -798,10 +798,17 @@ static void LogInterpretImageProperties(const ImageInfo *image_info,
         (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no image");
 }
 
+static inline MagickBooleanType IsOwnedInterpretImage(const Image *image,
+  const Image *property_image)
+{
+  return(((property_image != image) && (property_image != (Image *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void DestroyInterpretSources(const ImageInfo *image_info,
   const Image *image,ImageInfo *property_info,Image *property_image)
 {
-  if ((property_image != image) && (property_image != (Image *) NULL))
+  if (IsOwnedInterpretImage(image,property_image) != MagickFalse)
     property_image=DestroyImage(property_image);
   if ((property_info != image_info) && (property_info != (ImageInfo *) NULL))
     property_info=DestroyImageInfo(property_info);
