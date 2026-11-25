@@ -395,10 +395,10 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     *stream;
 
   FT_UInt
-    first_glyph_id;
+    first_glyph_id=0;
 
   GraphemeInfo
-    *grapheme;
+    *grapheme=(GraphemeInfo *) NULL;
 
   size_t
     length;
@@ -412,7 +412,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   if (OpenFreetypeFace(target,&targets,exception) == MagickFalse)
     return(MagickFalse);
   SetFreetypeMetrics(face,metrics);
-  first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
   if (IsTextWithoutGlyphs(draw_info,first_glyph_id) != MagickFalse)
     {
@@ -432,7 +431,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     SetFreetypeCanvas(image,exception);
   p=FindInvalidUTFCode(draw_info);
   SelectFreetypeText(draw_info,&utf8,&p);
-  grapheme=(GraphemeInfo *) NULL;
   length=strlen(p);
 #if defined(MAGICKCORE_RAQM_DELEGATE)
   if (ContainsRaqmParagraphSeparator((const unsigned char *) p,length) == MagickFalse)
