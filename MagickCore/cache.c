@@ -845,6 +845,12 @@ MagickExport MagickBooleanType PersistPixelCache(Image *image,
   return(status);
 }
 
+static inline MagickBooleanType HasNexusMaskChannels(const Image *image)
+{
+  return(((image->channels & WriteMaskChannel) != 0) ||
+    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   Q u e u e A u t h e n t i c P i x e l C a c h e N e x u s                 %
@@ -936,9 +942,7 @@ MagickPrivate Quantum *QueueAuthenticPixelCacheNexus(Image *image,
     Return pixel cache.
   */
   pixels=SetPixelCacheNexusPixels(cache_info,WriteMode,x,y,columns,rows,
-    ((image->channels & WriteMaskChannel) != 0) ||
-    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse,
-    nexus_info,exception);
+    HasNexusMaskChannels(image),nexus_info,exception);
   return(pixels);
 }
 
