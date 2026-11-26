@@ -564,6 +564,30 @@ static MagickBooleanType FailPixelCacheOnDisk(CacheInfo *cache_info,
   return(MagickFalse);
 }
 
+static void LogDiskPixelCacheOpen(const CacheInfo *cache_info)
+{
+  char
+    format[MagickPathExtent],
+    message[MagickPathExtent];
+
+  const char
+    *type;
+
+  if (cache_info->debug != MagickFalse)
+    {
+      (void) FormatMagickSize(cache_info->length,MagickFalse,"B",
+        MagickPathExtent,format);
+      type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
+        cache_info->type);
+      (void) FormatLocaleString(message,MagickPathExtent,
+        "open %s (%s[%d], %s, %.17gx%.17gx%.17g %s)",cache_info->filename,
+        cache_info->cache_filename,cache_info->file,type,(double)
+        cache_info->columns,(double) cache_info->rows,(double)
+        cache_info->number_channels,format);
+      (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",message);
+    }
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -571,13 +595,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
     *magick_restrict cache_info,
     source_info;
 
-  char
-    format[MagickPathExtent],
-    message[MagickPathExtent];
-
   const char
-    *hosts,
-    *type;
+    *hosts;
 
   MagickBooleanType
     status;
@@ -791,19 +810,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
       status=ClonePixelCacheRepository(cache_info,&source_info,exception);
       RelinquishPixelCachePixels(&source_info);
     }
-  if (cache_info->debug != MagickFalse)
-    {
-      (void) FormatMagickSize(cache_info->length,MagickFalse,"B",
-        MagickPathExtent,format);
-      type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
-        cache_info->type);
-      (void) FormatLocaleString(message,MagickPathExtent,
-        "open %s (%s[%d], %s, %.17gx%.17gx%.17g %s)",cache_info->filename,
-        cache_info->cache_filename,cache_info->file,type,(double)
-        cache_info->columns,(double) cache_info->rows,(double)
-        cache_info->number_channels,format);
-      (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",message);
-    }
+  LogDiskPixelCacheOpen(cache_info);
   if (status == 0)
     {
       cache_info->type=UndefinedCache;
