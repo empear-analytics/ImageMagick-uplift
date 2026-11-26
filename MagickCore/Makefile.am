@@ -271,6 +271,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw-private.h \
   MagickCore/draw-core-private.h \
   MagickCore/draw-mvg-trace-private.h \
+  MagickCore/draw-mvg-push-private.h \
   MagickCore/draw-path-trace-private.h \
   MagickCore/draw-primitive-path-private.h \
   MagickCore/draw-primitive-convert-private.h \
@@ -880,6 +881,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/draw-private.h \
   MagickCore/draw-core-private.h \
   MagickCore/draw-mvg-trace-private.h \
+  MagickCore/draw-mvg-push-private.h \
   MagickCore/draw-path-trace-private.h \
   MagickCore/draw-primitive-path-private.h \
   MagickCore/draw-primitive-convert-private.h \
