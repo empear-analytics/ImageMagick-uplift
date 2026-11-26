@@ -15,6 +15,7 @@ MagickCore/accelerate-recreate-buffer-private.h 921d03af784c52f96a5e3914e5613316
 MagickCore/accelerate-recreate-release-private.h 9fd2fd49dac2444619c8c6efdd66ac9301c24a88  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
 MagickCore/animate-private.h 320dab7ba985d8f6fe8adc159b57428f228a42ce  # declarations only
 MagickCore/annotate-private.h dc6ede4f864d86b7fdef189a435b78bd97d1bb82  # declarations only
+MagickCore/blob-info-private.h 01070d79f80193346cc4b83331fb09237c3dbdc3  # macros, a union and structs (blob.c's define and typedef blocks)
 MagickCore/blob-private.h 7e08e6884804d639e534a980bb2c9c071a6faa7c  # enums, macros and declarations
 MagickCore/coder-private.h 228dd338c5b9319afb4d23af8df8cb113eab55b8  # declarations only
 MagickCore/configure-private.h 25a0dace172e9a8ef83f18039c2c942301996f85  # declarations only
