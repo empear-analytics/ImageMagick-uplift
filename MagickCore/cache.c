@@ -1103,6 +1103,16 @@ MagickPrivate void SetPixelCacheMethods(Cache cache,CacheMethods *cache_methods)
 
 #include "MagickCore/cache-nexus-private.h"
 
+static void SetBackgroundVirtualPixels(Image *image,ExceptionInfo *exception)
+{
+  if ((image->background_color.alpha_trait != UndefinedPixelTrait) &&
+      ((image->alpha_trait & BlendPixelTrait) == 0))
+    (void) SetCacheAlphaChannel(image,OpaqueAlpha,exception);
+  if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
+      (IsGrayColorspace(image->colorspace) != MagickFalse))
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %   S e t P i x e l C a c h e V i r t u a l M e t h o d                       %
@@ -1149,12 +1159,7 @@ MagickPrivate VirtualPixelMethod SetPixelCacheVirtualMethod(Image *image,
     {
       case BackgroundVirtualPixelMethod:
       {
-        if ((image->background_color.alpha_trait != UndefinedPixelTrait) &&
-            ((image->alpha_trait & BlendPixelTrait) == 0))
-          (void) SetCacheAlphaChannel(image,OpaqueAlpha,exception);
-        if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
-            (IsGrayColorspace(image->colorspace) != MagickFalse))
-          (void) SetImageColorspace(image,sRGBColorspace,exception);
+        SetBackgroundVirtualPixels(image,exception);
         break;
       }
       case TransparentVirtualPixelMethod:
