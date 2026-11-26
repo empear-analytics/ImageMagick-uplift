@@ -305,7 +305,7 @@ first (scratch copies under `build-oracle/probe/`).
 | --- | --- | --- | --- |
 | stream.c | 7.32 | **10.0** | stream-row (8.03), stream-quantum (7.32), stream-map (8.81), stream-pixels (8.28) |
 | draw.c | 6.63 | **9.68** | draw-mvg-prepare (9.09), draw-mvg-trace (7.72), draw-mvg-push (8.54), draw-mvg-attribute (8.03), draw-mvg-keyword (8.28), draw-mvg-render (8.47), draw-path-trace (9.38) |
-| utility.c | 7.84 | 8.09 | utility-path (8.81), utility-template (10.0), utility-list (9.68), utility-expand (9.38) |
+| utility.c | 7.84 | 8.34 | utility-path (8.81), utility-template (10.0), utility-list (9.68), utility-expand (9.38), utility-base64 (10.0, added later to clear the Primitive Obsession the carves had exposed) |
 | profile.c | 8.19 | 8.71 | profile-lcms (9.68) |
 
 Every header scores at or above its file's score before the chain. What is left: draw.c,
