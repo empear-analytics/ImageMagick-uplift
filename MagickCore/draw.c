@@ -237,6 +237,7 @@ MagickExport MagickBooleanType DrawClipPath(Image *image,
   return(status);
 }
 
+#include "MagickCore/draw-mvg-prepare-private.h"
 #include "MagickCore/draw-mvg-trace-private.h"
 
 #include "MagickCore/draw-mvg-push-private.h"
