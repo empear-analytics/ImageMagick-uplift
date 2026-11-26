@@ -365,3 +365,38 @@ commits, all valid.
   no-slowdown rule applies).
 - module.c (6.63) and image-view.c (6.84): function-level findings, mostly in code no case
   reaches (guard-level recipes only).
+
+## 2026-11-26, later: cache.c out of the red, color.c and pixel.c
+
+| File | Before | After | Headers (score) |
+| --- | --- | --- | --- |
+| cache.c | 3.52 | **6.92** | cache-clone (7.17), cache-image (9.09), cache-virtual (7.71), cache-open (7.80), cache-read (8.33), cache-nexus (8.77), cache-write (8.37) |
+| color.c | 9.09 | 9.68 | color-parse (9.38) |
+| pixel.c | 8.74 | 9.31 | pixel-interpolate-channel (9.38), pixel-interpolate-channels (9.09), pixel-interpolate-info (9.38) |
+
+cache.c's M141 plateau note held for Recipe S and Form B; the mid-file form reaches the 75
+statics between its 18 external definitions, and every step held or raised the file (3.52,
+3.52, 3.91, 4.47, 5.18, 5.93, 6.92). Left in cache.c: six Complex Methods in its
+`MagickPrivate` functions (GetVirtualPixelCacheNexus, QueueAuthenticPixelCacheNexus,
+SyncAuthenticPixelCacheNexus and others) and four functions' arguments.
+
+- **OpenMP regions moved as text** (ClonePixelCacheChannels, ClonePixelCacheRepository,
+  SetCacheAlphaChannel): besides the oracle build, the file was compiled with gcc-16 and the
+  `omp-cand` tree's flags (`-fopenmp -O2`), HEAD against the working tree; with string
+  labels normalised the disassembly was identical at every step. On this Mac, gcc-16 needs
+  `PATH=/usr/bin:...` ahead of Anaconda, whose x86_64 `as` breaks the assembler step.
+- **Form-feed lines** at a run's edges stay in the `.c` file (cache.c has `^L` pairs between
+  sections).
+- Unbuilt blocks moved verbatim with their pairs (owner, 2026-11-20): MAGICKCORE_HAVE_LINUX_SENDFILE,
+  MAGICKCORE_HAVE_POSIX_FALLOCATE, MAGICKCORE_OPENCL_SUPPORT.
+- Oracle per step: ClipPixelCacheNexus 41, ClonePixelCacheRepository 8477, GetImagePixelCache
+  15129, OpenPixelCache 15129, SetPixelCacheNexusPixels 14864, all 0 diverged; the other steps
+  were object-IDENTICAL in both builds (guard level).
+
+Not taken: blob.c (2.71): OH reaches only 2.77 (its debt is in 86 external functions; M128 and
+M130 record why splits are blocked). log.c (8.81): its largest run alone scores 8.54, below the
+file; it needs that run cut in two. module.c and image-view.c: unreached or unbuilt code.
+
+Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c5651ffad8`),
+`matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 27 refactor
+commits, all valid.
