@@ -125,6 +125,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/blob-file.c \
   MagickCore/blob-open.c \
   MagickCore/blob-query.c \
+  MagickCore/blob-seek.c \
   MagickCore/blob-write.c \
   MagickCore/blob-read.c \
   MagickCore/blob-image.c \

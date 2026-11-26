@@ -52,6 +52,7 @@ $call Make blob-raw-read.c
 $call Make blob-file.c
 $call Make blob-open.c
 $call Make blob-query.c
+$call Make blob-seek.c
 $call Make blob-write.c
 $call Make blob-read.c
 $call Make blob-image.c
