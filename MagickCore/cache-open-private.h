@@ -564,6 +564,21 @@ static MagickBooleanType FailPixelCacheOnDisk(CacheInfo *cache_info,
   return(MagickFalse);
 }
 
+static MagickBooleanType CheckPixelCacheGeometryLimits(const Image *image,
+  const CacheInfo *magick_restrict cache_info,ExceptionInfo *exception)
+{
+  if (((MagickSizeType) image->columns > cache_info->width_limit) ||
+      ((MagickSizeType) image->rows > cache_info->height_limit))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "WidthOrHeightExceedsLimit","`%s' (%.17gx%.17g) > (%.17gx%.17g)",
+        image->filename, (double) image->columns, (double) image->rows,
+        (double) cache_info->width_limit,(double) cache_info->height_limit);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void LogDiskPixelCacheOpen(const CacheInfo *cache_info)
 {
   char
@@ -645,15 +660,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
     ThrowBinaryException(CacheError,"NoPixelsDefinedInCache",image->filename);
   cache_info=(CacheInfo *) image->cache;
   assert(cache_info->signature == MagickCoreSignature);
-  if (((MagickSizeType) image->columns > cache_info->width_limit) ||
-      ((MagickSizeType) image->rows > cache_info->height_limit))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "WidthOrHeightExceedsLimit","`%s' (%.17gx%.17g) > (%.17gx%.17g)",
-        image->filename, (double) image->columns, (double) image->rows,
-        (double) cache_info->width_limit,(double) cache_info->height_limit);
-      return(MagickFalse);
-    }
+  if (CheckPixelCacheGeometryLimits(image,cache_info,exception) == MagickFalse)
+    return(MagickFalse);
   if (AcquireListLengthResource(image,&length,exception) == MagickFalse)
     return(MagickFalse);
   source_info=(*cache_info);
