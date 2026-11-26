@@ -1605,6 +1605,8 @@ MagickPrivate char **GetPathComponents(const char *path,
   return(components);
 }
 
+#include "MagickCore/utility-template-private.h"
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1629,72 +1631,6 @@ MagickPrivate char **GetPathComponents(const char *path,
 %
 %
 */
-static char *GetTemporaryDirectory(void)
-{
-  char
-    *directory;
-
-  ExceptionInfo
-    *exception;
-
-  exception=AcquireExceptionInfo();
-  directory=(char *) GetImageRegistry(StringRegistryType,"temporary-path",
-    exception);
-  exception=DestroyExceptionInfo(exception);
-  if (directory == (char *) NULL)
-    directory=GetEnvironmentValue("MAGICK_TEMPORARY_PATH");
-  if (directory == (char *) NULL)
-    directory=GetEnvironmentValue("MAGICK_TMPDIR");
-  if (directory == (char *) NULL)
-    directory=GetEnvironmentValue("TMPDIR");
-  return(directory);
-}
-
-static MagickBooleanType ValidateTemporaryDirectory(char *directory)
-{
-  MagickBooleanType
-    status;
-
-  struct stat
-    attributes;
-
-  if (strlen(directory) > (MagickPathExtent-25))
-    {
-      directory=DestroyString(directory);
-      return(MagickFalse);
-    }
-  status=GetPathAttributes(directory,&attributes);
-  if ((status == MagickFalse) || !S_ISDIR(attributes.st_mode))
-    {
-      directory=DestroyString(directory);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
-}
-
-static void ApplyTemporaryPathPolicy(char **directory)
-{
-  char
-    *value;
-
-  value=GetPolicyValue("resource:temporary-path");
-  if (value != (char *) NULL)
-    {
-      (void) CloneString(&(*directory),value);
-      value=DestroyString(value);
-    }
-}
-
-static void FormatPathTemplate(char *path,const char *directory)
-{
-  if (directory[strlen(directory)-1] == *DirectorySeparator)
-    (void) FormatLocaleString(path,MagickPathExtent,"%smagick-"
-      MagickPathTemplate,directory);
-  else
-    (void) FormatLocaleString(path,MagickPathExtent,
-      "%s%smagick-" MagickPathTemplate,directory,DirectorySeparator);
-}
-
 MagickExport MagickBooleanType GetPathTemplate(char *path)
 {
   char
