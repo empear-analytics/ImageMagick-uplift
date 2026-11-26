@@ -55,6 +55,7 @@ $call Make blob-query.c
 $call Make blob-write.c
 $call Make blob-read.c
 $call Make blob-image.c
+$call Make blob-to-custom.c
 $call Make blob-to-blob.c
 $call Make blob-custom.c
 $call Make cache.c

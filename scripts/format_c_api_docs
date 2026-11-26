@@ -44,6 +44,7 @@ if ( ! GetOptions(
 	 'blob-write.c',
 	 'blob-read.c',
 	 'blob-image.c',
+	 'blob-to-custom.c',
 	 'blob-to-blob.c',
 	 'blob-custom.c',
 	 'cache.c',
