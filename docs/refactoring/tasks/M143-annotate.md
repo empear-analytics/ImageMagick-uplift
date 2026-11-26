@@ -426,3 +426,29 @@ showed only `gaps/c5651ffad8`, the known logcfg tie-break; its object is IDENTIC
 - The PR's CodeScene gate counts advisory findings (Primitive Obsession) only in files that
   existed before; several new headers carry it and the gate passes.
 
+### cache.c, function-level steps
+
+| Step | Recipe | cache.c |
+| --- | --- | --- |
+| SetPixelCacheMethods: four NULL-tested handler copies into SetPixelCacheGetMethods (cc 12 -> 8) | E | 6.92 -> 7.15 |
+| SetPixelCacheVirtualMethod: the background case into SetBackgroundVirtualPixels | E | 7.15 -> 7.39 |
+| SyncAuthenticPixelCacheNexus: the mask block into ApplyPixelCacheNexusMasks (cc 14 -> 10, Bumpy Road gone, still Complex) | W | 7.39 -> 7.52 |
+| QueueAuthenticPixelCacheNexus: the mask argument into HasNexusMaskChannels (cc 10 -> 8) | P | 7.52 -> 7.74 |
+
+The W and P steps touch functions that run once per row; both objects (clang oracle build
+and gcc-16 OpenMP -O2) stayed identical, so no timing. The W commit's message first said
+SyncAuthenticPixelCacheNexus left Complex Method; it did not (cc 10). The two unpushed
+commits were replayed with the corrected message (`--no-verify` on the replay only: the
+trees are the ones the gate passed).
+
+Left in cache.c: GetVirtualPixelCacheNexus (cc 35, 149 lines), SyncAuthenticPixelCacheNexus
+(cc 10), GetAuthenticOpenCLBuffer (OpenCL, not built here), four `MagickPrivate` signatures'
+arguments. Probed for GetVirtualPixelCacheNexus: its colour `switch` as one helper is itself
+a Complex Method (cc 11) and lowers the file (7.71); its four constant-fill cases differ in two
+values, but Gray's `QuantumRange/2` is not a literal, which Recipe SC requires, and the
+helper would change per-row code (timing). With the switch, the metacontent block and the
+mask predicate moved, the stub probe reaches 8.02 (cc 22 left).
+Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c5651ffad8`),
+`matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 35
+refactor commits, all valid.
+
