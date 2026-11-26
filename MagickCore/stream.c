@@ -579,6 +579,7 @@ MagickExport Image *StreamImage(const ImageInfo *image_info,
   return(image);
 }
 
+#include "MagickCore/stream-row-private.h"
 #include "MagickCore/stream-quantum-private.h"
 
 #include "MagickCore/stream-map-private.h"
