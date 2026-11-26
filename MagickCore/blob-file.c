@@ -88,7 +88,6 @@
 
 #include "MagickCore/blob-info-private.h"
 #include "MagickCore/blob-io-private.h"
-#include "MagickCore/blob-sync-private.h"
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
