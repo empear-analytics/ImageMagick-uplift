@@ -47,6 +47,7 @@ $call Make attribute-depth.c
 $call Make attribute-depth-measure.c
 $call Make blob.c
 $call Make blob-stream.c
+$call Make blob-raw-write.c
 $call Make blob-raw-read.c
 $call Make blob-file.c
 $call Make blob-open.c
