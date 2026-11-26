@@ -423,17 +423,17 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/accelerate-private.h \
 	MagickCore/accelerate-kernels-private.h MagickCore/accelerate-blur-private.h MagickCore/accelerate-core-private.h MagickCore/accelerate-histogram-private.h MagickCore/accelerate-recreate-buffer-private.h MagickCore/accelerate-recreate-release-private.h MagickCore/animate.c MagickCore/animate-window.c \
 	MagickCore/animate.h MagickCore/animate-private.h MagickCore/animate-window-command-private.h MagickCore/animate-window-menu-private.h MagickCore/animate-window-scene-private.h MagickCore/animate-window-events-private.h MagickCore/animate-window-session-private.h \
-	MagickCore/annotate.c MagickCore/annotate-metrics.c MagickCore/annotate.h \
+	MagickCore/annotate.c MagickCore/annotate-metrics.c MagickCore/annotate.h MagickCore/annotate-type-private.h MagickCore/annotate-raqm-private.h MagickCore/annotate-freetype-private.h MagickCore/annotate-freetype-render-private.h MagickCore/annotate-render-private.h \
 	MagickCore/artifact.c MagickCore/artifact.h \
 	MagickCore/attribute.c MagickCore/attribute-hull.c MagickCore/attribute-bounds.c MagickCore/attribute-depth.c MagickCore/attribute-depth-measure.c MagickCore/attribute.h \
-	MagickCore/blob.c MagickCore/blob.h MagickCore/blob-private.h \
+	MagickCore/blob.c MagickCore/blob-stream.c MagickCore/blob-query.c MagickCore/blob-write.c MagickCore/blob-read.c MagickCore/blob-image.c MagickCore/blob-custom.c MagickCore/blob.h MagickCore/blob-private.h MagickCore/blob-info-private.h MagickCore/blob-io-private.h \
 	MagickCore/cache.c MagickCore/cache-access.c MagickCore/cache.h \
-	MagickCore/cache-private.h MagickCore/cache-view.c \
+	MagickCore/cache-private.h MagickCore/cache-clone-private.h MagickCore/cache-image-private.h MagickCore/cache-virtual-private.h MagickCore/cache-open-private.h MagickCore/cache-read-private.h MagickCore/cache-nexus-private.h MagickCore/cache-write-private.h MagickCore/cache-view.c \
 	MagickCore/cache-view.h MagickCore/channel.c MagickCore/channel-combine.c MagickCore/channel-alpha.c \
 	MagickCore/channel.h MagickCore/cipher.c MagickCore/cipher.h \
 	MagickCore/client.c MagickCore/client.h MagickCore/coder.c MagickCore/coder-list.c \
 	MagickCore/coder.h MagickCore/color.c MagickCore/color-tuple.c MagickCore/color-equivalent.c MagickCore/color.h \
-	MagickCore/color-private.h MagickCore/colormap.c \
+	MagickCore/color-private.h MagickCore/color-parse-private.h MagickCore/colormap.c \
 	MagickCore/colormap.h MagickCore/colormap-private.h \
 	MagickCore/colorspace.c MagickCore/colorspace-transform.c MagickCore/colorspace-transform-image.c MagickCore/colorspace-convert.c MagickCore/colorspace-generic-rgb.c MagickCore/colorspace.h \
 	MagickCore/colorspace-private.h MagickCore/colorspace-rgb-predicates-private.h MagickCore/colorspace-lab-compatible-private.h MagickCore/colorspace-predicates-private.h MagickCore/colorspace-illuminant-xyz-private.h MagickCore/colorspace-xyz-to-rgb-private.h MagickCore/colorspace-hcl-plain-to-rgb-private.h MagickCore/colorspace-hcl-to-rgb-private.h MagickCore/colorspace-hsb-hsi-to-rgb-private.h MagickCore/colorspace-to-rgb-private.h MagickCore/colorspace-lab-to-rgb-private.h MagickCore/colorspace-luv-lms-to-rgb-private.h MagickCore/colorspace-cie-to-rgb-private.h MagickCore/colorspace-rgb-to-xyz-cmy-private.h MagickCore/colorspace-rgb-to-hcl-hsb-private.h MagickCore/colorspace-rgb-to-xyz-private.h MagickCore/colorspace-rgb-to-hue-private.h MagickCore/colorspace-rgb-to-lab-private.h MagickCore/colorspace-rgb-to-lchuv-private.h MagickCore/colorspace-rgb-to-cie-private.h MagickCore/colorspace-xyz-to-jzazbz-private.h MagickCore/colorspace-rgb-to-jzazbz-private.h MagickCore/colorspace-jzazbz-to-xyz-private.h MagickCore/colorspace-jzazbz-private.h MagickCore/colorspace-jzazbz-oklab-private.h MagickCore/colorspace-rgb-to-ycc-private.h MagickCore/colorspace-rgb-to-luma-private.h MagickCore/colorspace-conversions-private.h MagickCore/colorspace-transform-srgb-private.h MagickCore/compare.c MagickCore/compare-similarity.c MagickCore/compare-similarity-image.c \n	MagickCore/compare.h MagickCore/compare-private.h MagickCore/compare-similarity-private.h MagickCore/compare-similarity-correlation-private.h MagickCore/compare-similarity-metric-private.h MagickCore/compare-similarity-phase-private.h MagickCore/compare-similarity-frequency-private.h MagickCore/compare-similarity-frequency-images-private.h \n	MagickCore/composite.c MagickCore/composite-image.c MagickCore/composite.h \n	MagickCore/composite-channel-blend-private.h MagickCore/composite-channel-mix-private.h MagickCore/composite-channel-groups-private.h MagickCore/composite-channel-private.h MagickCore/composite-image-blend-private.h MagickCore/composite-image-over-private.h MagickCore/composite-image-virtual-private.h MagickCore/composite-image-alpha-coverage-private.h MagickCore/composite-image-alpha-private.h MagickCore/composite-image-coverage-private.h MagickCore/composite-private.h MagickCore/composite-row-private.h MagickCore/compress.c MagickCore/compress-lzw.c \n	MagickCore/compress.h MagickCore/configure.c MagickCore/configure-paths.c \
@@ -449,6 +449,11 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/distribute-cache-private.h MagickCore/draw.c MagickCore/draw-primitive.c MagickCore/draw-info.c MagickCore/draw-gradient.c MagickCore/draw-affine.c \
 	MagickCore/draw.h MagickCore/draw-private.h \
 	MagickCore/draw-core-private.h \
+	MagickCore/draw-mvg-trace-private.h \
+	MagickCore/draw-mvg-push-private.h \
+	MagickCore/draw-mvg-keyword-private.h \
+	MagickCore/draw-mvg-render-private.h \
+	MagickCore/draw-path-trace-private.h \
 	MagickCore/draw-primitive-path-private.h \
 	MagickCore/draw-primitive-convert-private.h \
 	MagickCore/draw-primitive-fill-private.h \
@@ -471,7 +476,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/layer.c MagickCore/layer-frames.c MagickCore/layer-optimize.c MagickCore/layer-dispose.c MagickCore/layer-composite.c MagickCore/layer-merge.c MagickCore/layer.h MagickCore/layer-frames-bounds-private.h MagickCore/layer-frames-private.h MagickCore/linked-list.c \
 	MagickCore/linked-list.h MagickCore/list.c MagickCore/list.h \
 	MagickCore/locale.c MagickCore/locale-options.c MagickCore/locale-format.c MagickCore/locale_.h MagickCore/log.c \
-	MagickCore/log.h MagickCore/magic.c MagickCore/magic.h \
+	MagickCore/log.h MagickCore/log-write-private.h MagickCore/log-event-private.h MagickCore/log-load-private.h MagickCore/magic.c MagickCore/magic.h \
 	MagickCore/magick.c MagickCore/magick-baseconfig.h \
 	MagickCore/magick-config.h MagickCore/magick-type.h \
 	MagickCore/magick.h MagickCore/matrix.c MagickCore/matrix-gauss.c MagickCore/matrix.h \
@@ -490,10 +495,10 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/option.h MagickCore/option-private.h \
 	MagickCore/paint.c MagickCore/paint-floodfill.c MagickCore/paint.h MagickCore/pixel.c MagickCore/pixel-fuzzy.c MagickCore/pixel-gamma.c MagickCore/pixel-import.c MagickCore/pixel-export.c \
 	MagickCore/pixel.h MagickCore/pixel-accessor.h \
-	MagickCore/pixel-gamma-private.h MagickCore/pixel-private.h MagickCore/pixel-export-private.h MagickCore/pixel-import-private.h MagickCore/policy.c MagickCore/policy-path.c MagickCore/policy-value.c \
+	MagickCore/pixel-gamma-private.h MagickCore/pixel-private.h MagickCore/pixel-interpolate-channel-private.h MagickCore/pixel-interpolate-channels-private.h MagickCore/pixel-interpolate-info-private.h MagickCore/pixel-export-private.h MagickCore/pixel-import-private.h MagickCore/policy.c MagickCore/policy-path.c MagickCore/policy-value.c \
 	MagickCore/policy.h MagickCore/policy-private.h \
 	MagickCore/prepress.c MagickCore/prepress.h \
-	MagickCore/property.c MagickCore/property.h \
+	MagickCore/property.c MagickCore/property.h MagickCore/property-iptc-private.h MagickCore/property-8bim-private.h MagickCore/property-exif-private.h MagickCore/property-icc-private.h MagickCore/property-xmp-private.h MagickCore/property-clippath-private.h MagickCore/property-profile-private.h MagickCore/property-magick-private.h MagickCore/property-interpret-private.h \
 	MagickCore/profile.c MagickCore/profile-sync.c MagickCore/profile.h \
 	MagickCore/profile-private.h MagickCore/profile-sync-private.h MagickCore/quantize.c MagickCore/quantize-remap.c MagickCore/quantize-kmeans.c MagickCore/quantize-error.c MagickCore/quantize-info.c MagickCore/quantize-posterize.c \
 	MagickCore/quantize.h MagickCore/quantize-private.h MagickCore/quantize-assign-private.h MagickCore/quantum.c MagickCore/quantum-type.c \
@@ -506,7 +511,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/resize.c MagickCore/resize-rescale.c MagickCore/resize-sample.c MagickCore/resize-scale.c MagickCore/resize-image.c MagickCore/magnify.c \
 	MagickCore/resize.h \
 	MagickCore/resize-private.h MagickCore/resource.c \
-	MagickCore/resource_.h MagickCore/resource-private.h \
+	MagickCore/resource_.h MagickCore/resource-private.h MagickCore/resource-unique-private.h \
 	MagickCore/segment.c MagickCore/segment-threshold.c MagickCore/segment.h MagickCore/segment-private.h \
 	MagickCore/semaphore.c MagickCore/semaphore.h \
 	MagickCore/semaphore-private.h MagickCore/shear.c MagickCore/shear-rotate.c MagickCore/shear-deskew.c \
@@ -516,7 +521,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/static.c MagickCore/static.h MagickCore/statistic.c MagickCore/statistic-polynomial.c MagickCore/statistic-measure.c MagickCore/statistic-function.c MagickCore/statistic-moments.c MagickCore/statistic-image.c \
 	MagickCore/statistic.h MagickCore/statistic-evaluate-private.h MagickCore/statistic-private.h \
 	MagickCore/stream.c MagickCore/stream-read.c MagickCore/stream.h \
-	MagickCore/stream-private.h MagickCore/stream-read-private.h MagickCore/string.c MagickCore/string-copy.c MagickCore/string-info.c MagickCore/string-argv.c MagickCore/string-si.c \
+	MagickCore/stream-private.h MagickCore/stream-read-private.h MagickCore/stream-row-private.h MagickCore/stream-quantum-private.h MagickCore/stream-map-private.h MagickCore/stream-pixels-private.h MagickCore/string.c MagickCore/string-copy.c MagickCore/string-info.c MagickCore/string-argv.c MagickCore/string-si.c \
 	MagickCore/string_.h MagickCore/string-private.h \
 	MagickCore/studio.h MagickCore/thread.c MagickCore/thread_.h \
 	MagickCore/thread-private.h MagickCore/timer.c \
@@ -526,12 +531,12 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/transform.h MagickCore/threshold.c MagickCore/threshold-image.c MagickCore/threshold-level.c MagickCore/threshold-adaptive.c MagickCore/threshold-auto.c \
 	MagickCore/threshold.h MagickCore/threshold-private.h MagickCore/type.c MagickCore/type-list.c MagickCore/type.h \
 	MagickCore/utility.c MagickCore/utility-unique.c MagickCore/utility.h \
-	MagickCore/utility-private.h MagickCore/version.c \
+	MagickCore/utility-private.h MagickCore/utility-path-private.h MagickCore/utility-template-private.h MagickCore/utility-list-private.h MagickCore/utility-expand-private.h MagickCore/utility-base64-private.h MagickCore/version.c \
 	MagickCore/version.h MagickCore/version-private.h \
 	MagickCore/visual-effects.c MagickCore/visual-effects-pixel.c MagickCore/visual-effects-pixel-methods.c MagickCore/visual-effects-polaroid.c MagickCore/visual-effects-color-matrix.c MagickCore/visual-effects-morph.c MagickCore/visual-effects-sepia.c MagickCore/visual-effects-colorize.c MagickCore/visual-effects-blueshift.c MagickCore/visual-effects-noise.c MagickCore/visual-effects-wavelet.c MagickCore/visual-effects-plasma.c MagickCore/visual-effects-stegano.c MagickCore/visual-effects.h MagickCore/visual-effects-pixel-methods-private.h \
 	MagickCore/vision.c MagickCore/vision-components.c MagickCore/vision.h MagickCore/vision-components-object-private.h MagickCore/vision-components-label-private.h MagickCore/widget.c MagickCore/widget-text.c MagickCore/widget-command.c MagickCore/widget-menu.c MagickCore/widget-list.c MagickCore/widget-font.c MagickCore/widget-file.c MagickCore/widget-color.c MagickCore/widget-prefs.c MagickCore/widget-confirm.c MagickCore/widget-dialog.c \
 	MagickCore/widget.h MagickCore/widget-core-private.h MagickCore/widget-browser-private.h MagickCore/widget-color-actions-private.h MagickCore/widget-font-actions-private.h MagickCore/widget-file-actions-private.h MagickCore/widget-text-view-private.h MagickCore/widget-list-actions-private.h MagickCore/widget-list-entries-private.h MagickCore/widget-private.h \
-	MagickCore/xml-tree.c MagickCore/xml-tree-file.c MagickCore/xml-tree.h \n	MagickCore/xml-tree-private.h MagickCore/xwindow.c MagickCore/xwindow-image.c MagickCore/xwindow-annotate.c MagickCore/xwindow-info.c MagickCore/xwindow-image-private.h MagickCore/xwindow-pixel.c MagickCore/xwindow-text.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c MagickCore/xwindow-import-image.c MagickCore/xwindow-import-private.h MagickCore/xwindow-import-image-window-private.h MagickCore/xwindow-search.c \n	MagickCore/xwindow.h MagickCore/nt-feature.c \
+	MagickCore/xml-tree.c MagickCore/xml-tree-file.c MagickCore/xml-tree.h \n	MagickCore/xml-tree-private.h MagickCore/xml-tree-text-private.h MagickCore/xml-tree-declarations-private.h MagickCore/xml-tree-markup-private.h MagickCore/xwindow.c MagickCore/xwindow-image.c MagickCore/xwindow-annotate.c MagickCore/xwindow-info.c MagickCore/xwindow-image-private.h MagickCore/xwindow-pixel.c MagickCore/xwindow-text.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c MagickCore/xwindow-import-image.c MagickCore/xwindow-import-private.h MagickCore/xwindow-import-image-window-private.h MagickCore/xwindow-search.c \n	MagickCore/xwindow.h MagickCore/nt-feature.c \
 	MagickCore/nt-base.c coders/aai.c coders/aai.h coders/art.c \
 	coders/art.h coders/ase.c coders/ase.h coders/ashlar.c \
 	coders/ashlar.h coders/avs.c coders/avs.h coders/bayer.c \
@@ -632,6 +637,12 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth-measure.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-access.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-view.lo \
@@ -2446,6 +2457,12 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth-measure.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-view.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-access.Plo \
@@ -5750,6 +5767,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/annotate.c \
   MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
+  MagickCore/annotate-type-private.h \
+  MagickCore/annotate-raqm-private.h \
+  MagickCore/annotate-freetype-private.h \
+  MagickCore/annotate-freetype-render-private.h \
+  MagickCore/annotate-render-private.h \
   MagickCore/artifact.c \
   MagickCore/artifact.h \
   MagickCore/attribute.c \
@@ -5759,12 +5781,27 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute-depth-measure.c \
   MagickCore/attribute.h \
   MagickCore/blob.c \
+  MagickCore/blob-stream.c \
+  MagickCore/blob-query.c \
+  MagickCore/blob-write.c \
+  MagickCore/blob-read.c \
+  MagickCore/blob-image.c \
+  MagickCore/blob-custom.c \
   MagickCore/blob.h \
   MagickCore/blob-private.h \
+  MagickCore/blob-info-private.h \
+  MagickCore/blob-io-private.h \
   MagickCore/cache.c \
   MagickCore/cache-access.c \
   MagickCore/cache.h \
   MagickCore/cache-private.h \
+  MagickCore/cache-clone-private.h \
+  MagickCore/cache-image-private.h \
+  MagickCore/cache-virtual-private.h \
+  MagickCore/cache-open-private.h \
+  MagickCore/cache-read-private.h \
+  MagickCore/cache-nexus-private.h \
+  MagickCore/cache-write-private.h \
   MagickCore/cache-view.c \
   MagickCore/cache-view.h \
   MagickCore/channel.c \
@@ -5783,6 +5820,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/color-equivalent.c \
   MagickCore/color.h \
   MagickCore/color-private.h \
+  MagickCore/color-parse-private.h \
   MagickCore/colormap.c \
   MagickCore/colormap.h \
   MagickCore/colormap-private.h \
@@ -5909,7 +5947,14 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw-affine.c \
   MagickCore/draw.h \
   MagickCore/draw-private.h \
-  MagickCore/draw-core-private.h \
+  MagickCore/draw-core-private.h MagickCore/draw-mvg-prepare-private.h \
+  MagickCore/draw-mvg-prepare-private.h \
+  MagickCore/draw-mvg-trace-private.h \
+  MagickCore/draw-mvg-push-private.h MagickCore/draw-mvg-attribute-private.h \
+  MagickCore/draw-mvg-attribute-private.h \
+  MagickCore/draw-mvg-keyword-private.h \
+  MagickCore/draw-mvg-render-private.h \
+  MagickCore/draw-path-trace-private.h \
   MagickCore/draw-primitive-path-private.h \
   MagickCore/draw-primitive-convert-private.h \
   MagickCore/draw-primitive-fill-private.h \
@@ -6019,6 +6064,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/locale_.h \
   MagickCore/log.c \
   MagickCore/log.h \
+  MagickCore/log-write-private.h \
+  MagickCore/log-event-private.h \
+  MagickCore/log-load-private.h \
   MagickCore/magic.c \
   MagickCore/magic.h \
   MagickCore/magick.c \
@@ -6089,6 +6137,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-interpolate-channel-private.h \
+  MagickCore/pixel-interpolate-channels-private.h \
+  MagickCore/pixel-interpolate-info-private.h \
   MagickCore/pixel-export-private.h \
   MagickCore/pixel-import-private.h \
   MagickCore/policy.c \
@@ -6100,10 +6151,20 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/prepress.h \
   MagickCore/property.c \
   MagickCore/property.h \
+  MagickCore/property-iptc-private.h \
+  MagickCore/property-8bim-private.h \
+  MagickCore/property-exif-private.h \
+  MagickCore/property-icc-private.h \
+  MagickCore/property-xmp-private.h \
+  MagickCore/property-clippath-private.h \
+  MagickCore/property-profile-private.h \
+  MagickCore/property-magick-private.h \
+  MagickCore/property-interpret-private.h \
   MagickCore/profile.c \
   MagickCore/profile-sync.c \
   MagickCore/profile.h \
-  MagickCore/profile-private.h \
+  MagickCore/profile-private.h MagickCore/profile-lcms-private.h \
+  MagickCore/profile-lcms-private.h \
   MagickCore/profile-sync-private.h \
   MagickCore/quantize.c \
   MagickCore/quantize-remap.c \
@@ -6141,6 +6202,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resource.c \
   MagickCore/resource_.h \
   MagickCore/resource-private.h \
+  MagickCore/resource-unique-private.h \
   MagickCore/segment.c \
   MagickCore/segment-threshold.c \
   MagickCore/segment.h \
@@ -6173,6 +6235,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/stream.h \
   MagickCore/stream-private.h \
   MagickCore/stream-read-private.h \
+  MagickCore/stream-row-private.h \
+  MagickCore/stream-quantum-private.h \
+  MagickCore/stream-map-private.h \
+  MagickCore/stream-pixels-private.h \
   MagickCore/string.c \
   MagickCore/string-copy.c \
   MagickCore/string-info.c \
@@ -6213,6 +6279,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/utility-unique.c \
   MagickCore/utility.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-path-private.h \
+  MagickCore/utility-template-private.h \
+  MagickCore/utility-list-private.h \
+  MagickCore/utility-expand-private.h \
+  MagickCore/utility-base64-private.h \
   MagickCore/version.c \
   MagickCore/version.h \
   MagickCore/version-private.h \
@@ -6261,6 +6332,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree-file.c \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
+  MagickCore/xml-tree-text-private.h \
+  MagickCore/xml-tree-declarations-private.h \
+  MagickCore/xml-tree-markup-private.h \
   MagickCore/xwindow.c \
   MagickCore/xwindow-image.c \
   MagickCore/xwindow-annotate.c \
@@ -6401,13 +6475,28 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/animate-window-events-private.h \
   MagickCore/animate-window-session-private.h \
   MagickCore/annotate-private.h \
+  MagickCore/annotate-type-private.h \
+  MagickCore/annotate-raqm-private.h \
+  MagickCore/annotate-freetype-private.h \
+  MagickCore/annotate-freetype-render-private.h \
+  MagickCore/annotate-render-private.h \
   MagickCore/blob-private.h \
+  MagickCore/blob-info-private.h \
+  MagickCore/blob-io-private.h \
   MagickCore/cache-private.h \
   MagickCore/cache-private.h \
+  MagickCore/cache-clone-private.h \
+  MagickCore/cache-image-private.h \
+  MagickCore/cache-virtual-private.h \
+  MagickCore/cache-open-private.h \
+  MagickCore/cache-read-private.h \
+  MagickCore/cache-nexus-private.h \
+  MagickCore/cache-write-private.h \
   MagickCore/coder-private.h \
   MagickCore/colormap-private.h \
   MagickCore/color-private.h \
   MagickCore/color-private.h \
+  MagickCore/color-parse-private.h \
   MagickCore/colorspace-private.h \
   MagickCore/colorspace-rgb-predicates-private.h \
   MagickCore/colorspace-lab-compatible-private.h \
@@ -6486,6 +6575,13 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
   MagickCore/draw-core-private.h \
+  MagickCore/draw-mvg-prepare-private.h \
+  MagickCore/draw-mvg-trace-private.h \
+  MagickCore/draw-mvg-push-private.h \
+  MagickCore/draw-mvg-attribute-private.h \
+  MagickCore/draw-mvg-keyword-private.h \
+  MagickCore/draw-mvg-render-private.h \
+  MagickCore/draw-path-trace-private.h \
   MagickCore/draw-primitive-path-private.h \
   MagickCore/draw-primitive-convert-private.h \
   MagickCore/draw-primitive-fill-private.h \
@@ -6519,6 +6615,15 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/property-set-iptc-private.h \
   MagickCore/property-set-pixel-private.h \
   MagickCore/property-set-xmp-private.h \
+  MagickCore/property-iptc-private.h \
+  MagickCore/property-8bim-private.h \
+  MagickCore/property-exif-private.h \
+  MagickCore/property-icc-private.h \
+  MagickCore/property-xmp-private.h \
+  MagickCore/property-clippath-private.h \
+  MagickCore/property-profile-private.h \
+  MagickCore/property-magick-private.h \
+  MagickCore/property-interpret-private.h \
   MagickCore/image-private.h \
   MagickCore/image-filename-private.h \
   MagickCore/layer-frames-bounds-private.h \
@@ -6526,6 +6631,9 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/linked-list-private.h \
   MagickCore/locale-private.h \
   MagickCore/log-private.h \
+  MagickCore/log-write-private.h \
+  MagickCore/log-event-private.h \
+  MagickCore/log-load-private.h \
   MagickCore/magick-private.h \
   MagickCore/magic-private.h \
   MagickCore/matrix-private.h \
@@ -6552,10 +6660,14 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-interpolate-channel-private.h \
+  MagickCore/pixel-interpolate-channels-private.h \
+  MagickCore/pixel-interpolate-info-private.h \
   MagickCore/pixel-export-private.h \
   MagickCore/pixel-import-private.h \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
+  MagickCore/profile-lcms-private.h \
   MagickCore/profile-sync-private.h \
   MagickCore/quantize-private.h \
   MagickCore/quantize-assign-private.h \
@@ -6568,6 +6680,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/resize-private.h \
   MagickCore/resource-private.h \
   MagickCore/resource-private.h \
+  MagickCore/resource-unique-private.h \
   MagickCore/segment-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/semaphore-private.h \
@@ -6576,6 +6689,10 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/statistic-private.h \
   MagickCore/stream-private.h \
   MagickCore/stream-read-private.h \
+  MagickCore/stream-row-private.h \
+  MagickCore/stream-quantum-private.h \
+  MagickCore/stream-map-private.h \
+  MagickCore/stream-pixels-private.h \
   MagickCore/string-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
@@ -6586,6 +6703,11 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/transform-region-private.h \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-path-private.h \
+  MagickCore/utility-template-private.h \
+  MagickCore/utility-list-private.h \
+  MagickCore/utility-expand-private.h \
+  MagickCore/utility-base64-private.h \
   MagickCore/version-private.h \
   MagickCore/vision-components-object-private.h \
   MagickCore/vision-components-label-private.h \
@@ -6600,6 +6722,9 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/widget-list-entries-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
+  MagickCore/xml-tree-text-private.h \
+  MagickCore/xml-tree-declarations-private.h \
+  MagickCore/xml-tree-markup-private.h \
   MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-import-private.h \
   MagickCore/xwindow-import-image-window-private.h \
@@ -7645,6 +7770,24 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.lo:  \
@@ -9811,6 +9954,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth-measure.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-view.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-access.Plo@am__quote@ # am--include-marker
@@ -10566,6 +10715,48 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.lo: 
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.lo `test -f 'MagickCore/blob.c' || echo '$(srcdir)/'`MagickCore/blob.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo: MagickCore/blob-stream.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo `test -f 'MagickCore/blob-stream.c' || echo '$(srcdir)/'`MagickCore/blob-stream.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob-stream.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.lo `test -f 'MagickCore/blob-stream.c' || echo '$(srcdir)/'`MagickCore/blob-stream.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo: MagickCore/blob-query.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo `test -f 'MagickCore/blob-query.c' || echo '$(srcdir)/'`MagickCore/blob-query.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob-query.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.lo `test -f 'MagickCore/blob-query.c' || echo '$(srcdir)/'`MagickCore/blob-query.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo: MagickCore/blob-write.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo `test -f 'MagickCore/blob-write.c' || echo '$(srcdir)/'`MagickCore/blob-write.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob-write.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.lo `test -f 'MagickCore/blob-write.c' || echo '$(srcdir)/'`MagickCore/blob-write.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo: MagickCore/blob-read.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo `test -f 'MagickCore/blob-read.c' || echo '$(srcdir)/'`MagickCore/blob-read.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob-read.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.lo `test -f 'MagickCore/blob-read.c' || echo '$(srcdir)/'`MagickCore/blob-read.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo: MagickCore/blob-image.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo `test -f 'MagickCore/blob-image.c' || echo '$(srcdir)/'`MagickCore/blob-image.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob-image.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.lo `test -f 'MagickCore/blob-image.c' || echo '$(srcdir)/'`MagickCore/blob-image.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo: MagickCore/blob-custom.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo `test -f 'MagickCore/blob-custom.c' || echo '$(srcdir)/'`MagickCore/blob-custom.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/blob-custom.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.lo `test -f 'MagickCore/blob-custom.c' || echo '$(srcdir)/'`MagickCore/blob-custom.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.lo: MagickCore/cache.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.lo `test -f 'MagickCore/cache.c' || echo '$(srcdir)/'`MagickCore/cache.c
@@ -15893,6 +16084,12 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth-measure.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-view.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-access.Plo
@@ -16577,6 +16774,12 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-attribute-depth-measure.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-stream.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-query.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-write.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-read.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-image.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-blob-custom.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-view.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-cache-access.Plo

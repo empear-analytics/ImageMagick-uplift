@@ -7527,6 +7527,12 @@ functions between files. No other recipe changes where a preprocessor line sits.
    that stay are then unchanged, and so is the macro's text, whose free identifiers
    (`output_scaling` in `DistortImage`'s `ScaleFilter`) are resolved where it is used.
    Use it only to unblock an extraction that follows, as step 5 says.
+   A `#define M` wrapped in its own guard, `#if !defined(M)`, the `#define`, `#endif`, with
+   nothing else between the directives (`RenderFreetype`'s `FT_OPEN_PATHNAME` fallback,
+   2026-11-25), is a run of its own under the second form: the three lines move together,
+   verbatim, whether or not the build's headers define `M`. The guard reads `M` only, so the
+   lines mean the same wherever they stand when no token between the old and new position
+   names `M`; step 4's proof checks that.
 2. Move the run, unchanged, to directly above the function's signature: below its
    comment banner and below any helper already placed there. When the helpers above
    the function stand inside a conditional block (`#if !defined(...)` ... `#endif`)
@@ -12086,6 +12092,13 @@ the caller (a *Bumpy Road Ahead* in `AcquireRidgesKernel`, 3.08 in a probe).
    the same token sequence once one constant at one position (a string literal or a
    numeric literal) is replaced by a name, checked by script. Each copy's only exit is
    `return(R);` inside a selection, with the same text `R` in every copy.
+   *Compared constants* (2026-11-25): the constant may be a numeric literal compared with
+   an expression that is the same in every copy (`if (ReadPropertyByte(exif,length) !=
+   0x45) return(MagickFalse);`); step 4's element type is then the type the comparison
+   brings the literal to under the usual arithmetic conversions (C11 6.3.1.8), `int` for
+   an `int` call result and an `int` literal. The step also serves *Overall Code
+   Complexity*: the caller loses the copies' `n` exits and the helper holds one loop and
+   one `if`, so the file's total falls by `n-3` while it gains one function.
 2. `R` reads only parameters and locals of the caller that no copy writes, so the caller
    evaluating `R` right after the helper returns reads what the copy's `return` would
    have read; any object it reaches through them the copies write only as the helper
@@ -17085,6 +17098,17 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
 - A local read twice, or whose address is taken, refuses the step: it is a name for a
   value used more than once, not a conversion.
 - The object code is the compiler's to judge; step 4 is the proof.
+
+5. *Member form* (2026-11-25). A local `v` may instead be declared with the initialiser
+   `p->m`, where `p` is a parameter of type pointer to a `const`-qualified struct type
+   that nothing in the function assigns, and `v` is declared with exactly the declared
+   type of member `m` (its own `const` on the pointer itself aside). Step 1 holds
+   otherwise: nothing assigns `v`, its address is never taken, and it is read exactly
+   once, as a whole argument of a call or a whole initialiser of a struct member; and
+   no statement or initialiser between `v`'s declaration and that read calls a
+   function or writes anything. Step 2 replaces the read by `p->m`, character for
+   character, and deletes `v`'s declarator (a type line left with no name under it
+   goes, with its blank line).
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
@@ -23818,7 +23842,13 @@ inside one file). Recipe E and relatives (change the text; this recipe changes n
    in all but its top-level qualifier, and may be in the run as a `static const` table is
    (checked by `grep` over the file: every use is an rvalue subscript). It keeps its internal
    linkage, its initialiser and its one translation unit (the header has one includer), and
-   step 4's identities show the unit unchanged. A doc comment in the run that documents
+   step 4's identities show the unit unchanged. A second exception (2026-11-26, mandate; confirmed by the owner the same day): a
+   Form A run may hold an `#include` that stands inside a conditional branch this build does
+   not compile (`blob.c`'s `#if defined(__OS2__)` / `#include <io.h>` in its define block),
+   moved verbatim with its pair: the header is named where the run stood, so in every
+   configuration, the one that compiles the branch included, the unit has the same tokens in
+   the same order; step 4's identities show it for the built configurations. An `#include`
+   that this build compiles stays out of the run. A doc comment in the run that documents
    a function with external linkage that stays (its `%` banner, with a plain comment block
    directly after it, such as `composite-image.c`'s SVG composition notes after the
    `CompositeImage` banner) does not move into the header: in the same commit it moves,
@@ -24759,6 +24789,15 @@ parameter the callee can read from another.
    --campaign-a`, and the oracle on the function's cases; score the file and its
    includers (no drop, or a stub-probed chain whose last step raises the file). Check by
    reading whether any caller runs per pixel, per row or per kernel element; if so, Ir first.
+6. *Address form* (2026-11-25). When every member of the group is the address `&v` of a
+   plain local `v` of one caller (a cursor and its remaining length, `&info,&length`), that
+   caller may instead declare the struct once, `const Name name = { &a, &b };`, as the last
+   declaration at the top of the block that declares the last of those locals, and every
+   call in that block, this step's and later steps' of the same group, passes `&name`. An
+   address does not change while its object lives, so the one fill holds at every call the
+   values a per-call fill would; the object is `const` and read only by those calls (Recipe
+   I step 2's exception), so each member is the only pointer to its local in use while the
+   callee runs, as `&v` was.
 
 **Why it behaves the same.** Each member is initialised from the argument expression the
 call passed, directly before the call, with nothing between: the callee's local holds the
@@ -27009,6 +27048,248 @@ of 2026-10-24.
 
 ---
 
+## Recipe SN - Sink Constant Writes to Their First Reader
+
+**Use when:** CodeScene reports *Large Method* on a function whose tail an extraction would
+take (a loop and the cleanup that ends the function), and that tail reads locals which a few
+statements higher up the function set to constants (`glyph.id=0;`, `last_glyph_id=0;`,
+`origin.x=0;`, `status=MagickTrue;`), separated from the tail by statements that never name
+them (a font load, a canvas setup, the text layout). Moved alone, the tail would carry each
+such local into its new function as an input, and the caller would keep its declaration and
+its write; with the writes sunk to directly above the tail, one extraction takes them with
+it, and each local becomes a temporary the new function declares (Recipe E step 4: written
+before it is read on every path, read by nothing after). `annotate-freetype-render-private.h`'s
+`RenderFreetype` sets `glyph`, `last_glyph_id`, `origin` and `status` before the text
+selection and layout, and reads them only in its glyph loop.
+
+**Not covered by:** Recipe SZ, which sinks zeroing `memset` calls only and does not cross a
+preprocessor line; Recipe DI, which keeps a constant write where it stands and moves it into
+the declaration; Recipe LM step 4, which moves a constant declarator the other way, into a
+statement after the declarations; Recipes E and N, which declare a temporary in the new
+function only when the *block* writes it first.
+
+**How:**
+
+1. The writes. Each is an expression statement `v=c;` or `v.m=c;` in one compound statement
+   `B` of the function, not inside a loop or a selection, where `v` is an automatic local of
+   the function (not a parameter, not `static`, not `volatile`, not an array) and `c` is a
+   constant: an integer literal, an enumeration constant (`MagickTrue`), `NULL` or a cast
+   `(T) NULL`. The writes need not be adjacent; the statements between them are crossed
+   statements as well.
+2. The target `T` is a later statement of `B`, the first one after the last write that
+   names any `v` of the writes, or a statement that names an object holding the address of
+   one (`glyph_targets`, a `const` targets struct initialised with `&glyph`). Taking an
+   address in a declaration's initialiser before the writes is allowed; the struct then
+   counts as naming each `v` it holds.
+3. The crossed statements (every statement between the first write and `T` that is not a
+   write), checked by reading each one and the body of every `static` callee it reaches:
+   none names a `v` or an object holding its address, and none is or holds a label, a `goto`
+   or a `#pragma`. A crossed statement may hold a preprocessor conditional (`#if
+   defined(M)` ... `#endif`) when the text of every branch, built or not, names no `v` and no
+   such object (checked by `grep` over the lines between the first write and `T`); the
+   branches are not edited and the step does not move any of their lines.
+4. Cut each write and paste them, unchanged and in their original order, as one run
+   directly above `T`, at `T`'s indentation. `T` stands in `B`, so the run is entered once on
+   every path that reaches `T`, and neither enters nor leaves a loop.
+5. A path that leaves the function between the old and the new position (a `return`, a
+   throw) no longer runs the writes: nothing on it reads them (step 3), and a local's
+   lifetime ends at the `return`.
+6. Nothing else changes: no declaration moves (the extraction that follows moves them), no
+   comment moves unless it stood inside the run.
+7. Rule 2: the step leaves the function's length and the file's score where they were.
+   Take it only as the first step of a probed chain whose extraction of the run and `T`
+   follows, and name the chain and its probed end score in the message.
+8. Checks: `tools/obj_identical.sh` (the compiler may schedule the stores anywhere, so it
+   often prints `IDENTICAL`; when it does not, the oracle decides), `refactor_guard.py`
+   and `--calls` (no change), the CI and C++ warning checks, and the oracle on the function's
+   cases.
+
+**Before:**
+
+```c
+  LogFreetypeFont(draw_info,encoding);
+  flags=GetFreetypeLoadFlags(draw_info);
+  flags=GetFreetypeHintingFlags(image,flags,exception);
+  glyph.id=0;
+  glyph.image=(FT_Glyph) NULL;
+  last_glyph_id=0;
+  origin.x=0;
+  origin.y=0;
+  affine=GetFreetypeAffine(draw_info);
+  annotate_info=CloneFreetypeAnnotateInfo(draw_info);
+  status=MagickTrue;
+  ...
+#if defined(MAGICKCORE_RAQM_DELEGATE)
+  ...
+#endif
+  length=ComplexTextLayout(draw_info,p,length,face,flags,&grapheme);
+  missing_glyph_id=FT_Get_Char_Index(face,' ');
+```
+
+**After:**
+
+```c
+  LogFreetypeFont(draw_info,encoding);
+  flags=GetFreetypeLoadFlags(draw_info);
+  flags=GetFreetypeHintingFlags(image,flags,exception);
+  affine=GetFreetypeAffine(draw_info);
+  annotate_info=CloneFreetypeAnnotateInfo(draw_info);
+  ...
+#if defined(MAGICKCORE_RAQM_DELEGATE)
+  ...
+#endif
+  length=ComplexTextLayout(draw_info,p,length,face,flags,&grapheme);
+  glyph.id=0;
+  glyph.image=(FT_Glyph) NULL;
+  last_glyph_id=0;
+  origin.x=0;
+  origin.y=0;
+  status=MagickTrue;
+  missing_glyph_id=FT_Get_Char_Index(face,' ');
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A constant write reads nothing and has no effect but the
+  value it stores in its own local. No crossed statement reads or writes that local, or
+  reaches it through an address (step 3): the only address of it, in a `const` struct of the
+  caller, is named by no crossed statement either. So when `T` begins, each local holds the
+  constant whether the write ran before or after the crossed statements, and `T` and
+  everything after it read the same values. The writes keep their order among themselves,
+  and two writes to members of one struct (`origin.x`, `origin.y`) still run in that order.
+- An unbuilt branch is crossed, not touched: its text is read for the names, so the
+  argument holds in every configuration, as for the built text. The step adds no line to the
+  branch and removes none.
+- A callee that a crossed statement reaches cannot see a local whose address it was never
+  given; step 3's reading of the callees is about the address-holding struct.
+- Not a deletion: every write still runs, once, on every path that reads it.
+
+**Evidence level:** oracle (the cases that reach `T`), with step 3's reading quoted in the
+commit message; `refactor_guard.py` and `--calls` see no change.
+
+**Provenance:** 2026-11-25, from `annotate-freetype-render-private.h`'s `RenderFreetype`
+(campaign B, M143): 111 lines after Recipe LB took its glyph loop's body. Its glyph state
+(`glyph`, `last_glyph_id`, `origin`, `status`) is set before the text selection and the
+Raqm layout, an `#if defined(MAGICKCORE_RAQM_DELEGATE)` branch this build does not compile,
+and read only in the glyph loop and the cleanup after it. A probe of the chain (this step,
+Recipe N on the tail, FI, H, DI, E) took the header from 9.38 to 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe JB - Join a Block to the Struct Fill After It and Extract It Reading the Struct
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function whose loop
+body ends in a Recipe FB compound statement, `{ const Name name = { e1, ..., en }; F(&name,
+...); }`, and whose statements just before it hold a decision that reads the values the
+initialiser copies plus one or two more: `annotate-freetype-private.h`'s `RasterizeGlyphRow`,
+whose column loop fetches the pixel when the row was not fetched whole (`if (active ==
+MagickFalse) q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,exception);`)
+and skips a missing pixel, directly before the block that fills `GlyphPixel pixel = {
+x_offset, y_offset, fill_opacity, active }` for `CompositeGlyphPixel`. Moved alone, the fetch
+would take `rows`, `active`, `x_offset`, `y_offset` and `q`, five parameters.
+
+**Not covered by:** Recipe SM, whose block passes `&s` to a callee itself and so already lies
+after the struct's initialisation; Recipe N step 8, whose later block reads only the members
+after the struct's own helper ran; Recipe RF, which deletes a repeated fill; Recipes FU and
+FB, which turn assignments into an initialiser and move no other statement; Recipe SN, which
+moves constant writes, not an initialiser.
+
+**How:**
+
+1. `C` is a compound statement of Recipe FB's form: its first item is the declaration
+   `const Name name = { e1, ..., en };`, every `ei` a plain identifier (a local or
+   parameter of the function), and nothing else in `C` writes any `ei` or takes its
+   address. `P` is the run of statements directly before `C` in the same statement list,
+   from a chosen first statement to the statement before `C`.
+2. Nothing in `P` (checked by reading, every callee included) writes an `ei` or takes the
+   address of one, and `P` holds no label, no `#` line and no `#pragma`. `P` may hold a
+   `continue` or `break` of the enclosing loop, or a `return`.
+3. Move `C`'s opening brace and its declaration (with the blank line after it) up to
+   directly before `P`; `P` follows, unchanged except for two more columns of indentation,
+   then `C`'s other statements. Nothing else moves.
+4. In the joined block, a block `E` of `P` that meets Recipe E steps 1 and 3 to 7 (at most
+   one written variable, which it returns), and that reads, besides the values of
+   `name`'s members (each `ei` it reads stands for `name.mi`), at most two variables, moves
+   into a new `static` function directly above the caller (with the helpers of the same
+   chain), taking `const Name *name` and those variables, at most four parameters in all.
+   Its body reads each such value as `name->mi`; a variable the caller binds from a
+   struct parameter it passes on (Recipe N's pass-through form) is read through that
+   parameter in the same way. The call passes `&name`.
+5. Every other statement of `P` stays as it is in the joined block, the `continue`s
+   included: a `continue` or `break` leaves the compound statement and the loop body as
+   before, and a `return` leaves the function; the struct's lifetime ends there either
+   way, and nothing outside `C` names it.
+6. One block per commit, with the joined `P`. Run `refactor_guard.py` (literals `OK`) and
+   `--calls` (the new function only), the CI and C++ warning checks, and the oracle on the
+   function's cases.
+7. A function that runs per pixel or per row is timed as the timing rule asks (the
+   initialiser now runs before `P`, also on the paths where `P` leaves the iteration:
+   stores of values already in registers, which may change the object code); an OpenMP
+   region's function takes the region checks (write set read by hand, `omp_compare` at 1
+   and 4 threads).
+
+**Before:**
+
+```c
+    fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
+    if (active == MagickFalse)
+      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
+        exception);
+    if (q == (Quantum *) NULL)
+      continue;
+    {
+      const GlyphPixel
+        pixel = { x_offset, y_offset, fill_opacity, active };
+
+      CompositeGlyphPixel(rows,&pixel,q,status);
+    }
+```
+
+**After:**
+
+```c
+    fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
+    {
+      const GlyphPixel
+        pixel = { x_offset, y_offset, fill_opacity, active };
+
+      q=FetchGlyphPixel(rows,&pixel,q);
+      if (q == (Quantum *) NULL)
+        continue;
+      CompositeGlyphPixel(rows,&pixel,q,status);
+    }
+```
+
+with `static Quantum *FetchGlyphPixel(const GlyphRows *rows,const GlyphPixel *pixel,Quantum
+*magick_restrict q)` returning `q`, after `if (pixel->active == MagickFalse)
+q=GetCacheViewAuthenticPixels(rows->image_view,pixel->x_offset,pixel->y_offset,1,1,
+rows->exception);`.
+
+**Careful:**
+
+- Why the behaviour is the same. The initialiser reads only plain variables that `P` does
+  not write (step 2), so evaluated before `P` it stores the values it stored after `P`; it
+  has no side effect, so running it on a path where `P` then leaves the iteration changes
+  nothing anyone reads. In the joined block each member holds the value of its variable
+  from the declaration to the block's end, so the new function's `name->mi` reads what the
+  block's `ei` read. The statements of `P` run in their order, with the same arguments.
+- `P` crossing the declaration is a C11 6.8p3 matter only for a `goto` into the block,
+  which step 2 excludes (no label).
+- The extracted block returns its one written variable as Recipe E does; the struct is
+  read through a pointer to `const`, so nothing writes it.
+
+**Evidence level:** oracle (the function's cases), with steps 2 and 4 read by hand and
+quoted in the message; timing and OpenMP checks as step 7 says.
+
+**Provenance:** 2026-11-25, from `annotate-freetype-private.h`'s `RasterizeGlyphRow`
+(campaign B, M143): after Recipes DB, E and N it stood at cc 9, one decision above the bar,
+and the per-pixel fetch was the decision left that the `GlyphPixel` fill could carry. A
+probe of this step took the header from 9.68 to 10.0. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -27600,3 +27881,10 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-24 | AMEND | TB | Step 1, character labels: the `char` predicate may also be one Recipe FD made (LP step 2's shape over a character `switch`); nothing else changes, the argument of the 2026-11-10 row applies unchanged | `constitute-pixels-private.h`'s `IsCMYKMapChannel` (M142), eight letters, cc 10, the file's last *Complex Method*; probed 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | RV | Step 6 (new (f)): a block inside a compiled `#if defined(M)` feature branch with no `#else` puts its helper directly above the caller under its own `#if defined(M)` ... `#endif`, so a configuration without `M` drops helper and call together; checked by script that the file with every `M` region deleted is unchanged, blank lines aside | `utility-unique.c`'s `AcquireUniqueSymbolicLink` (M142): the relative-path block calls `getcwd` and `symlink` under `MAGICKCORE_HAVE_SYMLINK`; probed 9.92 to 10.0 | mandate (2026-10-24) |
 | 2026-11-24 | AMEND | B | Step 1, MagickPrivate form, condition (b): a function held by a caller in the other campaign's files may be released by the owner, the callers there changing in the same commit; a caller in the oracle driver keeps the old call under `#else` of a macro that `driver/build.sh` defines from the build's own private header, since one driver source links against both the baseline and the candidate library | `matrix.c`'s `LeastSquaresAddTerms` (M142, 6 arguments, the file's last finding): nine calls in campaign A's `distort-private.h` and `distort-linear-private.h` and one in `imdriver.c` (the `matrix gauss N lsq` cases) | owner |
+| 2026-11-25 | NEW | SN | Sink Constant Writes to Their First Reader: constant writes `v=c;` or `v.m=c;` to plain locals move, in order, to directly above the first statement that names any of them, past statements (an unbuilt `#if` branch among them, read but not edited) that name none of them or a struct holding their addresses | `annotate-freetype-render-private.h`'s `RenderFreetype` (campaign B, M143): the glyph state set before the text layout and read only in the glyph loop; SZ takes only `memset` and crosses no preprocessor line. Probed chain: 9.38 to 10.0 | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | H | Step 1, guarded form: a `#define M` wrapped in its own `#if !defined(M)` ... `#endif` (nothing else inside) is a run of its own, and moves with its two directive lines, verbatim; `pp_identical.sh` stays the proof | `RenderFreetype`'s `FT_OPEN_PATHNAME` fallback (campaign B, M143), the three lines that kept the function at 70 lines; the macro is named nowhere else, and the guard is false with any FreeType that defines it | mandate (2026-10-24) |
+| 2026-11-25 | NEW | JB | Join a Block to the Struct Fill After It and Extract It Reading the Struct: the statements just before a Recipe FB compound statement that write none of its initialiser's identifiers join the block (the initialiser runs first), and a block of them moves into a helper taking `const Name *` and reading the members for the values the initialiser copied | `annotate-freetype-private.h`'s `RasterizeGlyphRow` (campaign B, M143), cc 9 after DB, E and N: the per-pixel fetch reads `x_offset`, `y_offset` and `active`, members of the `GlyphPixel` fill that follows it; alone it needs five parameters. Probed 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | IC | Step 5, member form: a local initialised with `p->m` (a member read through a parameter pointing to a `const` struct, with nothing assigning `p`), of the member's exact type, read exactly once with no call or write between its declaration and the read, is replaced at its one read by `p->m` and its declarator goes | `property-clippath-private.h`'s `TracePSClippathRecord` and `TraceSVGClippathRecord` (campaign B, M143): after Recipe CF the two wrappers only bound `blob`, `length` and `knot_count` from their state to pass them on, and the bindings were the duplicated text. Probed 9.09 to 9.68, then 10.0 after SD | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
+| 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
+| 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |

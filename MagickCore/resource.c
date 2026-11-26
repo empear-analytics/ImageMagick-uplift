@@ -500,6 +500,8 @@ MagickExport void AsynchronousResourceComponentTerminus(void)
   }
 }
 
+#include "MagickCore/resource-unique-private.h"
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -524,94 +526,6 @@ MagickExport void AsynchronousResourceComponentTerminus(void)
 %      name is returned in this array.
 %
 */
-
-static void *DestroyTemporaryResources(void *temporary_resource)
-{
-  (void) ShredFile((char *) temporary_resource);
-  (void) remove_utf8((char *) temporary_resource);
-  temporary_resource=DestroyString((char *) temporary_resource);
-  return((void *) NULL);
-}
-
-static void FillPathTemplate(char *path,const size_t length)
-{
-  char
-    *p;
-
-  int
-    c;
-
-  ssize_t
-    j;
-
-  static const char
-    portable_filename[65] =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
-
-  StringInfo
-    *key;
-
-  unsigned char
-    *datum;
-
-  key=GetRandomKey(random_info,length);
-  p=path+strlen(path)-strlen(MagickPathTemplate);
-  datum=GetStringInfoDatum(key);
-  for (j=0; j < (ssize_t) GetStringInfoLength(key); j++)
-  {
-    c=(int) (datum[j] & 0x3f);
-    *p++=portable_filename[c];
-  }
-  key=DestroyStringInfo(key);
-}
-
-static MagickBooleanType AddTemporaryResource(const char *path)
-{
-  MagickBooleanType
-    status;
-
-  struct stat
-    *attributes;
-
-  LockResourceSemaphore(FileResource);
-  if (temporary_resources == (SplayTreeInfo *) NULL)
-    temporary_resources=NewSplayTree(CompareSplayTreeString,
-      DestroyTemporaryResources,RelinquishMagickMemory);
-  UnlockSemaphoreInfo(resource_semaphore[FileResource]);
-  attributes=(struct stat *) AcquireCriticalMemory(sizeof(struct stat));
-  status=GetPathAttributes(path,attributes);
-  if (status == MagickFalse)
-    attributes=(struct stat *) RelinquishMagickMemory(attributes);
-  else
-    status=AddValueToSplayTree(temporary_resources,ConstantString(path),
-      attributes);
-  return(status);
-}
-
-static int RegisterUniqueFileResource(const char *path,int file)
-{
-  MagickBooleanType
-    status;
-
-  if (file == -1)
-    return(file);
-  status=AddTemporaryResource(path);
-  if (status == MagickFalse)
-    file=close_utf8(file)-1;
-  return(file);
-}
-
-static void AcquireResourceRandomInfo(void)
-{
-  if (random_info == (RandomInfo *) NULL)
-    {
-      LockResourceSemaphore(FileResource);
-      if (random_info == (RandomInfo *) NULL)
-        random_info=AcquireRandomInfo();
-      UnlockSemaphoreInfo(resource_semaphore[FileResource]);
-    }
-}
-
 MagickExport int AcquireUniqueFileResource(char *path)
 {
   int
@@ -1044,6 +958,65 @@ MagickExport MagickBooleanType ListMagickResourceInfo(FILE *file,
   return(MagickTrue);
 }
 
+typedef struct _RelinquishTargets
+{
+  MagickBooleanType
+    *bi;
+
+  MagickSizeType
+    *current,
+    *limit;
+} RelinquishTargets;
+
+static void RelinquishMagickResourceTail(const ResourceType type,
+  const MagickSizeType size,const RelinquishTargets *targets)
+{
+  MagickBooleanType
+    *const bi = targets->bi;
+
+  MagickSizeType
+    *const current = targets->current;
+
+  MagickSizeType
+    *const limit = targets->limit;
+
+  switch (type)
+  {
+    case MapResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.map-=(MagickOffsetType) size;
+      (*current)=(MagickSizeType) resource_info.map;
+      (*limit)=resource_info.map_limit;
+      assert(resource_info.map >= 0);
+      break;
+    }
+    case MemoryResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.memory-=(MagickOffsetType) size;
+      (*current)=(MagickSizeType) resource_info.memory;
+      (*limit)=resource_info.memory_limit;
+      assert(resource_info.memory >= 0);
+      break;
+    }
+    case TimeResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.time-=(MagickOffsetType) size;
+      (*current)=(MagickSizeType) resource_info.time;
+      (*limit)=resource_info.time_limit;
+      assert(resource_info.time >= 0);
+      break;
+    }
+    default:
+    {
+      (*current)=0;
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1079,6 +1052,9 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
     current,
     limit;
 
+  const RelinquishTargets
+    targets = { &bi, &current, &limit };
+
   bi=MagickFalse;
   limit=0;
   current=0;
@@ -1102,36 +1078,9 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
       assert(resource_info.file >= 0);
       break;
     }
-    case MapResource:
-    {
-      bi=MagickTrue;
-      resource_info.map-=(MagickOffsetType) size;
-      current=(MagickSizeType) resource_info.map;
-      limit=resource_info.map_limit;
-      assert(resource_info.map >= 0);
-      break;
-    }
-    case MemoryResource:
-    {
-      bi=MagickTrue;
-      resource_info.memory-=(MagickOffsetType) size;
-      current=(MagickSizeType) resource_info.memory;
-      limit=resource_info.memory_limit;
-      assert(resource_info.memory >= 0);
-      break;
-    }
-    case TimeResource:
-    {
-      bi=MagickTrue;
-      resource_info.time-=(MagickOffsetType) size;
-      current=(MagickSizeType) resource_info.time;
-      limit=resource_info.time_limit;
-      assert(resource_info.time >= 0);
-      break;
-    }
     default:
     {
-      current=0;
+      RelinquishMagickResourceTail(type,size,&targets);
       break;
     }
   }
