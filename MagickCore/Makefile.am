@@ -150,6 +150,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/color-equivalent.c \
   MagickCore/color.h \
   MagickCore/color-private.h \
+  MagickCore/color-parse-private.h \
   MagickCore/colormap.c \
   MagickCore/colormap.h \
   MagickCore/colormap-private.h \
@@ -820,6 +821,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colormap-private.h \
   MagickCore/color-private.h \
   MagickCore/color-private.h \
+  MagickCore/color-parse-private.h \
   MagickCore/colorspace-private.h \
   MagickCore/colorspace-rgb-predicates-private.h \
   MagickCore/colorspace-lab-compatible-private.h \
