@@ -480,3 +480,22 @@ Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c565
 `matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 37
 refactor commits, all valid.
 
+### cache-open-private.h, and type.c probed
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| cache-open-private.h | 7.80 | 7.90 | E (OpenPixelCache's closing debug log into LogDiskPixelCacheOpen, as LogMemoryPixelCacheOpen), W (the geometry-limit check into CheckPixelCacheGeometryLimits; its exception names the helper, 2026-11-12 ruling) |
+
+OpenPixelCache stays a Complex and Large Method (cc 33). Its memory-cache and mapped-disk
+blocks fit Recipe RV (each returns a Create*PixelCache call or falls through) but read six
+inputs (status, length, cache_info, open_info, the by-value source_info and the result), so
+they need RV's struct widening (c); not taken this round.
+
+type.c (9.09) is a trap for *Overall Code Complexity*: the shared IsListedTypeInfo predicate
+for GetTypeInfoList and GetTypeList (Recipe P, two sites) crosses *Lines of Code in a Single
+File* (8.54); a small OH carve first makes room but removes simple statics, so lizard's mean
+goes back to 4.1 (9.09); the large loader run exposes hidden Code Duplication (8.54).
+Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c5651ffad8`),
+`matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 39
+refactor commits, all valid.
+
