@@ -1219,6 +1219,21 @@ MagickPrivate void SyncAuthenticOpenCLBuffer(const Image *image)
 }
 #endif
 
+static MagickBooleanType ApplyPixelCacheNexusMasks(Image *image,
+  NexusInfo *magick_restrict nexus_info,ExceptionInfo *exception)
+{
+  if ((image->mask_trait & UpdatePixelTrait) != 0)
+    {
+      if (((image->channels & WriteMaskChannel) != 0) &&
+          (ClipPixelCacheNexus(image,nexus_info,exception) == MagickFalse))
+        return(MagickFalse);
+      if (((image->channels & CompositeMaskChannel) != 0) &&
+          (MaskPixelCacheNexus(image,nexus_info,exception) == MagickFalse))
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   S y n c A u t h e n t i c P i x e l C a c h e N e x u s                   %
@@ -1262,15 +1277,8 @@ MagickPrivate MagickBooleanType SyncAuthenticPixelCacheNexus(Image *image,
   assert(cache_info->signature == MagickCoreSignature);
   if (cache_info->type == UndefinedCache)
     return(MagickFalse);
-  if ((image->mask_trait & UpdatePixelTrait) != 0)
-    {
-      if (((image->channels & WriteMaskChannel) != 0) &&
-          (ClipPixelCacheNexus(image,nexus_info,exception) == MagickFalse))
-        return(MagickFalse);
-      if (((image->channels & CompositeMaskChannel) != 0) &&
-          (MaskPixelCacheNexus(image,nexus_info,exception) == MagickFalse))
-        return(MagickFalse);
-    }
+  if (ApplyPixelCacheNexusMasks(image,nexus_info,exception) == MagickFalse)
+    return(MagickFalse);
   if (nexus_info->authentic_pixel_cache != MagickFalse)
     {
       if (image->taint == MagickFalse)
