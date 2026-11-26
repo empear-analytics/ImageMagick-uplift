@@ -1012,6 +1012,25 @@ MagickExport MagickBooleanType ReshapePixelCache(Image *image,
   return(SyncImagePixelCache(image,exception));
 }
 
+static void SetPixelCacheGetMethods(CacheInfo *magick_restrict cache_info,
+  const CacheMethods *cache_methods)
+{
+  if (cache_methods->get_virtual_pixel_handler != (GetVirtualPixelHandler) NULL)
+    cache_info->methods.get_virtual_pixel_handler=
+      cache_methods->get_virtual_pixel_handler;
+  if (cache_methods->destroy_pixel_handler != (DestroyPixelHandler) NULL)
+    cache_info->methods.destroy_pixel_handler=
+      cache_methods->destroy_pixel_handler;
+  if (cache_methods->get_virtual_metacontent_from_handler !=
+      (GetVirtualMetacontentFromHandler) NULL)
+    cache_info->methods.get_virtual_metacontent_from_handler=
+      cache_methods->get_virtual_metacontent_from_handler;
+  if (cache_methods->get_authentic_pixels_handler !=
+      (GetAuthenticPixelsHandler) NULL)
+    cache_info->methods.get_authentic_pixels_handler=
+      cache_methods->get_authentic_pixels_handler;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   S e t P i x e l C a c h e M e t h o d s                                   %
@@ -1051,20 +1070,7 @@ MagickPrivate void SetPixelCacheMethods(Cache cache,CacheMethods *cache_methods)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       cache_info->filename);
-  if (cache_methods->get_virtual_pixel_handler != (GetVirtualPixelHandler) NULL)
-    cache_info->methods.get_virtual_pixel_handler=
-      cache_methods->get_virtual_pixel_handler;
-  if (cache_methods->destroy_pixel_handler != (DestroyPixelHandler) NULL)
-    cache_info->methods.destroy_pixel_handler=
-      cache_methods->destroy_pixel_handler;
-  if (cache_methods->get_virtual_metacontent_from_handler !=
-      (GetVirtualMetacontentFromHandler) NULL)
-    cache_info->methods.get_virtual_metacontent_from_handler=
-      cache_methods->get_virtual_metacontent_from_handler;
-  if (cache_methods->get_authentic_pixels_handler !=
-      (GetAuthenticPixelsHandler) NULL)
-    cache_info->methods.get_authentic_pixels_handler=
-      cache_methods->get_authentic_pixels_handler;
+  SetPixelCacheGetMethods(cache_info,cache_methods);
   if (cache_methods->queue_authentic_pixels_handler !=
       (QueueAuthenticPixelsHandler) NULL)
     cache_info->methods.queue_authentic_pixels_handler=
