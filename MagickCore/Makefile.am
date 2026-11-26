@@ -127,6 +127,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/cache-private.h \
   MagickCore/cache-clone-private.h \
   MagickCore/cache-image-private.h \
+  MagickCore/cache-virtual-private.h \
   MagickCore/cache-view.c \
   MagickCore/cache-view.h \
   MagickCore/channel.c \
@@ -806,6 +807,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/cache-private.h \
   MagickCore/cache-clone-private.h \
   MagickCore/cache-image-private.h \
+  MagickCore/cache-virtual-private.h \
   MagickCore/coder-private.h \
   MagickCore/colormap-private.h \
   MagickCore/color-private.h \
