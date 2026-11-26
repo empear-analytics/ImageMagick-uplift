@@ -400,3 +400,29 @@ file; it needs that run cut in two. module.c and image-view.c: unreached or unbu
 Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c5651ffad8`),
 `matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 27 refactor
 commits, all valid.
+
+### log.c
+
+| File | Before | After | Headers (score) |
+| --- | --- | --- | --- |
+| log.c | 8.81 | 9.68 | log-write (10.0), log-event (9.09), log-load (9.38) |
+
+The writer-and-translator run scored 8.54 as one header; cut at GetModuleBasename it gives
+10.0 and 9.09, and the order writers, translators, loader keeps the file at 8.81, 9.38,
+9.68. `log-private.h` is listed only under MAGICKCORE_NOINST_HDRS, so the first header went
+into MAGICKCORE_BASE_SRCS after `log.h`. The LoadLogCache step's oracle (16,009 cases)
+showed only `gaps/c5651ffad8`, the known logcfg tie-break; its object is IDENTICAL.
+
+### Probed, not taken
+
+- identify.c (9.38): its one external function is last; any carve of the leading run scores
+  the file 9.28 to 9.30.
+- The MVG keyword headers' Code Duplication (draw-mvg-attribute 8.03, -keyword 8.28, -push
+  8.54): a helper for the repeated `ParseCommandOption` block (10 handlers) leaves the
+  findings almost unchanged (push 8.54 -> 8.81, the others equal). The clones are the
+  state-binding prologue and write-back that every Recipe KH handler repeats.
+- `FormatSanitizedDelegateOption` (delegate-private.h 9.68): its callers are in `coders/`.
+- ProfileImage: Recipe MB refuses its blocks (ThrowProfileException hides a `return`).
+- The PR's CodeScene gate counts advisory findings (Primitive Obsession) only in files that
+  existed before; several new headers carry it and the gate passes.
+
