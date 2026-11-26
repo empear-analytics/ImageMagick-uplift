@@ -499,3 +499,35 @@ Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c565
 `matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 39
 refactor commits, all valid.
 
+### blob.c out of the red: a Recipe S chain
+
+| File | Score | Holds |
+| --- | --- | --- |
+| blob.c | 2.71 -> **8.28** | blob management (Attach, Clone, Destroy, Detach, Duplicate, Map/Unmap, the properties) |
+| blob-info-private.h | no score (no function; `noscore_headers.txt`) | the define block and FileInfo, `_BlobInfo`, `_CustomStreamInfo` |
+| blob-io-private.h | 10.0 | ThrowBlobException, WriteBlobStream (shared, `static inline`) |
+| blob-custom.c | 10.0 | the custom-stream accessors |
+| blob-image.c | 4.74 | the image/blob conversions (BlobToImage, ImageToBlob, PingBlob...) |
+| blob-read.c | 7.37 | the typed readers |
+| blob-write.c | 8.28 | the typed writers |
+| blob-query.c | 5.96 | EOFBlob, ErrorBlob, GetBlobSize, IsBlobSeekable, TellBlob, SeekBlob... |
+| blob-stream.c | 3.75 | OpenBlob, CloseBlob, ReadBlob, WriteBlob, SetBlobExtent, FileToImage, InjectImageBlob |
+
+Why earlier rounds stopped (M128, M130): the private structures blocked splits, and fixing
+functions in place barely moves the score (stub probes: the 7 worst emptied 2.81, 20 emptied
+4.8, all 28 emptied 7.05). The 2026-11-16 ruling (typedefs, macros and static helpers shared
+through one non-installed private header) lifts the first; the split bar (each product at least
+the original's 2.71) makes moving debt out the lever. The first step needed a Recipe OH
+amendment (2026-11-26, mandate): blob.c's define block holds `#include <io.h>` under
+`#if defined(__OS2__)`.
+
+Every step: whole catalogue 16,010 cases, only the known `gaps/c5651ffad8`; guards --combined
+and --calls OK; nm shows each moved symbol in its new object only. blob-stream.c's
+-Wimplicit-fallthrough reports under clang++ are upstream's `magick_fallthrough;` cases moved
+(16 before in blob.c, 16 after in blob-stream.c, 0 left in blob.c).
+
+Next for this family: blob-stream.c (3.75) can be split again (OpenBlob/CloseBlob from the raw
+I/O, sharing SyncBlob and IsWriteBlobMode through a header that only those includers name),
+then function-level work on the products; ReadBlob, WriteBlob and the typed readers/writers are
+per-byte or per-row paths (timing).
+
