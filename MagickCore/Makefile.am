@@ -128,6 +128,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/blob-write.c \
   MagickCore/blob-read.c \
   MagickCore/blob-image.c \
+  MagickCore/blob-file-io.c \
   MagickCore/blob-to-custom.c \
   MagickCore/blob-to-blob.c \
   MagickCore/blob-custom.c \
