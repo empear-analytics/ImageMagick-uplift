@@ -564,6 +564,77 @@ static MagickBooleanType FailPixelCacheOnDisk(CacheInfo *cache_info,
   return(MagickFalse);
 }
 
+typedef struct _MemoryPixelCacheTry
+{
+  MagickBooleanType
+    status;
+
+  MagickSizeType
+    length;
+
+  CacheInfo
+    *cache_info;
+
+  PixelCacheOpenInfo
+    open_info;
+
+  CacheInfo
+    source_info;
+} MemoryPixelCacheTry;
+
+static MagickBooleanType TryMemoryPixelCache(const MemoryPixelCacheTry *attempt,
+  MagickBooleanType *result)
+{
+  MagickBooleanType
+    status = attempt->status;
+
+  const MagickSizeType
+    length = attempt->length;
+
+  CacheInfo
+    *const cache_info = attempt->cache_info;
+
+  const PixelCacheOpenInfo
+    open_info = attempt->open_info;
+
+  const CacheInfo
+    source_info = attempt->source_info;
+
+  if (IsMemoryCacheCandidate(status,length,cache_info) != MagickFalse)
+    {
+      status=AcquireMagickResource(MemoryResource,cache_info->length);
+      if (status != MagickFalse)
+        {
+          status=MagickTrue;
+          if (cache_anonymous_memory <= 0)
+            {
+              cache_info->mapped=MagickFalse;
+              cache_info->pixels=(Quantum *) MagickAssumeAligned(
+                AcquireAlignedMemory(1,(size_t) cache_info->length));
+            }
+          else
+            {
+              cache_info->mapped=MagickTrue;
+              cache_info->pixels=(Quantum *) MapBlob(-1,IOMode,0,(size_t)
+                cache_info->length);
+            }
+          if (cache_info->pixels == (Quantum *) NULL)
+            {
+              RelinquishMagickResource(MemoryResource,cache_info->length);
+              cache_info->mapped=source_info.mapped;
+              cache_info->pixels=source_info.pixels;
+            }
+          else
+            {
+              (*result)=CreateMemoryPixelCache(cache_info,&open_info,
+                source_info,status);
+              return(MagickTrue);
+            }
+        }
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType CheckPixelCacheGeometryLimits(const Image *image,
   const CacheInfo *magick_restrict cache_info,ExceptionInfo *exception)
 {
@@ -614,6 +685,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
     *hosts;
 
   MagickBooleanType
+    returned,
     status;
 
   MagickSizeType
@@ -623,6 +695,9 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   size_t
     columns,
     packet_size;
+
+  MemoryPixelCacheTry
+    memory_attempt;
 
   PixelCacheOpenInfo
     open_info;
@@ -717,35 +792,13 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   open_info.mode=mode;
   open_info.number_pixels=number_pixels;
   open_info.exception=exception;
-  if (IsMemoryCacheCandidate(status,length,cache_info) != MagickFalse)
-    {
-      status=AcquireMagickResource(MemoryResource,cache_info->length);
-      if (status != MagickFalse)
-        {
-          status=MagickTrue;
-          if (cache_anonymous_memory <= 0)
-            {
-              cache_info->mapped=MagickFalse;
-              cache_info->pixels=(Quantum *) MagickAssumeAligned(
-                AcquireAlignedMemory(1,(size_t) cache_info->length));
-            }
-          else
-            {
-              cache_info->mapped=MagickTrue;
-              cache_info->pixels=(Quantum *) MapBlob(-1,IOMode,0,(size_t)
-                cache_info->length);
-            }
-          if (cache_info->pixels == (Quantum *) NULL)
-            {
-              RelinquishMagickResource(MemoryResource,cache_info->length);
-              cache_info->mapped=source_info.mapped;
-              cache_info->pixels=source_info.pixels;
-            }
-          else
-            return(CreateMemoryPixelCache(cache_info,&open_info,source_info,
-              status));
-        }
-    }
+  memory_attempt.status=status;
+  memory_attempt.length=length;
+  memory_attempt.cache_info=cache_info;
+  memory_attempt.open_info=open_info;
+  memory_attempt.source_info=source_info;
+  if (TryMemoryPixelCache(&memory_attempt,&returned) != MagickFalse)
+    return(returned);
   status=AcquireMagickResource(DiskResource,cache_info->length);
   hosts=(const char *) GetImageRegistry(StringRegistryType,"cache:hosts",
     exception);
