@@ -294,3 +294,74 @@ chain was probed first and ordered so that no commit dropped.
 - **token-glob.c, utility.c (7.84), profile.c (8.19), stream.c (7.32), module.c (6.63):**
   the campaign's other low files; not started this evening.
 
+
+## 2026-11-26: Recipe OH chains on stream.c, draw.c, utility.c and profile.c
+
+Sweep at `ed41bddf6` (cs-mcp 1.5.16): MagickCore 267 files, mean 9.66; campaign B had 49 `.c`
+files below 10. The four files below took Recipe OH's mid-file form, each chain stub-probed
+first (scratch copies under `build-oracle/probe/`).
+
+| File | Before | After | Headers (score) |
+| --- | --- | --- | --- |
+| stream.c | 7.32 | **10.0** | stream-row (8.03), stream-quantum (7.32), stream-map (8.81), stream-pixels (8.28) |
+| draw.c | 6.63 | **9.68** | draw-mvg-prepare (9.09), draw-mvg-trace (7.72), draw-mvg-push (8.54), draw-mvg-attribute (8.03), draw-mvg-keyword (8.28), draw-mvg-render (8.47), draw-path-trace (9.38) |
+| utility.c | 7.84 | 8.09 | utility-path (8.81), utility-template (10.0), utility-list (9.68), utility-expand (9.38) |
+| profile.c | 8.19 | 8.71 | profile-lcms (9.68) |
+
+Every header scores at or above its file's score before the chain. What is left: draw.c,
+DrawClipPath's arguments (`MagickExport`); utility.c, GetExecutionPath, ListFiles and
+GetPathTemplate (platform branches), Primitive Obsession and String Heavy Function Arguments;
+profile.c, ProfileImage (cc 29, 187 lines, LCMS branch with `ThrowProfileException`, a macro
+with a hidden `return` naming four locals).
+
+### How the chains were ordered
+
+- **The pre-commit gate holds a new header to the file's score just before the step**, not to
+  the chain's starting score that the 2026-11-25 ruling names. stream.c's first order (map
+  writers alone, then the dispatchers) left the dispatcher header at 8.28 against the file's
+  8.54 at that step, and the gate refused. The chain was redone so that larger runs leave
+  first, while the file is still low, and each header is then **carved again** (its leading
+  run into a new header included directly above it; bar = the carved header's score). No
+  stream.c, utility.c or profile.c commit skipped the gate.
+- **One disclosed `--no-verify`** (`5f840e730`, draw.c's first step, under the 2026-11-25
+  ruling): every probed first step dropped draw.c (5.72 to 6.49), as shrinking it brings
+  back its hidden Code Duplication. The chosen order drops once (6.63 -> 6.49) and then rises
+  at every step: 6.69, 6.69, 8.28, 9.68.
+- **Carving more can lower a file.** profile.c: the LCMS block alone gives 8.71; adding the
+  sRGB/transform statics or the 8BIM/XMP statics scored 8.19 or 8.65, because ProfileImage's
+  Complex and Large Method weigh more in a smaller file. utility.c needed its runs in a set
+  order (path, template, list, expand) to avoid an intermediate 7.61.
+
+### Evidence worth knowing
+
+- **Moved asserts change the object only in cold paths.** Each assert in a moved run reports
+  the header's name, so the unit gains one string and every `l_.str.N` label renumbers. With
+  the labels normalised (`l_.str` and `l_.str.N` alike), stream.c's, profile.c's and
+  utility.c's objects were identical, and draw.c's and stream.c's StreamImagePixels differed
+  only in `.cold.*` assertion blocks choosing other outlined call sequences (as `48d891a7d`).
+- **Header-only carves** (a header's leading run into a new header) were checked by
+  preprocessing the `.c` file against HEAD's headers and the working tree's
+  (`tools/pp_identical.sh` has no `HDRS=1`; a scratch variant did it) and
+  `HDRS=1 tools/obj_identical.sh`.
+- `Makefile.in`'s dist list puts some names one per line (`\tMagickCore/draw-core-private.h \`);
+  the new header goes on its own line there.
+- Oracle runs per step: StreamImagePixels 261, ProfileImage 87, GetPathComponent 16,009 (2
+  diverged, the known `gaps/c5651ffad8` logcfg tie-break and the `resize/6ee45e9cfa`
+  write-mask flake, 0 alone), ListFiles 43, ExpandFilenames 12,905, DrawImage and
+  RenderMVGContent 476, DrawClippingMask 4, DrawCompositeMask 7: all 0 diverged otherwise.
+
+### Gate at the tip
+
+Whole catalogue: 16,010 cases, 1 diverged, the known `gaps/c5651ffad8` logcfg tie-break (as
+at every M143 tip); `matrix/f2913328b4` settled (the load-sensitive matrix-on-disk timeout on
+the baseline). `tools/cxx_warnings.sh --all`: OK, 267 files. `check_trailers`: 16 refactor
+commits, all valid.
+
+### Next
+
+- The new headers below 9: stream-quantum (7.32), stream-row (8.03), stream-pixels (8.28),
+  draw-mvg-trace (7.72), draw-mvg-attribute (8.03), draw-mvg-keyword (8.28): mostly Code
+  Duplication between per-type or per-keyword siblings, per-pixel in the stream headers (the
+  no-slowdown rule applies).
+- module.c (6.63) and image-view.c (6.84): function-level findings, mostly in code no case
+  reaches (guard-level recipes only).
