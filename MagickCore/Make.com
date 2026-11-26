@@ -46,6 +46,7 @@ $call Make attribute-bounds.c
 $call Make attribute-depth.c
 $call Make attribute-depth-measure.c
 $call Make blob.c
+$call Make blob-read.c
 $call Make blob-image.c
 $call Make blob-custom.c
 $call Make cache.c
