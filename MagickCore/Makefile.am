@@ -395,6 +395,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/log.c \
   MagickCore/log.h \
   MagickCore/log-write-private.h \
+  MagickCore/log-event-private.h \
   MagickCore/magic.c \
   MagickCore/magic.h \
   MagickCore/magick.c \
@@ -962,6 +963,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/locale-private.h \
   MagickCore/log-private.h \
   MagickCore/log-write-private.h \
+  MagickCore/log-event-private.h \
   MagickCore/magick-private.h \
   MagickCore/magic-private.h \
   MagickCore/matrix-private.h \
