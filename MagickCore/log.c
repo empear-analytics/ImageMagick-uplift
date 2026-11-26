@@ -1324,173 +1324,7 @@ MagickPrivate void LogComponentTerminus(void)
   RelinquishSemaphoreInfo(&log_semaphore);
 }
 
-static void WriteLogToSystem(const LogInfo *log_info,const char *text)
-{
-  if ((log_info->handler_mask & ConsoleHandler) != 0)
-    {
-      (void) FormatLocaleFile(stderr,"%s\n",text);
-      (void) fflush(stderr);
-    }
-  if ((log_info->handler_mask & DebugHandler) != 0)
-    {
-#if defined(MAGICKCORE_WINDOWS_SUPPORT)
-      OutputDebugString(text);
-      OutputDebugString("\n");
-#endif
-    }
-  if ((log_info->handler_mask & EventHandler) != 0)
-    {
-#if defined(MAGICKCORE_WINDOWS_SUPPORT)
-      (void) NTReportEvent(text,MagickFalse);
-#endif
-    }
-}
-
-static void WriteLogToStreams(const LogInfo *log_info,const LogEventType type,
-  const char *text)
-{
-  if ((log_info->handler_mask & MethodHandler) != 0)
-    {
-      if (log_info->method != (MagickLogMethod) NULL)
-        log_info->method(type,text);
-    }
-  if ((log_info->handler_mask & StdoutHandler) != 0)
-    {
-      (void) FormatLocaleFile(stdout,"%s\n",text);
-      (void) fflush(stdout);
-    }
-  if ((log_info->handler_mask & StderrHandler) != 0)
-    {
-      (void) FormatLocaleFile(stderr,"%s\n",text);
-      (void) fflush(stderr);
-    }
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%   L o g M a g i c k E v e n t                                               %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  LogMagickEvent() logs an event as determined by the log configuration file.
-%  If an error occurs, MagickFalse is returned otherwise MagickTrue.
-%
-%  The format of the LogMagickEvent method is:
-%
-%      MagickBooleanType LogMagickEvent(const LogEventType type,
-%        const char *module,const char *function,const size_t line,
-%        const char *format,...)
-%
-%  A description of each parameter follows:
-%
-%    o type: the event type.
-%
-%    o filename: the source module filename.
-%
-%    o function: the function name.
-%
-%    o line: the line number of the source module.
-%
-%    o format: the output format.
-%
-*/
-
-static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
-  const char specifier)
-{
-  switch (specifier)
-  {
-    case 'c':
-      return((ptrdiff_t) CopyMagickString(q,GetClientName(),extent));
-    case 'n':
-      return((ptrdiff_t) CopyMagickString(q,GetLogName(),extent));
-    case 'p':
-      return((ptrdiff_t) FormatLocaleString(q,extent,"%.17g",(double)
-        getpid()));
-    case 'v':
-      return((ptrdiff_t) CopyMagickString(q,MagickLibVersionText,extent));
-    case '%':
-    {
-      *q=specifier;
-      return(1);
-    }
-    default:
-    {
-      q[0]='%';
-      q[1]=specifier;
-      return(2);
-    }
-  }
-}
-
-static char *FormatLogGeneration(const LogInfo *log_info,
-  const ssize_t generation,char *q)
-{
-  if (log_info->generations == 0)
-    {
-      (void) CopyMagickString(q,"0",MagickPathExtent);
-      q++;
-      return(q);
-    }
-  q+=(ptrdiff_t) FormatLocaleString(q,MagickPathExtent,"%.17g",(double)
-    (generation % log_info->generations));
-  return(q);
-}
-
-static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
-  char *filename)
-{
-  char
-    *q;
-
-  const char
-    *p;
-
-  /*
-    Translate event in "human readable" format.
-  */
-  assert(log_info != (LogInfo *) NULL);
-  q=filename;
-  for (p=log_info->filename; *p != '\0'; p++)
-  {
-    /*
-      The format of the filename is defined by embedding special format
-      characters:
-
-        %c   client name
-        %n   log name
-        %p   process id
-        %v   version
-        %%   percent sign
-    */
-    if (*p != '%')
-      {
-        *q++=(*p);
-        continue;
-      }
-    p++;
-    if (*p == '\0')
-      break;
-    switch (*p)
-    {
-      case '\0':
-      {
-        p--;
-        break;
-      }
-      case 'g':
-      {
-        q=FormatLogGeneration(log_info,generation,q);
-        break;
-      }
-      default:
-      {
-        q+=FormatLogSpecifier(q,MagickPathExtent,*p);
-        break;
-      }
-    }
-  }
-  *q='\0';
-}
+#include "MagickCore/log-write-private.h"
 
 static const char *GetModuleBasename(const char *module)
 {
@@ -1995,6 +1829,33 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
   return(MagickTrue);
 }
 
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   L o g M a g i c k E v e n t                                               %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  LogMagickEvent() logs an event as determined by the log configuration file.
+%  If an error occurs, MagickFalse is returned otherwise MagickTrue.
+%
+%  The format of the LogMagickEvent method is:
+%
+%      MagickBooleanType LogMagickEvent(const LogEventType type,
+%        const char *module,const char *function,const size_t line,
+%        const char *format,...)
+%
+%  A description of each parameter follows:
+%
+%    o type: the event type.
+%
+%    o filename: the source module filename.
+%
+%    o function: the function name.
+%
+%    o line: the line number of the source module.
+%
+%    o format: the output format.
+%
+*/
 MagickExport MagickBooleanType LogMagickEvent(const LogEventType type,
   const char *module,const char *function,const size_t line,
   const char *format,...)
