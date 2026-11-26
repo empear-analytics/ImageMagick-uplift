@@ -119,6 +119,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute-depth-measure.c \
   MagickCore/attribute.h \
   MagickCore/blob.c \
+  MagickCore/blob-query.c \
   MagickCore/blob-write.c \
   MagickCore/blob-read.c \
   MagickCore/blob-image.c \
