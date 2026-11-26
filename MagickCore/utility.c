@@ -159,6 +159,8 @@ MagickExport void AppendImageFormat(const char *format,char *filename)
   (void) FormatLocaleString(filename,MagickPathExtent,"%s.%s",root,format);
 }
 
+#include "MagickCore/utility-base64-private.h"
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -185,128 +187,6 @@ MagickExport void AppendImageFormat(const char *format,char *filename)
 %    o length: the number of bytes decoded.
 %
 */
-static void DecodeBase64Character(unsigned char *decode,const char *q,
-  size_t *i,int *state)
-{
-  switch (*state)
-  {
-    case 0:
-    {
-      decode[(*i)]=(unsigned char)((q-Base64) << 2);
-      (*state)++;
-      break;
-    }
-    case 1:
-    {
-      decode[(*i)++]|=(unsigned char)((q-Base64) >> 4);
-      decode[(*i)]=(unsigned char)(((q-Base64) & 0x0f) << 4);
-      (*state)++;
-      break;
-    }
-    case 2:
-    {
-      decode[(*i)++]|=(unsigned char)((q-Base64) >> 2);
-      decode[(*i)]=(unsigned char)(((q-Base64) & 0x03) << 6);
-      (*state)++;
-      break;
-    }
-    case 3:
-    {
-      decode[(*i)++]|=(unsigned char)(q-Base64);
-      (*state)=0;
-      break;
-    }
-  }
-}
-
-static MagickBooleanType VerifyBase64Tail(const char *p,
-  unsigned char *decode,const size_t i)
-{
-  for ( ; *p != '\0'; p++)
-    if (isspace((int) ((unsigned char) *p)) == 0)
-      {
-        decode=(unsigned char *) RelinquishMagickMemory(decode);
-        return(MagickFalse);
-      }
-  if ((int) decode[i] != 0)
-    {
-      decode=(unsigned char *) RelinquishMagickMemory(decode);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
-}
-
-static const char *SkipBase64Whitespace(const char *p)
-{
-  for ( ; *p != '\0'; p++)
-    if (isspace((int) ((unsigned char) *p)) == 0)
-      break;
-  return(p);
-}
-
-static MagickBooleanType VerifyBase64Padding(const char *p,const int state,
-  unsigned char *decode,const size_t i)
-{
-  p++;
-  switch (state)
-  {
-    case 0:
-    case 1:
-    {
-      /*
-        Unrecognized '=' character.
-      */
-      decode=(unsigned char *) RelinquishMagickMemory(decode);
-      return(MagickFalse);
-    }
-    case 2:
-    {
-      p=SkipBase64Whitespace(p);
-      if (*p != '=')
-        {
-          decode=(unsigned char *) RelinquishMagickMemory(decode);
-          return(MagickFalse);
-        }
-      p++;
-      magick_fallthrough;
-    }
-    case 3:
-    {
-      if (VerifyBase64Tail(p,decode,i) == MagickFalse)
-        return(MagickFalse);
-      break;
-    }
-  }
-  return(MagickTrue);
-}
-
-static MagickBooleanType VerifyBase64Terminal(const char *p,const int state,
-  unsigned char *decode,const size_t i)
-{
-  if (*p != '=')
-    {
-      if (state != 0)
-        {
-          decode=(unsigned char *) RelinquishMagickMemory(decode);
-          return(MagickFalse);
-        }
-    }
-  else if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
-    return(MagickFalse);
-  return(MagickTrue);
-}
-
-static void CheckBase64DecodeArguments(const char *source,
-  const size_t *length)
-{
-  magick_unreferenced(source);
-  magick_unreferenced(length);
-  assert(source != (char *) NULL);
-  assert(length != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-}
-
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int

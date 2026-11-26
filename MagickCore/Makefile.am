@@ -609,6 +609,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
   MagickCore/utility-expand-private.h \
+  MagickCore/utility-base64-private.h \
   MagickCore/version.c \
   MagickCore/version.h \
   MagickCore/version-private.h \
@@ -1031,6 +1032,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
   MagickCore/utility-expand-private.h \
+  MagickCore/utility-base64-private.h \
   MagickCore/version-private.h \
   MagickCore/vision-components-object-private.h \
   MagickCore/vision-components-label-private.h \
