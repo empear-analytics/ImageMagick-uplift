@@ -120,6 +120,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute.h \
   MagickCore/blob.c \
   MagickCore/blob-stream.c \
+  MagickCore/blob-file.c \
   MagickCore/blob-open.c \
   MagickCore/blob-query.c \
   MagickCore/blob-write.c \
