@@ -124,6 +124,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/blob.h \
   MagickCore/blob-private.h \
   MagickCore/blob-info-private.h \
+  MagickCore/blob-io-private.h \
   MagickCore/cache.c \
   MagickCore/cache-access.c \
   MagickCore/cache.h \
@@ -820,6 +821,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/annotate-render-private.h \
   MagickCore/blob-private.h \
   MagickCore/blob-info-private.h \
+  MagickCore/blob-io-private.h \
   MagickCore/cache-private.h \
   MagickCore/cache-private.h \
   MagickCore/cache-clone-private.h \
