@@ -958,6 +958,65 @@ MagickExport MagickBooleanType ListMagickResourceInfo(FILE *file,
   return(MagickTrue);
 }
 
+typedef struct _RelinquishTargets
+{
+  MagickBooleanType
+    *bi;
+
+  MagickSizeType
+    *current,
+    *limit;
+} RelinquishTargets;
+
+static void RelinquishMagickResourceTail(const ResourceType type,
+  const MagickSizeType size,const RelinquishTargets *targets)
+{
+  MagickBooleanType
+    *const bi = targets->bi;
+
+  MagickSizeType
+    *const current = targets->current;
+
+  MagickSizeType
+    *const limit = targets->limit;
+
+  switch (type)
+  {
+    case MapResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.map-=(MagickOffsetType) size;
+      (*current)=(MagickSizeType) resource_info.map;
+      (*limit)=resource_info.map_limit;
+      assert(resource_info.map >= 0);
+      break;
+    }
+    case MemoryResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.memory-=(MagickOffsetType) size;
+      (*current)=(MagickSizeType) resource_info.memory;
+      (*limit)=resource_info.memory_limit;
+      assert(resource_info.memory >= 0);
+      break;
+    }
+    case TimeResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.time-=(MagickOffsetType) size;
+      (*current)=(MagickSizeType) resource_info.time;
+      (*limit)=resource_info.time_limit;
+      assert(resource_info.time >= 0);
+      break;
+    }
+    default:
+    {
+      (*current)=0;
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -993,6 +1052,9 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
     current,
     limit;
 
+  const RelinquishTargets
+    targets = { &bi, &current, &limit };
+
   bi=MagickFalse;
   limit=0;
   current=0;
@@ -1016,36 +1078,9 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
       assert(resource_info.file >= 0);
       break;
     }
-    case MapResource:
-    {
-      bi=MagickTrue;
-      resource_info.map-=(MagickOffsetType) size;
-      current=(MagickSizeType) resource_info.map;
-      limit=resource_info.map_limit;
-      assert(resource_info.map >= 0);
-      break;
-    }
-    case MemoryResource:
-    {
-      bi=MagickTrue;
-      resource_info.memory-=(MagickOffsetType) size;
-      current=(MagickSizeType) resource_info.memory;
-      limit=resource_info.memory_limit;
-      assert(resource_info.memory >= 0);
-      break;
-    }
-    case TimeResource:
-    {
-      bi=MagickTrue;
-      resource_info.time-=(MagickOffsetType) size;
-      current=(MagickSizeType) resource_info.time;
-      limit=resource_info.time_limit;
-      assert(resource_info.time >= 0);
-      break;
-    }
     default:
     {
-      current=0;
+      RelinquishMagickResourceTail(type,size,&targets);
       break;
     }
   }
