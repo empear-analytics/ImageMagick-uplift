@@ -452,3 +452,31 @@ Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c565
 `matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 35
 refactor commits, all valid.
 
+### resource.c, and the near-10 files checked
+
+| File | Before | After | Steps |
+| --- | --- | --- | --- |
+| resource.c | 8.97 | 9.38 | OH (resource-unique-private.h, 10.0), then SD with Recipe Z step 7's targets struct on RelinquishMagickResource (Map, Memory, Time and default groups into RelinquishMagickResourceTail) |
+
+SD alone cleared the Large Method but brought *Lines of Code in a Single File* (8.81), so the
+carve went first (8.97 held), then SD (9.38). `tools/switch_split_check.py` confirms the
+moved groups token for token but reports the new targets typedef and its `const` fill as a
+difference outside the switch: it was written for the unreached form, where the targets
+typedef already existed. RelinquishMagickResource is reached (15,132 cases, 0 diverged), so
+the oracle is the evidence. Left: *Overall Code Complexity*, held by the external functions
+(every remaining OH run probed: 9.38).
+
+Checked and not taken (each would need more than one step or a ruling):
+- random.c (9.45): GenerateEntropicChaos' time block holds a `CLOCK_REALTIME_HR` branch that no
+  available build compiles.
+- policy-path.c (9.53): IsPathContainsSymlink's remaining blocks need five parameters.
+- magick.c (9.61): both of GetMagickInfo's blocks hold `MAGICKCORE_BUILD_MODULES` branches; no
+  modules build here.
+- configure-paths.c (9.18): GetConfigurePaths is made of platform branches.
+- token-private.h (9.09): ConvertMacRomanToUTF8, the known clone trap (M141).
+- type.c (9.09): *Overall Code Complexity* at lizard mean 4.1; about five small Recipe E
+  helpers would bring it under the ~3.9 bar (owner 2026-11-16 allows such steps).
+Gate at this tip: whole catalogue 16,010 cases, 1 diverged (the known `gaps/c5651ffad8`),
+`matrix/f2913328b4` settled; `cxx_warnings --all` OK (267 files); `check_trailers` 37
+refactor commits, all valid.
+
