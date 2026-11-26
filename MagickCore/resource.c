@@ -500,6 +500,8 @@ MagickExport void AsynchronousResourceComponentTerminus(void)
   }
 }
 
+#include "MagickCore/resource-unique-private.h"
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -524,94 +526,6 @@ MagickExport void AsynchronousResourceComponentTerminus(void)
 %      name is returned in this array.
 %
 */
-
-static void *DestroyTemporaryResources(void *temporary_resource)
-{
-  (void) ShredFile((char *) temporary_resource);
-  (void) remove_utf8((char *) temporary_resource);
-  temporary_resource=DestroyString((char *) temporary_resource);
-  return((void *) NULL);
-}
-
-static void FillPathTemplate(char *path,const size_t length)
-{
-  char
-    *p;
-
-  int
-    c;
-
-  ssize_t
-    j;
-
-  static const char
-    portable_filename[65] =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
-
-  StringInfo
-    *key;
-
-  unsigned char
-    *datum;
-
-  key=GetRandomKey(random_info,length);
-  p=path+strlen(path)-strlen(MagickPathTemplate);
-  datum=GetStringInfoDatum(key);
-  for (j=0; j < (ssize_t) GetStringInfoLength(key); j++)
-  {
-    c=(int) (datum[j] & 0x3f);
-    *p++=portable_filename[c];
-  }
-  key=DestroyStringInfo(key);
-}
-
-static MagickBooleanType AddTemporaryResource(const char *path)
-{
-  MagickBooleanType
-    status;
-
-  struct stat
-    *attributes;
-
-  LockResourceSemaphore(FileResource);
-  if (temporary_resources == (SplayTreeInfo *) NULL)
-    temporary_resources=NewSplayTree(CompareSplayTreeString,
-      DestroyTemporaryResources,RelinquishMagickMemory);
-  UnlockSemaphoreInfo(resource_semaphore[FileResource]);
-  attributes=(struct stat *) AcquireCriticalMemory(sizeof(struct stat));
-  status=GetPathAttributes(path,attributes);
-  if (status == MagickFalse)
-    attributes=(struct stat *) RelinquishMagickMemory(attributes);
-  else
-    status=AddValueToSplayTree(temporary_resources,ConstantString(path),
-      attributes);
-  return(status);
-}
-
-static int RegisterUniqueFileResource(const char *path,int file)
-{
-  MagickBooleanType
-    status;
-
-  if (file == -1)
-    return(file);
-  status=AddTemporaryResource(path);
-  if (status == MagickFalse)
-    file=close_utf8(file)-1;
-  return(file);
-}
-
-static void AcquireResourceRandomInfo(void)
-{
-  if (random_info == (RandomInfo *) NULL)
-    {
-      LockResourceSemaphore(FileResource);
-      if (random_info == (RandomInfo *) NULL)
-        random_info=AcquireRandomInfo();
-      UnlockSemaphoreInfo(resource_semaphore[FileResource]);
-    }
-}
-
 MagickExport int AcquireUniqueFileResource(char *path)
 {
   int
