@@ -543,6 +543,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/stream-private.h \
   MagickCore/stream-read-private.h \
   MagickCore/stream-quantum-private.h \
+  MagickCore/stream-pixels-private.h \
   MagickCore/string.c \
   MagickCore/string-copy.c \
   MagickCore/string-info.c \
@@ -969,6 +970,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/stream-private.h \
   MagickCore/stream-read-private.h \
   MagickCore/stream-quantum-private.h \
+  MagickCore/stream-pixels-private.h \
   MagickCore/string-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
