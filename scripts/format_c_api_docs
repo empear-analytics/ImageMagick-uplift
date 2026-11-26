@@ -36,6 +36,7 @@ if ( ! GetOptions(
 	 'attribute-depth-measure.c',
 	 'blob.c',
 	 'blob-stream.c',
+	 'blob-raw-read.c',
 	 'blob-file.c',
 	 'blob-open.c',
 	 'blob-query.c',
