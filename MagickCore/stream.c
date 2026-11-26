@@ -581,6 +581,7 @@ MagickExport Image *StreamImage(const ImageInfo *image_info,
 
 #include "MagickCore/stream-quantum-private.h"
 
+#include "MagickCore/stream-map-private.h"
 #include "MagickCore/stream-pixels-private.h"
 
 
