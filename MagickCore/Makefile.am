@@ -464,6 +464,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-interpolate-channels-private.h \
   MagickCore/pixel-export-private.h \
   MagickCore/pixel-import-private.h \
   MagickCore/policy.c \
@@ -982,6 +983,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-interpolate-channels-private.h \
   MagickCore/pixel-export-private.h \
   MagickCore/pixel-import-private.h \
   MagickCore/policy-private.h \
