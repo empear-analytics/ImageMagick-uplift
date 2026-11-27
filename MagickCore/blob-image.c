@@ -110,6 +110,104 @@ static void RestoreCustomStreamFilenames(const ImageInfo *image_info,
   }
 }
 
+typedef Image
+  *(*BlobReadMethod)(const ImageInfo *,ExceptionInfo *);
+
+typedef struct _BlobReadRequest
+{
+  BlobReadMethod
+    method;
+
+  const ImageInfo
+    *image_info;
+
+  const void
+    *blob;
+
+  size_t
+    length;
+} BlobReadRequest;
+
+static Image *ReadBlobImage(const BlobReadRequest *request,
+  ImageInfo *blob_info,ExceptionInfo *exception)
+{
+  const BlobReadMethod
+    method = request->method;
+
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  const void
+    *const blob = request->blob;
+
+  const size_t
+    length = request->length;
+
+  const MagickInfo
+    *magick_info;
+
+  Image
+    *image;
+
+  ImageInfo
+    *clone_info;
+
+  MagickBooleanType
+    status;
+
+  if (*blob_info->magick == '\0')
+    (void) SetImageInfo(blob_info,0,exception);
+  magick_info=GetMagickInfo(blob_info->magick,exception);
+  if (magick_info == (const MagickInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
+        blob_info->magick);
+      blob_info=DestroyImageInfo(blob_info);
+      return((Image *) NULL);
+    }
+  if (GetMagickBlobSupport(magick_info) != MagickFalse)
+    {
+      char
+        filename[MagickPathExtent];
+
+      /*
+        Native blob support for this image format.
+      */
+      (void) CopyMagickString(filename,blob_info->filename,MagickPathExtent);
+      (void) FormatLocaleString(blob_info->filename,MagickPathExtent,"%s:%s",
+        blob_info->magick,filename);
+      image=method(blob_info,exception);
+      if (image != (Image *) NULL)
+        (void) DetachBlob(image->blob);
+      blob_info=DestroyImageInfo(blob_info);
+      return(image);
+    }
+  /*
+    Write blob to a temporary file on disk.
+  */
+  blob_info->blob=(void *) NULL;
+  blob_info->length=0;
+  *blob_info->filename='\0';
+  status=BlobToFile(blob_info->filename,blob,length,exception);
+  if (status == MagickFalse)
+    {
+      (void) RelinquishUniqueFileResource(blob_info->filename);
+      blob_info=DestroyImageInfo(blob_info);
+      return((Image *) NULL);
+    }
+  clone_info=CloneImageInfo(blob_info);
+  (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:%s",
+    blob_info->magick,blob_info->filename);
+  image=method(clone_info,exception);
+  if (image != (Image *) NULL)
+    RestoreCustomStreamFilenames(image_info,magick_info,image);
+  clone_info=DestroyImageInfo(clone_info);
+  (void) RelinquishUniqueFileResource(blob_info->filename);
+  blob_info=DestroyImageInfo(blob_info);
+  return(image);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -144,18 +242,8 @@ static void RestoreCustomStreamFilenames(const ImageInfo *image_info,
 MagickExport Image *BlobToImage(const ImageInfo *image_info,const void *blob,
   const size_t length,ExceptionInfo *exception)
 {
-  const MagickInfo
-    *magick_info;
-
-  Image
-    *image;
-
   ImageInfo
-    *blob_info,
-    *clone_info;
-
-  MagickBooleanType
-    status;
+    *blob_info;
 
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
@@ -172,57 +260,12 @@ MagickExport Image *BlobToImage(const ImageInfo *image_info,const void *blob,
   blob_info=CloneImageInfo(image_info);
   blob_info->blob=(void *) blob;
   blob_info->length=length;
-  if (*blob_info->magick == '\0')
-    (void) SetImageInfo(blob_info,0,exception);
-  magick_info=GetMagickInfo(blob_info->magick,exception);
-  if (magick_info == (const MagickInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
-        blob_info->magick);
-      blob_info=DestroyImageInfo(blob_info);
-      return((Image *) NULL);
-    }
-  if (GetMagickBlobSupport(magick_info) != MagickFalse)
-    {
-      char
-        filename[MagickPathExtent];
+  {
+    const BlobReadRequest
+      request = { ReadImage, image_info, blob, length };
 
-      /*
-        Native blob support for this image format.
-      */
-      (void) CopyMagickString(filename,blob_info->filename,MagickPathExtent);
-      (void) FormatLocaleString(blob_info->filename,MagickPathExtent,"%s:%s",
-        blob_info->magick,filename);
-      image=ReadImage(blob_info,exception);
-      if (image != (Image *) NULL)
-        (void) DetachBlob(image->blob);
-      blob_info=DestroyImageInfo(blob_info);
-      return(image);
-    }
-  /*
-    Write blob to a temporary file on disk.
-  */
-  blob_info->blob=(void *) NULL;
-  blob_info->length=0;
-  *blob_info->filename='\0';
-  status=BlobToFile(blob_info->filename,blob,length,exception);
-  if (status == MagickFalse)
-    {
-      (void) RelinquishUniqueFileResource(blob_info->filename);
-      blob_info=DestroyImageInfo(blob_info);
-      return((Image *) NULL);
-    }
-  clone_info=CloneImageInfo(blob_info);
-  (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:%s",
-    blob_info->magick,blob_info->filename);
-  image=ReadImage(clone_info,exception);
-  if (image != (Image *) NULL)
-    RestoreCustomStreamFilenames(image_info,magick_info,image);
-  clone_info=DestroyImageInfo(clone_info);
-  (void) RelinquishUniqueFileResource(blob_info->filename);
-  blob_info=DestroyImageInfo(blob_info);
-  return(image);
+    return(ReadBlobImage(&request,blob_info,exception));
+  }
 }
 
 /*
@@ -429,21 +472,17 @@ static size_t PingStream(const Image *magick_unused(image),
 }
 #endif
 
+static Image *PingBlobImage(const ImageInfo *image_info,
+  ExceptionInfo *exception)
+{
+  return(ReadStream(image_info,&PingStream,exception));
+}
+
 MagickExport Image *PingBlob(const ImageInfo *image_info,const void *blob,
   const size_t length,ExceptionInfo *exception)
 {
-  const MagickInfo
-    *magick_info;
-
-  Image
-    *image;
-
   ImageInfo
-    *clone_info,
     *ping_info;
-
-  MagickBooleanType
-    status;
 
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
@@ -461,55 +500,10 @@ MagickExport Image *PingBlob(const ImageInfo *image_info,const void *blob,
   ping_info->blob=(void *) blob;
   ping_info->length=length;
   ping_info->ping=MagickTrue;
-  if (*ping_info->magick == '\0')
-    (void) SetImageInfo(ping_info,0,exception);
-  magick_info=GetMagickInfo(ping_info->magick,exception);
-  if (magick_info == (const MagickInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
-        ping_info->magick);
-      ping_info=DestroyImageInfo(ping_info);
-      return((Image *) NULL);
-    }
-  if (GetMagickBlobSupport(magick_info) != MagickFalse)
-    {
-      char
-        filename[MagickPathExtent];
+  {
+    const BlobReadRequest
+      request = { PingBlobImage, image_info, blob, length };
 
-      /*
-        Native blob support for this image format.
-      */
-      (void) CopyMagickString(filename,ping_info->filename,MagickPathExtent);
-      (void) FormatLocaleString(ping_info->filename,MagickPathExtent,"%s:%s",
-        ping_info->magick,filename);
-      image=ReadStream(ping_info,&PingStream,exception);
-      if (image != (Image *) NULL)
-        (void) DetachBlob(image->blob);
-      ping_info=DestroyImageInfo(ping_info);
-      return(image);
-    }
-  /*
-    Write blob to a temporary file on disk.
-  */
-  ping_info->blob=(void *) NULL;
-  ping_info->length=0;
-  *ping_info->filename='\0';
-  status=BlobToFile(ping_info->filename,blob,length,exception);
-  if (status == MagickFalse)
-    {
-      (void) RelinquishUniqueFileResource(ping_info->filename);
-      ping_info=DestroyImageInfo(ping_info);
-      return((Image *) NULL);
-    }
-  clone_info=CloneImageInfo(ping_info);
-  (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:%s",
-    ping_info->magick,ping_info->filename);
-  image=ReadStream(clone_info,&PingStream,exception);
-  if (image != (Image *) NULL)
-    RestoreCustomStreamFilenames(image_info,magick_info,image);
-  clone_info=DestroyImageInfo(clone_info);
-  (void) RelinquishUniqueFileResource(ping_info->filename);
-  ping_info=DestroyImageInfo(ping_info);
-  return(image);
+    return(ReadBlobImage(&request,ping_info,exception));
+  }
 }
