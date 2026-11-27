@@ -669,6 +669,28 @@ static MagickBooleanType AcquireVirtualMetacontent(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType UsesVirtualPixelColor(
+  const VirtualPixelMethod virtual_pixel_method)
+{
+  switch (virtual_pixel_method)
+  {
+    case BackgroundVirtualPixelMethod:
+    case BlackVirtualPixelMethod:
+    case GrayVirtualPixelMethod:
+    case TransparentVirtualPixelMethod:
+    case MaskVirtualPixelMethod:
+    case WhiteVirtualPixelMethod:
+    case EdgeVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+    case HorizontalTileVirtualPixelMethod:
+    case VerticalTileVirtualPixelMethod:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   const VirtualPixelMethod virtual_pixel_method,const ssize_t x,const ssize_t y,
   const size_t columns,const size_t rows,NexusInfo *nexus_info,
@@ -741,29 +763,14 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   (void) memset(virtual_pixel,0,cache_info->number_channels*
     sizeof(*virtual_pixel));
   virtual_metacontent=(void *) NULL;
-  switch (virtual_pixel_method)
-  {
-    case BackgroundVirtualPixelMethod:
-    case BlackVirtualPixelMethod:
-    case GrayVirtualPixelMethod:
-    case TransparentVirtualPixelMethod:
-    case MaskVirtualPixelMethod:
-    case WhiteVirtualPixelMethod:
-    case EdgeVirtualPixelMethod:
-    case CheckerTileVirtualPixelMethod:
-    case HorizontalTileVirtualPixelMethod:
-    case VerticalTileVirtualPixelMethod:
+  if (UsesVirtualPixelColor(virtual_pixel_method) != MagickFalse)
     {
       if (AcquireVirtualMetacontent(image,cache_info,&virtual_metacontent,
             exception) == MagickFalse)
         return((const Quantum *) NULL);
       SetVirtualPixelColor(image,cache_info,virtual_pixel_method,
         virtual_pixel);
-      break;
     }
-    default:
-      break;
-  }
   {
     const VirtualPixelRows
       virtual_rows = { image, virtual_pixel_method, x, y, columns, rows,
