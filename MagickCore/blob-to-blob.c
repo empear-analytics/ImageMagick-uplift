@@ -147,6 +147,26 @@ static void *DetachImageBlob(ImageInfo *blob_info,Image *image,
   return(blob);
 }
 
+static void *WriteImageMemoryBlob(ImageInfo *blob_info,Image *image,
+  size_t *length,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  void
+    *blob;
+
+  (void) CloseBlob(image);
+  image->blob->exempt=MagickTrue;
+  image->blob->extent=0;
+  *image->filename='\0';
+  status=WriteImage(blob_info,image,exception);
+  SyncBlobStream(blob_info,image,image);
+  *length=image->blob->length;
+  blob=DetachImageBlob(blob_info,image,status,length);
+  return(blob);
+}
+
 MagickExport void *ImageToBlob(const ImageInfo *image_info,
   Image *image,size_t *length,ExceptionInfo *exception)
 {
@@ -200,16 +220,7 @@ MagickExport void *ImageToBlob(const ImageInfo *image_info,
         (void) ThrowMagickException(exception,GetMagickModule(),
           ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       else
-        {
-          (void) CloseBlob(image);
-          image->blob->exempt=MagickTrue;
-          image->blob->extent=0;
-          *image->filename='\0';
-          status=WriteImage(blob_info,image,exception);
-          SyncBlobStream(blob_info,image,image);
-          *length=image->blob->length;
-          blob=DetachImageBlob(blob_info,image,status,length);
-        }
+        blob=WriteImageMemoryBlob(blob_info,image,length,exception);
     }
   else
     {
