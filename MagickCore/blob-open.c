@@ -760,6 +760,9 @@ static void OpenWriteBlobStream(const BlobOpenRequest *request,
   const int
     flags = request->flags;
 
+#if !defined(MAGICKCORE_ZLIB_DELEGATE) && !defined(MAGICKCORE_BZLIB_DELEGATE)
+  (void) extension;
+#endif
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
   if (IsCompressedSVGExtension(extension) != MagickFalse)
     OpenGzipWriteBlob(blob_info,filename);
