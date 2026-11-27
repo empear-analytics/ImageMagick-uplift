@@ -692,6 +692,53 @@ static void OpenReadBlobStream(const BlobOpenRequest *request,
     }
 }
 
+static void OpenWriteBlobStream(const BlobOpenRequest *request,
+  BlobInfo *magick_restrict blob_info,const char *filename,
+  const char *extension)
+{
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  const char
+    *const type = request->type;
+
+  const int
+    flags = request->flags;
+
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+  if (IsCompressedSVGExtension(extension) != MagickFalse)
+    {
+      blob_info->file_info.gzfile=gzopen_utf8(filename,"wb");
+      if (blob_info->file_info.gzfile != (gzFile) NULL)
+        blob_info->type=ZipStream;
+    }
+  else
+#endif
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+    if (LocaleCompare(extension,"bz2") == 0)
+      {
+        blob_info->file_info.bzfile=BZ2_bzopen(filename,"w");
+        if (blob_info->file_info.bzfile != (BZFILE *) NULL)
+          blob_info->type=BZipStream;
+      }
+    else
+#endif
+      {
+        int
+          file;
+
+        blob_info->file_info.file=(FILE *) NULL;
+        file=open_utf8(filename,flags,P_MODE);
+        if (file >= 0)
+          blob_info->file_info.file=fdopen(file,type);
+        if (blob_info->file_info.file != (FILE *) NULL)
+          {
+            blob_info->type=FileStream;
+            (void) SetStreamBuffering(image_info,blob_info);
+          }
+      }
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -836,38 +883,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     if (*type == 'r')
       OpenReadBlobStream(&request,blob_info,filename);
     else
-#if defined(MAGICKCORE_ZLIB_DELEGATE)
-      if (IsCompressedSVGExtension(extension) != MagickFalse)
-        {
-          blob_info->file_info.gzfile=gzopen_utf8(filename,"wb");
-          if (blob_info->file_info.gzfile != (gzFile) NULL)
-            blob_info->type=ZipStream;
-        }
-      else
-#endif
-#if defined(MAGICKCORE_BZLIB_DELEGATE)
-        if (LocaleCompare(extension,"bz2") == 0)
-          {
-            blob_info->file_info.bzfile=BZ2_bzopen(filename,"w");
-            if (blob_info->file_info.bzfile != (BZFILE *) NULL)
-              blob_info->type=BZipStream;
-          }
-        else
-#endif
-          {
-            int
-              file;
-
-            blob_info->file_info.file=(FILE *) NULL;
-            file=open_utf8(filename,flags,P_MODE);
-            if (file >= 0)
-              blob_info->file_info.file=fdopen(file,type);
-            if (blob_info->file_info.file != (FILE *) NULL)
-              {
-                blob_info->type=FileStream;
-                (void) SetStreamBuffering(image_info,blob_info);
-              }
-          }
+      OpenWriteBlobStream(&request,blob_info,filename,extension);
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
   blob_info->status=0;
