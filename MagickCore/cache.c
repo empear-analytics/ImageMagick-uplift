@@ -572,6 +572,29 @@ static ssize_t
 
 #include "MagickCore/cache-virtual-private.h"
 
+static MagickBooleanType AcquireVirtualMetacontent(const Image *image,
+  const CacheInfo *magick_restrict cache_info,
+  void *magick_restrict *virtual_metacontent,
+  ExceptionInfo *exception)
+{
+  if (cache_info->metacontent_extent != 0)
+    {
+      /*
+        Acquire a metacontent buffer.
+      */
+      (*virtual_metacontent)=(void *) AcquireQuantumMemory(1,
+        cache_info->metacontent_extent);
+      if ((*virtual_metacontent) == (void *) NULL)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            CacheError,"UnableToGetCacheNexus","`%s'",image->filename);
+          return(MagickFalse);
+        }
+      (void) memset((*virtual_metacontent),0,cache_info->metacontent_extent);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   const VirtualPixelMethod virtual_pixel_method,const ssize_t x,const ssize_t y,
   const size_t columns,const size_t rows,NexusInfo *nexus_info,
@@ -658,21 +681,9 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
     case HorizontalTileVirtualPixelMethod:
     case VerticalTileVirtualPixelMethod:
     {
-      if (cache_info->metacontent_extent != 0)
-        {
-          /*
-            Acquire a metacontent buffer.
-          */
-          virtual_metacontent=(void *) AcquireQuantumMemory(1,
-            cache_info->metacontent_extent);
-          if (virtual_metacontent == (void *) NULL)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                CacheError,"UnableToGetCacheNexus","`%s'",image->filename);
-              return((const Quantum *) NULL);
-            }
-          (void) memset(virtual_metacontent,0,cache_info->metacontent_extent);
-        }
+      if (AcquireVirtualMetacontent(image,cache_info,&virtual_metacontent,
+            exception) == MagickFalse)
+        return((const Quantum *) NULL);
       switch (virtual_pixel_method)
       {
         case BlackVirtualPixelMethod:
