@@ -655,6 +655,9 @@ typedef struct _BlobOpenRequest
 
   int
     flags;
+
+  PolicyRights
+    rights;
 } BlobOpenRequest;
 
 static MagickBooleanType OpenDescriptorBlob(const BlobOpenRequest *request,
@@ -817,6 +820,34 @@ static MagickBooleanType AttachImageInfoStream(const ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType FormWriteBlobFilename(
+  const BlobOpenRequest *request,Image *image,const char *extension,
+  char *filename)
+{
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  const char
+    *const type = request->type;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  const PolicyRights
+    rights = request->rights;
+
+  if (*type == 'w')
+    {
+      (void) CopyMagickString(filename,image->filename,MagickPathExtent);
+      if ((image_info->adjoin == MagickFalse) ||
+          (strchr(filename,'%') != (char *) NULL))
+        FormMultiPartFilename(request,image,extension,filename);
+      if (IsPathAuthorized(rights,filename) == MagickFalse)
+        ThrowPolicyException(filename,MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void OpenBlobFileStream(const BlobOpenRequest *request,
   BlobInfo *magick_restrict blob_info,const char *filename,
   const char *extension)
@@ -917,6 +948,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   request.type=type;
   request.exception=exception;
   request.flags=flags;
+  request.rights=rights;
   if ((LocaleNCompare(filename,"fd:",3) == 0) &&
       (IsGeometry(filename+3) != MagickFalse))
     return(OpenDescriptorBlob(&request,blob_info,filename));
@@ -965,15 +997,8 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     }
 #endif
   GetPathComponent(image->filename,ExtensionPath,extension);
-  if (*type == 'w')
-    {
-      (void) CopyMagickString(filename,image->filename,MagickPathExtent);
-      if ((image_info->adjoin == MagickFalse) ||
-          (strchr(filename,'%') != (char *) NULL))
-        FormMultiPartFilename(&request,image,extension,filename);
-      if (IsPathAuthorized(rights,filename) == MagickFalse)
-        ThrowPolicyException(filename,MagickFalse);
-    }
+  if (FormWriteBlobFilename(&request,image,extension,filename) == MagickFalse)
+    return(MagickFalse);
   OpenBlobFileStream(&request,blob_info,filename,extension);
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
