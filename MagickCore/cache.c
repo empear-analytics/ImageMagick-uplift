@@ -572,6 +572,40 @@ static ssize_t
 
 #include "MagickCore/cache-virtual-private.h"
 
+static void SetVirtualPixelColorTail(const Image *image,
+  const CacheInfo *magick_restrict cache_info,
+  const VirtualPixelMethod virtual_pixel_method,Quantum *virtual_pixel)
+{
+  ssize_t
+    i;
+
+  switch (virtual_pixel_method)
+  {
+    case MaskVirtualPixelMethod:
+    case WhiteVirtualPixelMethod:
+    {
+      for (i=0; i < (ssize_t) cache_info->number_channels; i++)
+        SetPixelChannel(image,(PixelChannel) i,QuantumRange,virtual_pixel);
+      SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
+      break;
+    }
+    default:
+    {
+      SetPixelRed(image,ClampToQuantum(image->background_color.red),
+        virtual_pixel);
+      SetPixelGreen(image,ClampToQuantum(image->background_color.green),
+        virtual_pixel);
+      SetPixelBlue(image,ClampToQuantum(image->background_color.blue),
+        virtual_pixel);
+      SetPixelBlack(image,ClampToQuantum(image->background_color.black),
+        virtual_pixel);
+      SetPixelAlpha(image,ClampToQuantum(image->background_color.alpha),
+        virtual_pixel);
+      break;
+    }
+  }
+}
+
 static void SetVirtualPixelColor(const Image *image,
   const CacheInfo *magick_restrict cache_info,
   const VirtualPixelMethod virtual_pixel_method,Quantum *virtual_pixel)
@@ -603,25 +637,9 @@ static void SetVirtualPixelColor(const Image *image,
       SetPixelAlpha(image,TransparentAlpha,virtual_pixel);
       break;
     }
-    case MaskVirtualPixelMethod:
-    case WhiteVirtualPixelMethod:
-    {
-      for (i=0; i < (ssize_t) cache_info->number_channels; i++)
-        SetPixelChannel(image,(PixelChannel) i,QuantumRange,virtual_pixel);
-      SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
-      break;
-    }
     default:
     {
-      SetPixelRed(image,ClampToQuantum(image->background_color.red),
-        virtual_pixel);
-      SetPixelGreen(image,ClampToQuantum(image->background_color.green),
-        virtual_pixel);
-      SetPixelBlue(image,ClampToQuantum(image->background_color.blue),
-        virtual_pixel);
-      SetPixelBlack(image,ClampToQuantum(image->background_color.black),
-        virtual_pixel);
-      SetPixelAlpha(image,ClampToQuantum(image->background_color.alpha),
+      SetVirtualPixelColorTail(image,cache_info,virtual_pixel_method,
         virtual_pixel);
       break;
     }
