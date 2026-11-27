@@ -770,6 +770,21 @@ static void FormMultiPartFilename(const BlobOpenRequest *request,
   (void) CopyMagickString(image->filename,filename,MagickPathExtent);
 }
 
+static MagickBooleanType AttachImageInfoStream(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info,const char *type)
+{
+  if (image_info->stream != (StreamHandler) NULL)
+    {
+      blob_info->stream=image_info->stream;
+      if (*type == 'w')
+        {
+          blob_info->type=FifoStream;
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -813,15 +828,8 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   GetBlobModeFlags(mode,&flags,&type);
   if (*type != 'r')
     blob_info->synchronize=image_info->synchronize;
-  if (image_info->stream != (StreamHandler) NULL)
-    {
-      blob_info->stream=image_info->stream;
-      if (*type == 'w')
-        {
-          blob_info->type=FifoStream;
-          return(MagickTrue);
-        }
-    }
+  if (AttachImageInfoStream(image_info,blob_info,type) == MagickFalse)
+    return(MagickTrue);
   /*
     Open image file.
   */
