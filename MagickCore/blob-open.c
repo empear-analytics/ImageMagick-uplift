@@ -211,21 +211,13 @@ static void CheckBlobStreamStatus(BlobInfo *blob_info,int status)
   }
 }
 
-static void CloseBlobStream(BlobInfo *blob_info)
+static void CloseBlobStreamTail(BlobInfo *blob_info)
 {
   int
     status;
 
   switch (blob_info->type)
   {
-    case UndefinedStream:
-    case StandardStream:
-      break;
-    case FileStream:
-    {
-      CloseBlobFile(blob_info);
-      break;
-    }
     case PipeStream:
     {
 #if defined(MAGICKCORE_HAVE_PCLOSE)
@@ -249,6 +241,28 @@ static void CloseBlobStream(BlobInfo *blob_info)
 #if defined(MAGICKCORE_BZLIB_DELEGATE)
       BZ2_bzclose(blob_info->file_info.bzfile);
 #endif
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void CloseBlobStream(BlobInfo *blob_info)
+{
+  switch (blob_info->type)
+  {
+    case UndefinedStream:
+    case StandardStream:
+      break;
+    case FileStream:
+    {
+      CloseBlobFile(blob_info);
+      break;
+    }
+    default:
+    {
+      CloseBlobStreamTail(blob_info);
       break;
     }
     case FifoStream:
