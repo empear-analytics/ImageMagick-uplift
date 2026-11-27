@@ -9912,6 +9912,25 @@ that clones the first (the *Code Duplication* cliff, W14).
    it; any other copy passes the pointer it passed (converted to `const void *` by the
    call), or for a scalar the address of the object it read.
    Step 2's type then has `const void *` in that position.
+   Adapters (2026-11-27, owner). A callee at the role whose type differs from the
+   others' only by further parameters (an exported function whose signature may not
+   change: `WriteImages`' filename beside `WriteImage`, `ReadStream`'s stream handler
+   beside `ReadImage`) may take part when, at each of its calls in the copies, every
+   further argument is a constant, the address of a function or object of static
+   storage duration, or an expression of the call's other arguments with no call,
+   assignment or increment in it (`images->filename`, `&PingStream`). It gets one
+   `static` adapter of step 2's type, placed before the first statement that names it:
+   its parameters are step 2's types with the names the copy's call passes, and its body
+   is the one statement `return(Callee(...));`, the callee's arguments in their order,
+   each further argument's text written with the adapter's parameter names. In step 1's
+   comparison that copy's call reads as the adapter's call, and step 5 passes the
+   adapter's name. Why the behaviour is the same: the adapter receives the values the
+   copy's call passed, in the same call at the same point, and computes each further
+   argument from them or from a constant, with no side effect, so the callee receives
+   exactly the arguments it received before (C leaves the order in which a call's
+   arguments are evaluated unspecified, and none of them writes anything). The adapter
+   adds a direct call and the method an indirect one: step 7's timing rule applies as
+   written.
 4. Write one `static inline` function directly above the first caller: its parameters
    are the variables a copy reads (Recipe E step 3) and `const NameMethod method` (one
    per role), at most four in all; when that would make five or more, the methods and,
@@ -27888,3 +27907,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
+| 2026-11-27 | AMEND | CF | Step 3, adapters: a callee whose type differs only by further parameters takes part through a one-statement `static` adapter of the common type, when each further argument is a constant, a static address or a side-effect-free expression of the call's other arguments | `blob-image.c`'s `BlobToImage` and `PingBlob` (campaign B, M144): their tails are the same tokens but for `ReadImage(x,exception)` against `ReadStream(x,&PingStream,exception)`; both are exported, so their types cannot change. A probe of the chain (CF, then W, D, E, D on the shared prologue): 8.67 to 8.83 | owner |
