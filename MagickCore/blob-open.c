@@ -751,6 +751,25 @@ static void OpenWriteBlobStream(const BlobOpenRequest *request,
       }
 }
 
+static void FormMultiPartFilename(const BlobOpenRequest *request,
+  Image *image,const char *extension,char *filename)
+{
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  /*
+    Form filename for multi-part images.
+  */
+  (void) InterpretImageFilename(image_info,image,image->filename,(int)
+    image->scene,filename,exception);
+  if (IsSharedListFilename(filename,image) != MagickFalse)
+    FormSharedListFilename(image,extension,filename);
+  (void) CopyMagickString(image->filename,filename,MagickPathExtent);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -872,16 +891,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       (void) CopyMagickString(filename,image->filename,MagickPathExtent);
       if ((image_info->adjoin == MagickFalse) ||
           (strchr(filename,'%') != (char *) NULL))
-        {
-          /*
-            Form filename for multi-part images.
-          */
-          (void) InterpretImageFilename(image_info,image,image->filename,(int)
-            image->scene,filename,exception);
-          if (IsSharedListFilename(filename,image) != MagickFalse)
-            FormSharedListFilename(image,extension,filename);
-          (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-        }
+        FormMultiPartFilename(&request,image,extension,filename);
       if (IsPathAuthorized(rights,filename) == MagickFalse)
         ThrowPolicyException(filename,MagickFalse);
     }
