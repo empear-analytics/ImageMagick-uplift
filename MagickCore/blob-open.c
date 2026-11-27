@@ -151,29 +151,8 @@ static void SynchronizeBlobFile(BlobInfo *blob_info,int status)
     ThrowBlobException(blob_info);
 }
 
-MagickExport MagickBooleanType CloseBlob(Image *image)
+static void CheckBlobStreamStatus(BlobInfo *blob_info,int status)
 {
-  BlobInfo
-    *magick_restrict blob_info;
-
-  int
-    status;
-
-  /*
-    Close image file.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  blob_info=image->blob;
-  if ((blob_info == (BlobInfo *) NULL) || (blob_info->type == UndefinedStream))
-    return(MagickTrue);
-  status=SyncBlob(image);
-  /* Some platforms report an error when a read-only stream is flushed. */
-  if (IsWrittenBlobFailure(status,blob_info) != MagickFalse)
-    ThrowBlobException(blob_info);
-  status=blob_info->status;
   switch (blob_info->type)
   {
     case UndefinedStream:
@@ -216,16 +195,13 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
     case CustomStream:
       break;
   }
-  blob_info->size=GetBlobSize(image);
-  image->extent=blob_info->size;
-  blob_info->eof=MagickFalse;
-  blob_info->error=0;
-  blob_info->mode=UndefinedBlobMode;
-  if (blob_info->exempt != MagickFalse)
-    {
-      blob_info->type=UndefinedStream;
-      return(blob_info->status != 0 ? MagickFalse : MagickTrue);
-    }
+}
+
+static void CloseBlobStream(BlobInfo *blob_info)
+{
+  int
+    status;
+
   switch (blob_info->type)
   {
     case UndefinedStream:
@@ -271,6 +247,43 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
     case CustomStream:
       break;
   }
+}
+
+MagickExport MagickBooleanType CloseBlob(Image *image)
+{
+  BlobInfo
+    *magick_restrict blob_info;
+
+  int
+    status;
+
+  /*
+    Close image file.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  blob_info=image->blob;
+  if ((blob_info == (BlobInfo *) NULL) || (blob_info->type == UndefinedStream))
+    return(MagickTrue);
+  status=SyncBlob(image);
+  /* Some platforms report an error when a read-only stream is flushed. */
+  if (IsWrittenBlobFailure(status,blob_info) != MagickFalse)
+    ThrowBlobException(blob_info);
+  status=blob_info->status;
+  CheckBlobStreamStatus(blob_info,status);
+  blob_info->size=GetBlobSize(image);
+  image->extent=blob_info->size;
+  blob_info->eof=MagickFalse;
+  blob_info->error=0;
+  blob_info->mode=UndefinedBlobMode;
+  if (blob_info->exempt != MagickFalse)
+    {
+      blob_info->type=UndefinedStream;
+      return(blob_info->status != 0 ? MagickFalse : MagickTrue);
+    }
+  CloseBlobStream(blob_info);
   (void) DetachBlob(blob_info);
   return(blob_info->status != 0 ? MagickFalse : MagickTrue);
 }
