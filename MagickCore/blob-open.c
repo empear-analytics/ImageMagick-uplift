@@ -620,6 +620,9 @@ typedef struct _BlobOpenRequest
 
   ExceptionInfo
     *exception;
+
+  int
+    flags;
 } BlobOpenRequest;
 
 static MagickBooleanType OpenDescriptorBlob(const BlobOpenRequest *request,
@@ -652,6 +655,41 @@ static MagickBooleanType OpenDescriptorBlob(const BlobOpenRequest *request,
   blob_info->type=FileStream;
   blob_info->exempt=MagickTrue;
   return(SetStreamBuffering(image_info,blob_info));
+}
+
+static void OpenReadBlobStream(const BlobOpenRequest *request,
+  BlobInfo *magick_restrict blob_info,const char *filename)
+{
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  const char
+    *const type = request->type;
+
+  const int
+    flags = request->flags;
+
+  OpenReadBlobFile(blob_info,filename,flags,type);
+  if (blob_info->file_info.file != (FILE *) NULL)
+    {
+      size_t
+        count;
+
+      unsigned char
+        magick[3];
+
+      blob_info->type=FileStream;
+      (void) SetStreamBuffering(image_info,blob_info);
+      (void) memset(magick,0,sizeof(magick));
+      count=fread(magick,1,sizeof(magick),blob_info->file_info.file);
+      (void) fseek(blob_info->file_info.file,-((off_t) count),SEEK_CUR);
+#if defined(MAGICKCORE_POSIX_SUPPORT)
+      (void) fflush(blob_info->file_info.file);
+#endif
+      (void) LogMagickEvent(BlobEvent,GetMagickModule(),
+         "  read %.17g magic header bytes",(double) count);
+      OpenCompressedBlob(image_info,blob_info,filename,magick);
+    }
 }
 
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
@@ -718,14 +756,13 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     ThrowPolicyException(filename,MagickFalse);
   if (IsStandardStreamName(filename,image_info) != MagickFalse)
     return(OpenStandardBlob(image_info,blob_info,type));
+  request.image_info=image_info;
+  request.type=type;
+  request.exception=exception;
+  request.flags=flags;
   if ((LocaleNCompare(filename,"fd:",3) == 0) &&
       (IsGeometry(filename+3) != MagickFalse))
-    {
-      request.image_info=image_info;
-      request.type=type;
-      request.exception=exception;
-      return(OpenDescriptorBlob(&request,blob_info,filename));
-    }
+    return(OpenDescriptorBlob(&request,blob_info,filename));
 #if defined(MAGICKCORE_HAVE_POPEN) && defined(MAGICKCORE_PIPES_SUPPORT)
   if (*filename == '|')
     {
@@ -797,29 +834,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     }
   else
     if (*type == 'r')
-      {
-        OpenReadBlobFile(blob_info,filename,flags,type);
-        if (blob_info->file_info.file != (FILE *) NULL)
-          {
-            size_t
-              count;
-
-            unsigned char
-              magick[3];
-
-            blob_info->type=FileStream;
-            (void) SetStreamBuffering(image_info,blob_info);
-            (void) memset(magick,0,sizeof(magick));
-            count=fread(magick,1,sizeof(magick),blob_info->file_info.file);
-            (void) fseek(blob_info->file_info.file,-((off_t) count),SEEK_CUR);
-#if defined(MAGICKCORE_POSIX_SUPPORT)
-            (void) fflush(blob_info->file_info.file);
-#endif
-            (void) LogMagickEvent(BlobEvent,GetMagickModule(),
-               "  read %.17g magic header bytes",(double) count);
-            OpenCompressedBlob(image_info,blob_info,filename,magick);
-          }
-      }
+      OpenReadBlobStream(&request,blob_info,filename);
     else
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
       if (IsCompressedSVGExtension(extension) != MagickFalse)
