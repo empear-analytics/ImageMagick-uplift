@@ -817,6 +817,29 @@ static MagickBooleanType AttachImageInfoStream(const ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void OpenBlobFileStream(const BlobOpenRequest *request,
+  BlobInfo *magick_restrict blob_info,const char *filename,
+  const char *extension)
+{
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  const char
+    *const type = request->type;
+
+  if (image_info->file != (FILE *) NULL)
+    {
+      blob_info->file_info.file=image_info->file;
+      blob_info->type=FileStream;
+      blob_info->exempt=MagickTrue;
+    }
+  else
+    if (*type == 'r')
+      OpenReadBlobStream(request,blob_info,filename);
+    else
+      OpenWriteBlobStream(request,blob_info,filename,extension);
+}
+
 static MagickBooleanType FinishOpenBlob(Image *image,
   BlobInfo *magick_restrict blob_info,const char *filename,
   ExceptionInfo *exception)
@@ -951,17 +974,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       if (IsPathAuthorized(rights,filename) == MagickFalse)
         ThrowPolicyException(filename,MagickFalse);
     }
-  if (image_info->file != (FILE *) NULL)
-    {
-      blob_info->file_info.file=image_info->file;
-      blob_info->type=FileStream;
-      blob_info->exempt=MagickTrue;
-    }
-  else
-    if (*type == 'r')
-      OpenReadBlobStream(&request,blob_info,filename);
-    else
-      OpenWriteBlobStream(&request,blob_info,filename,extension);
+  OpenBlobFileStream(&request,blob_info,filename,extension);
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
   return(FinishOpenBlob(image,blob_info,filename,exception));
