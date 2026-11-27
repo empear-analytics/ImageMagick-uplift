@@ -30,6 +30,11 @@ def problems(msg, known):
     ver = re.findall(r"^Verified: *(\S+) *$", msg, re.M)
     if len(rec) != 1:
         out.append(f"{len(rec)} 'Recipe:' trailers (need exactly one)")
+    elif rec[0] == "none":
+        # Owner, 2026-11-27 (AGENTS.md): an uncatalogued behaviour-preserving
+        # rewrite on code the oracle executes, never at guard level.
+        if ver != ["oracle"]:
+            out.append("'Recipe: none' needs 'Verified: oracle' (owner, 2026-11-27)")
     elif rec[0] not in known:
         out.append(f"recipe '{rec[0]}' is not in the playbook ({' '.join(sorted(known))})")
     if len(ver) != 1 or ver[0] not in ("oracle", "guard"):
