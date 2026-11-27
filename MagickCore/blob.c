@@ -633,6 +633,35 @@ MagickExport MagickBooleanType IsBlobTemporary(const Image *image)
   return(image->blob->temporary);
 }
 
+#if defined(MAGICKCORE_HAVE_MMAP)
+static void GetMapBlobProtection(const MapMode mode,int *protection,
+  int *flags)
+{
+  switch (mode)
+  {
+    case ReadMode:
+    default:
+    {
+      *protection=PROT_READ;
+      *flags|=MAP_PRIVATE;
+      break;
+    }
+    case WriteMode:
+    {
+      *protection=PROT_WRITE;
+      *flags|=MAP_SHARED;
+      break;
+    }
+    case IOMode:
+    {
+      *protection=PROT_READ | PROT_WRITE;
+      *flags|=MAP_SHARED;
+      break;
+    }
+  }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -683,28 +712,7 @@ MagickExport void *MapBlob(int file,const MapMode mode,
 #else
     return(NULL);
 #endif
-  switch (mode)
-  {
-    case ReadMode:
-    default:
-    {
-      protection=PROT_READ;
-      flags|=MAP_PRIVATE;
-      break;
-    }
-    case WriteMode:
-    {
-      protection=PROT_WRITE;
-      flags|=MAP_SHARED;
-      break;
-    }
-    case IOMode:
-    {
-      protection=PROT_READ | PROT_WRITE;
-      flags|=MAP_SHARED;
-      break;
-    }
-  }
+  GetMapBlobProtection(mode,&protection,&flags);
 #if !defined(MAGICKCORE_HAVE_HUGEPAGES) || !defined(MAP_HUGETLB)
   map=mmap((char *) NULL,length,protection,flags,file,offset);
 #else
