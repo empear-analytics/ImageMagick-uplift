@@ -692,6 +692,26 @@ static void OpenReadBlobStream(const BlobOpenRequest *request,
     }
 }
 
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+static void OpenGzipWriteBlob(BlobInfo *magick_restrict blob_info,
+  const char *filename)
+{
+  blob_info->file_info.gzfile=gzopen_utf8(filename,"wb");
+  if (blob_info->file_info.gzfile != (gzFile) NULL)
+    blob_info->type=ZipStream;
+}
+#endif
+
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+static void OpenBZipWriteBlob(BlobInfo *magick_restrict blob_info,
+  const char *filename)
+{
+  blob_info->file_info.bzfile=BZ2_bzopen(filename,"w");
+  if (blob_info->file_info.bzfile != (BZFILE *) NULL)
+    blob_info->type=BZipStream;
+}
+#endif
+
 static void OpenWriteBlobStream(const BlobOpenRequest *request,
   BlobInfo *magick_restrict blob_info,const char *filename,
   const char *extension)
@@ -707,20 +727,12 @@ static void OpenWriteBlobStream(const BlobOpenRequest *request,
 
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
   if (IsCompressedSVGExtension(extension) != MagickFalse)
-    {
-      blob_info->file_info.gzfile=gzopen_utf8(filename,"wb");
-      if (blob_info->file_info.gzfile != (gzFile) NULL)
-        blob_info->type=ZipStream;
-    }
+    OpenGzipWriteBlob(blob_info,filename);
   else
 #endif
 #if defined(MAGICKCORE_BZLIB_DELEGATE)
     if (LocaleCompare(extension,"bz2") == 0)
-      {
-        blob_info->file_info.bzfile=BZ2_bzopen(filename,"w");
-        if (blob_info->file_info.bzfile != (BZFILE *) NULL)
-          blob_info->type=BZipStream;
-      }
+      OpenBZipWriteBlob(blob_info,filename);
     else
 #endif
       {
