@@ -1017,6 +1017,18 @@ static size_t ReadBlobLine(Image *image,BlobInfo *magick_restrict blob_info,
   return(i);
 }
 
+static void StripBlobStringNewline(char *string,const size_t i)
+{
+  /*
+    Strip trailing newline.
+  */
+  if ((string[i] == '\r') || (string[i] == '\n'))
+    string[i]='\0';
+  if (i >= 1)
+    if ((string[i-1] == '\r') || (string[i-1] == '\n'))
+      string[i-1]='\0';
+}
+
 MagickExport char *ReadBlobString(Image *image,char *string)
 {
   BlobInfo
@@ -1072,14 +1084,7 @@ MagickExport char *ReadBlobString(Image *image,char *string)
       break;
     }
   }
-  /*
-    Strip trailing newline.
-  */
-  if ((string[i] == '\r') || (string[i] == '\n'))
-    string[i]='\0';
-  if (i >= 1)
-    if ((string[i-1] == '\r') || (string[i-1] == '\n'))
-      string[i-1]='\0';
+  StripBlobStringNewline(string,i);
   if ((*string == '\0') && (blob_info->eof != MagickFalse))
     return((char *) NULL);
   return(string);
