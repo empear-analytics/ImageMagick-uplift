@@ -669,6 +669,22 @@ static MagickBooleanType AcquireVirtualMetacontent(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType IsEdgeOrTileVirtualPixelMethod(
+  const VirtualPixelMethod virtual_pixel_method)
+{
+  switch (virtual_pixel_method)
+  {
+    case EdgeVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+    case HorizontalTileVirtualPixelMethod:
+    case VerticalTileVirtualPixelMethod:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static MagickBooleanType UsesVirtualPixelColor(
   const VirtualPixelMethod virtual_pixel_method)
 {
@@ -680,15 +696,11 @@ static MagickBooleanType UsesVirtualPixelColor(
     case TransparentVirtualPixelMethod:
     case MaskVirtualPixelMethod:
     case WhiteVirtualPixelMethod:
-    case EdgeVirtualPixelMethod:
-    case CheckerTileVirtualPixelMethod:
-    case HorizontalTileVirtualPixelMethod:
-    case VerticalTileVirtualPixelMethod:
       return(MagickTrue);
     default:
       break;
   }
-  return(MagickFalse);
+  return(IsEdgeOrTileVirtualPixelMethod(virtual_pixel_method));
 }
 
 MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
