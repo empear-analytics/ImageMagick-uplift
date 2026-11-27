@@ -9422,6 +9422,12 @@ whole `switch` with the tail of the function.
    which then is the last statement of `B` and is dropped in step 3 (the end of the `if`
    goes where the `break` went: to the statement after the `switch`). `B` holds no other
    `break`, `continue` or label.
+   Those statements may also leave the function through `return(...)` on some paths
+   (2026-11-27), as step 1's `B` does on all of them (`GetVirtualPixelCacheNexus`' `if
+   (AcquireVirtualMetacontent(...) == MagickFalse) return((const Quantum *) NULL);`
+   before the colour fill). In the `if` each such `return` leaves the function at the
+   same point, after the same statements, as it did from the group; every other path
+   reaches the end of the `if`, where the dropped `break;` went.
 
 7. *Chain form* (2026-11-14). A predicate of step 2's shape whose one group holds four or
    more labels `L1 ... Ln` and is a *Complex Method* (cc is the labels plus 2: the base
@@ -27908,3 +27914,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
 | 2026-11-27 | AMEND | CF | Step 3, adapters: a callee whose type differs only by further parameters takes part through a one-statement `static` adapter of the common type, when each further argument is a constant, a static address or a side-effect-free expression of the call's other arguments | `blob-image.c`'s `BlobToImage` and `PingBlob` (campaign B, M144): their tails are the same tokens but for `ReadImage(x,exception)` against `ReadStream(x,&PingStream,exception)`; both are exported, so their types cannot change. A probe of the chain (CF, then W, D, E, D on the shared prologue): 8.67 to 8.83 | owner |
+| 2026-11-27 | AMEND | LP | Step 6 (widening): the statements before the dropped `break;` may also leave the function through `return(...)` on some paths | `cache.c`'s `GetVirtualPixelCacheNexus` (campaign B, M144): ten labels select the colour setup, whose metacontent allocation returns NULL on failure; neither step 1 (every path returns) nor the widening (no path returns) covered it, and the fall-out form would leave a `switch` holding only `default: break;`. A probe of LP and its chain form: 7.97 to 8.16 | mandate (2026-10-24) |
