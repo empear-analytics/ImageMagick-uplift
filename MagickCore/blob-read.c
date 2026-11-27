@@ -1017,6 +1017,38 @@ static size_t ReadBlobLine(Image *image,BlobInfo *magick_restrict blob_info,
   return(i);
 }
 
+static MagickBooleanType ReadBlobFileString(
+  BlobInfo *magick_restrict blob_info,char *string,size_t *i)
+{
+  char *p = fgets(string,MagickPathExtent,blob_info->file_info.file);
+  if (p == (char *) NULL)
+    {
+      if (ferror(blob_info->file_info.file) != 0)
+        ThrowBlobException(blob_info);
+      return(MagickFalse);
+    }
+  (*i)=strlen(string);
+  return(MagickTrue);
+}
+
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+static MagickBooleanType ReadBlobGzipString(
+  BlobInfo *magick_restrict blob_info,char *string,size_t *i)
+{
+  char *p = gzgets(blob_info->file_info.gzfile,string,MagickPathExtent);
+  if (p == (char *) NULL)
+    {
+      int status = Z_OK;
+      (void) gzerror(blob_info->file_info.gzfile,&status);
+      if (status != Z_OK)
+        ThrowBlobException(blob_info);
+      return(MagickFalse);
+    }
+  (*i)=strlen(string);
+  return(MagickTrue);
+}
+#endif
+
 static void StripBlobStringNewline(char *string,const size_t i)
 {
   /*
@@ -1052,29 +1084,15 @@ MagickExport char *ReadBlobString(Image *image,char *string)
     case StandardStream:
     case FileStream:
     {
-      char *p = fgets(string,MagickPathExtent,blob_info->file_info.file);
-      if (p == (char *) NULL)
-        {
-          if (ferror(blob_info->file_info.file) != 0)
-            ThrowBlobException(blob_info);
-          return((char *) NULL);
-        }
-      i=strlen(string);
+      if (ReadBlobFileString(blob_info,string,&i) == MagickFalse)
+        return((char *) NULL);
       break;
     }
     case ZipStream:
     {
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-      char *p = gzgets(blob_info->file_info.gzfile,string,MagickPathExtent);
-      if (p == (char *) NULL)
-        {
-          int status = Z_OK;
-          (void) gzerror(blob_info->file_info.gzfile,&status);
-          if (status != Z_OK)
-            ThrowBlobException(blob_info);
-          return((char *) NULL);
-        }
-      i=strlen(string);
+      if (ReadBlobGzipString(blob_info,string,&i) == MagickFalse)
+        return((char *) NULL);
       break;
 #endif
     }
