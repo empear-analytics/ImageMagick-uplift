@@ -1001,6 +1001,37 @@ static void AssembleStrokePolygon(const StrokePolygonInput *assembly,
 }
 
 
+static void TraceStrokeJoinQ(const DrawInfo *draw_info,const StrokeBoxes *boxes,
+  const StrokeTargets *targets,const double miterlimit)
+{
+  PointInfo
+    *const box_q = boxes->box_q,
+    **const stroke_p = targets->stroke_p,
+    **const stroke_q = targets->stroke_q;
+
+  ssize_t
+    *const p = targets->p,
+    *const q = targets->q;
+
+  switch (draw_info->linejoin)
+  {
+    case BevelJoin:
+    {
+      (*stroke_q)[(*q)++]=box_q[1];
+      (*stroke_q)[(*q)++]=box_q[2];
+      (*p)=TraceMiterPointP(boxes,(*stroke_p),(*p),miterlimit);
+      break;
+    }
+    case MiterJoin:
+    {
+      TraceMiterPoints(boxes,miterlimit,targets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -1163,16 +1194,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     if (dot_product <= 0.0)
       switch (draw_info->linejoin)
       {
-        case BevelJoin:
+        default:
         {
-          stroke_q[q++]=box_q[1];
-          stroke_q[q++]=box_q[2];
-          p=TraceMiterPointP(&boxes,stroke_p,p,miterlimit);
-          break;
-        }
-        case MiterJoin:
-        {
-          TraceMiterPoints(&boxes,miterlimit,&targets);
+          TraceStrokeJoinQ(draw_info,&boxes,&targets,miterlimit);
           break;
         }
         case RoundJoin:
@@ -1198,8 +1222,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           stroke_q[q++]=box_q[2];
           break;
         }
-        default:
-          break;
       }
     else
       switch (draw_info->linejoin)
