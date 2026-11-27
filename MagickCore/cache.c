@@ -572,6 +572,12 @@ static ssize_t
 
 #include "MagickCore/cache-virtual-private.h"
 
+static inline MagickBooleanType HasNexusMaskChannels(const Image *image)
+{
+  return(((image->channels & WriteMaskChannel) != 0) ||
+    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse);
+}
+
 static void SetVirtualPixelColorTail(const Image *image,
   const CacheInfo *magick_restrict cache_info,
   const VirtualPixelMethod virtual_pixel_method,Quantum *virtual_pixel)
@@ -749,9 +755,7 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   CopyOpenCLBuffer(cache_info);
 #endif
   pixels=SetPixelCacheNexusPixels(cache_info,ReadMode,x,y,columns,rows,
-    ((image->channels & WriteMaskChannel) != 0) ||
-    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse,
-    nexus_info,exception);
+    HasNexusMaskChannels(image),nexus_info,exception);
   if (pixels == (Quantum *) NULL)
     return((const Quantum *) NULL);
   if (IsValidPixelOffset(nexus_info->region.y,cache_info->columns) == MagickFalse)
@@ -903,12 +907,6 @@ MagickExport MagickBooleanType PersistPixelCache(Image *image,
   return(status);
 }
 
-static inline MagickBooleanType HasNexusMaskChannels(const Image *image)
-{
-  return(((image->channels & WriteMaskChannel) != 0) ||
-    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse);
-}
-
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   Q u e u e A u t h e n t i c P i x e l C a c h e N e x u s                 %
