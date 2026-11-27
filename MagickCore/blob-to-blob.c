@@ -167,6 +167,48 @@ static void *WriteImageMemoryBlob(ImageInfo *blob_info,Image *image,
   return(blob);
 }
 
+typedef struct _TemporaryImageBlobWrite
+{
+  ImageInfo
+    *blob_info;
+
+  Image
+    *image;
+
+  size_t
+    *length;
+
+  ExceptionInfo
+    *exception;
+} TemporaryImageBlobWrite;
+
+static void *WriteImageBlobFile(const TemporaryImageBlobWrite *temporary,
+  const char *unique,void *blob)
+{
+  ImageInfo
+    *const blob_info = temporary->blob_info;
+
+  Image
+    *const image = temporary->image;
+
+  size_t
+    *const length = temporary->length;
+
+  ExceptionInfo
+    *const exception = temporary->exception;
+
+  MagickBooleanType
+    status;
+
+  (void) FormatLocaleString(image->filename,MagickPathExtent,
+    "%s:%s",image->magick,unique);
+  status=WriteImage(blob_info,image,exception);
+  (void) fclose(blob_info->file);
+  if (status != MagickFalse)
+    blob=FileToBlob(unique,SIZE_MAX,length,exception);
+  return(blob);
+}
+
 MagickExport void *ImageToBlob(const ImageInfo *image_info,
   Image *image,size_t *length,ExceptionInfo *exception)
 {
@@ -175,9 +217,6 @@ MagickExport void *ImageToBlob(const ImageInfo *image_info,
 
   ImageInfo
     *blob_info;
-
-  MagickBooleanType
-    status;
 
   void
     *blob;
@@ -244,12 +283,10 @@ MagickExport void *ImageToBlob(const ImageInfo *image_info,
           blob_info->file=fdopen(file,"wb");
           if (blob_info->file != (FILE *) NULL)
             {
-              (void) FormatLocaleString(image->filename,MagickPathExtent,
-                "%s:%s",image->magick,unique);
-              status=WriteImage(blob_info,image,exception);
-              (void) fclose(blob_info->file);
-              if (status != MagickFalse)
-                blob=FileToBlob(unique,SIZE_MAX,length,exception);
+              const TemporaryImageBlobWrite
+                temporary = { blob_info, image, length, exception };
+
+              blob=WriteImageBlobFile(&temporary,unique,blob);
             }
           (void) RelinquishUniqueFileResource(unique);
         }
