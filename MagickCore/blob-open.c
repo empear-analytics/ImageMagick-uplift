@@ -151,19 +151,10 @@ static void SynchronizeBlobFile(BlobInfo *blob_info,int status)
     ThrowBlobException(blob_info);
 }
 
-static void CheckBlobStreamStatus(BlobInfo *blob_info,int status)
+static void CheckBlobStreamStatusTail(BlobInfo *blob_info,int status)
 {
   switch (blob_info->type)
   {
-    case UndefinedStream:
-      break;
-    case StandardStream:
-    case FileStream:
-    case PipeStream:
-    {
-      SynchronizeBlobFile(blob_info,status);
-      break;
-    }
     case ZipStream:
     {
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
@@ -184,14 +175,37 @@ static void CheckBlobStreamStatus(BlobInfo *blob_info,int status)
 #endif
       break;
     }
-    case FifoStream:
-      break;
     case BlobStream:
     {
       if (blob_info->file_info.file != (FILE *) NULL)
         SynchronizeBlobFile(blob_info,status);
       break;
     }
+    default:
+      break;
+  }
+}
+
+static void CheckBlobStreamStatus(BlobInfo *blob_info,int status)
+{
+  switch (blob_info->type)
+  {
+    case UndefinedStream:
+      break;
+    case StandardStream:
+    case FileStream:
+    case PipeStream:
+    {
+      SynchronizeBlobFile(blob_info,status);
+      break;
+    }
+    default:
+    {
+      CheckBlobStreamStatusTail(blob_info,status);
+      break;
+    }
+    case FifoStream:
+      break;
     case CustomStream:
       break;
   }
