@@ -89,6 +89,27 @@
 #include "MagickCore/blob-info-private.h"
 
 
+static void RestoreCustomStreamFilenames(const ImageInfo *image_info,
+  const MagickInfo *magick_info,Image *image)
+{
+  Image
+    *images;
+
+  /*
+    Restore original filenames and image format.
+  */
+  for (images=GetFirstImageInList(image); images != (Image *) NULL; )
+  {
+    (void) CopyMagickString(images->filename,image_info->filename,
+      MagickPathExtent);
+    (void) CopyMagickString(images->magick_filename,
+      image_info->filename,MagickPathExtent);
+    (void) CopyMagickString(images->magick,magick_info->name,
+      MagickPathExtent);
+    images=GetNextImageInList(images);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -197,24 +218,7 @@ MagickExport Image *BlobToImage(const ImageInfo *image_info,const void *blob,
     blob_info->magick,blob_info->filename);
   image=ReadImage(clone_info,exception);
   if (image != (Image *) NULL)
-    {
-      Image
-        *images;
-
-      /*
-        Restore original filenames and image format.
-      */
-      for (images=GetFirstImageInList(image); images != (Image *) NULL; )
-      {
-        (void) CopyMagickString(images->filename,image_info->filename,
-          MagickPathExtent);
-        (void) CopyMagickString(images->magick_filename,image_info->filename,
-          MagickPathExtent);
-        (void) CopyMagickString(images->magick,magick_info->name,
-          MagickPathExtent);
-        images=GetNextImageInList(images);
-      }
-    }
+    RestoreCustomStreamFilenames(image_info,magick_info,image);
   clone_info=DestroyImageInfo(clone_info);
   (void) RelinquishUniqueFileResource(blob_info->filename);
   blob_info=DestroyImageInfo(blob_info);
@@ -247,27 +251,6 @@ MagickExport Image *BlobToImage(const ImageInfo *image_info,const void *blob,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void RestoreCustomStreamFilenames(const ImageInfo *image_info,
-  const MagickInfo *magick_info,Image *image)
-{
-  Image
-    *images;
-
-  /*
-    Restore original filenames and image format.
-  */
-  for (images=GetFirstImageInList(image); images != (Image *) NULL; )
-  {
-    (void) CopyMagickString(images->filename,image_info->filename,
-      MagickPathExtent);
-    (void) CopyMagickString(images->magick_filename,
-      image_info->filename,MagickPathExtent);
-    (void) CopyMagickString(images->magick,magick_info->name,
-      MagickPathExtent);
-    images=GetNextImageInList(images);
-  }
-}
-
 static Image *ReadNativeCustomStream(ImageInfo *blob_info,
   ExceptionInfo *exception)
 {
