@@ -597,6 +597,19 @@ static void FormSharedListFilename(const Image *image,const char *extension,
       "%s-%.17g.%s",path,(double) image->scene,extension);
 }
 
+static MagickBooleanType OpenStandardBlob(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info,const char *type)
+{
+  blob_info->file_info.file=(*type == 'r') ? stdin : stdout;
+#if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
+  if (strchr(type,'b') != (char *) NULL)
+    (void) setmode(fileno(blob_info->file_info.file),_O_BINARY);
+#endif
+  blob_info->type=StandardStream;
+  blob_info->exempt=MagickTrue;
+  return(SetStreamBuffering(image_info,blob_info));
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -657,16 +670,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
   if (IsStandardStreamName(filename,image_info) != MagickFalse)
-    {
-      blob_info->file_info.file=(*type == 'r') ? stdin : stdout;
-#if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
-      if (strchr(type,'b') != (char *) NULL)
-        (void) setmode(fileno(blob_info->file_info.file),_O_BINARY);
-#endif
-      blob_info->type=StandardStream;
-      blob_info->exempt=MagickTrue;
-      return(SetStreamBuffering(image_info,blob_info));
-    }
+    return(OpenStandardBlob(image_info,blob_info,type));
   if ((LocaleNCompare(filename,"fd:",3) == 0) &&
       (IsGeometry(filename+3) != MagickFalse))
     {
