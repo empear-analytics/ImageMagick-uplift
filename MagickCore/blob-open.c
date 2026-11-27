@@ -610,11 +610,58 @@ static MagickBooleanType OpenStandardBlob(const ImageInfo *image_info,
   return(SetStreamBuffering(image_info,blob_info));
 }
 
+typedef struct _BlobOpenRequest
+{
+  const ImageInfo
+    *image_info;
+
+  const char
+    *type;
+
+  ExceptionInfo
+    *exception;
+} BlobOpenRequest;
+
+static MagickBooleanType OpenDescriptorBlob(const BlobOpenRequest *request,
+  BlobInfo *magick_restrict blob_info,const char *filename)
+{
+  const ImageInfo
+    *const image_info = request->image_info;
+
+  const char
+    *const type = request->type;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  char
+    fileMode[2];
+
+  *fileMode=(*type);
+  fileMode[1]='\0';
+  blob_info->file_info.file=fdopen(StringToInteger(filename+3),fileMode);
+  if (blob_info->file_info.file == (FILE *) NULL)
+    {
+      ThrowFileException(exception,BlobError,"UnableToOpenBlob",filename);
+      return(MagickFalse);
+    }
+#if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
+  if (strchr(type,'b') != (char *) NULL)
+    (void) setmode(fileno(blob_info->file_info.file),_O_BINARY);
+#endif
+  blob_info->type=FileStream;
+  blob_info->exempt=MagickTrue;
+  return(SetStreamBuffering(image_info,blob_info));
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
   BlobInfo
     *magick_restrict blob_info;
+
+  BlobOpenRequest
+    request;
 
   char
     extension[MagickPathExtent],
@@ -674,24 +721,10 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   if ((LocaleNCompare(filename,"fd:",3) == 0) &&
       (IsGeometry(filename+3) != MagickFalse))
     {
-      char
-        fileMode[2];
-
-      *fileMode=(*type);
-      fileMode[1]='\0';
-      blob_info->file_info.file=fdopen(StringToInteger(filename+3),fileMode);
-      if (blob_info->file_info.file == (FILE *) NULL)
-        {
-          ThrowFileException(exception,BlobError,"UnableToOpenBlob",filename);
-          return(MagickFalse);
-        }
-#if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
-      if (strchr(type,'b') != (char *) NULL)
-        (void) setmode(fileno(blob_info->file_info.file),_O_BINARY);
-#endif
-      blob_info->type=FileStream;
-      blob_info->exempt=MagickTrue;
-      return(SetStreamBuffering(image_info,blob_info));
+      request.image_info=image_info;
+      request.type=type;
+      request.exception=exception;
+      return(OpenDescriptorBlob(&request,blob_info,filename));
     }
 #if defined(MAGICKCORE_HAVE_POPEN) && defined(MAGICKCORE_PIPES_SUPPORT)
   if (*filename == '|')
