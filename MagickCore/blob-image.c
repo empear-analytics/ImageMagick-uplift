@@ -268,6 +268,26 @@ static void RestoreCustomStreamFilenames(const ImageInfo *image_info,
   }
 }
 
+static Image *ReadNativeCustomStream(ImageInfo *blob_info,
+  ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent];
+
+  Image
+    *image;
+
+  /*
+    Native blob support for this image format or SetImageInfo changed the
+    blob to a file.
+  */
+  (void) CopyMagickString(filename,blob_info->filename,MagickPathExtent);
+  (void) FormatLocaleString(blob_info->filename,MagickPathExtent,"%s:%s",
+    blob_info->magick,filename);
+  image=ReadImage(blob_info,exception);
+  return(image);
+}
+
 MagickExport Image *CustomStreamToImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -304,19 +324,7 @@ MagickExport Image *CustomStreamToImage(const ImageInfo *image_info,
   image=(Image *) NULL;
   if ((GetMagickBlobSupport(magick_info) != MagickFalse) ||
       (*blob_info->filename != '\0'))
-    {
-      char
-        filename[MagickPathExtent];
-
-      /*
-        Native blob support for this image format or SetImageInfo changed the
-        blob to a file.
-      */
-      (void) CopyMagickString(filename,blob_info->filename,MagickPathExtent);
-      (void) FormatLocaleString(blob_info->filename,MagickPathExtent,"%s:%s",
-        blob_info->magick,filename);
-      image=ReadImage(blob_info,exception);
-    }
+    image=ReadNativeCustomStream(blob_info,exception);
   else
     {
       char
