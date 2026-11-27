@@ -572,6 +572,143 @@ static ssize_t
 
 #include "MagickCore/cache-virtual-private.h"
 
+static inline MagickBooleanType HasNexusMaskChannels(const Image *image)
+{
+  return(((image->channels & WriteMaskChannel) != 0) ||
+    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse);
+}
+
+static void SetVirtualPixelColorTail(const Image *image,
+  const CacheInfo *magick_restrict cache_info,
+  const VirtualPixelMethod virtual_pixel_method,Quantum *virtual_pixel)
+{
+  ssize_t
+    i;
+
+  switch (virtual_pixel_method)
+  {
+    case MaskVirtualPixelMethod:
+    case WhiteVirtualPixelMethod:
+    {
+      for (i=0; i < (ssize_t) cache_info->number_channels; i++)
+        SetPixelChannel(image,(PixelChannel) i,QuantumRange,virtual_pixel);
+      SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
+      break;
+    }
+    default:
+    {
+      SetPixelRed(image,ClampToQuantum(image->background_color.red),
+        virtual_pixel);
+      SetPixelGreen(image,ClampToQuantum(image->background_color.green),
+        virtual_pixel);
+      SetPixelBlue(image,ClampToQuantum(image->background_color.blue),
+        virtual_pixel);
+      SetPixelBlack(image,ClampToQuantum(image->background_color.black),
+        virtual_pixel);
+      SetPixelAlpha(image,ClampToQuantum(image->background_color.alpha),
+        virtual_pixel);
+      break;
+    }
+  }
+}
+
+static void SetVirtualPixelColor(const Image *image,
+  const CacheInfo *magick_restrict cache_info,
+  const VirtualPixelMethod virtual_pixel_method,Quantum *virtual_pixel)
+{
+  ssize_t
+    i;
+
+  switch (virtual_pixel_method)
+  {
+    case BlackVirtualPixelMethod:
+    {
+      for (i=0; i < (ssize_t) cache_info->number_channels; i++)
+        SetPixelChannel(image,(PixelChannel) i,(Quantum) 0,virtual_pixel);
+      SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
+      break;
+    }
+    case GrayVirtualPixelMethod:
+    {
+      for (i=0; i < (ssize_t) cache_info->number_channels; i++)
+        SetPixelChannel(image,(PixelChannel) i,QuantumRange/2,
+          virtual_pixel);
+      SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
+      break;
+    }
+    case TransparentVirtualPixelMethod:
+    {
+      for (i=0; i < (ssize_t) cache_info->number_channels; i++)
+        SetPixelChannel(image,(PixelChannel) i,(Quantum) 0,virtual_pixel);
+      SetPixelAlpha(image,TransparentAlpha,virtual_pixel);
+      break;
+    }
+    default:
+    {
+      SetVirtualPixelColorTail(image,cache_info,virtual_pixel_method,
+        virtual_pixel);
+      break;
+    }
+  }
+}
+
+static MagickBooleanType AcquireVirtualMetacontent(const Image *image,
+  const CacheInfo *magick_restrict cache_info,
+  void *magick_restrict *virtual_metacontent,
+  ExceptionInfo *exception)
+{
+  if (cache_info->metacontent_extent != 0)
+    {
+      /*
+        Acquire a metacontent buffer.
+      */
+      (*virtual_metacontent)=(void *) AcquireQuantumMemory(1,
+        cache_info->metacontent_extent);
+      if ((*virtual_metacontent) == (void *) NULL)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            CacheError,"UnableToGetCacheNexus","`%s'",image->filename);
+          return(MagickFalse);
+        }
+      (void) memset((*virtual_metacontent),0,cache_info->metacontent_extent);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType IsEdgeOrTileVirtualPixelMethod(
+  const VirtualPixelMethod virtual_pixel_method)
+{
+  switch (virtual_pixel_method)
+  {
+    case EdgeVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+    case HorizontalTileVirtualPixelMethod:
+    case VerticalTileVirtualPixelMethod:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType UsesVirtualPixelColor(
+  const VirtualPixelMethod virtual_pixel_method)
+{
+  switch (virtual_pixel_method)
+  {
+    case BackgroundVirtualPixelMethod:
+    case BlackVirtualPixelMethod:
+    case GrayVirtualPixelMethod:
+    case TransparentVirtualPixelMethod:
+    case MaskVirtualPixelMethod:
+    case WhiteVirtualPixelMethod:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(IsEdgeOrTileVirtualPixelMethod(virtual_pixel_method));
+}
+
 MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   const VirtualPixelMethod virtual_pixel_method,const ssize_t x,const ssize_t y,
   const size_t columns,const size_t rows,NexusInfo *nexus_info,
@@ -596,7 +733,6 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
     virtual_pixel[MaxPixelChannels];
 
   ssize_t
-    i,
     v;
 
   unsigned char
@@ -619,9 +755,7 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   CopyOpenCLBuffer(cache_info);
 #endif
   pixels=SetPixelCacheNexusPixels(cache_info,ReadMode,x,y,columns,rows,
-    ((image->channels & WriteMaskChannel) != 0) ||
-    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse,
-    nexus_info,exception);
+    HasNexusMaskChannels(image),nexus_info,exception);
   if (pixels == (Quantum *) NULL)
     return((const Quantum *) NULL);
   if (IsValidPixelOffset(nexus_info->region.y,cache_info->columns) == MagickFalse)
@@ -645,86 +779,14 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   (void) memset(virtual_pixel,0,cache_info->number_channels*
     sizeof(*virtual_pixel));
   virtual_metacontent=(void *) NULL;
-  switch (virtual_pixel_method)
-  {
-    case BackgroundVirtualPixelMethod:
-    case BlackVirtualPixelMethod:
-    case GrayVirtualPixelMethod:
-    case TransparentVirtualPixelMethod:
-    case MaskVirtualPixelMethod:
-    case WhiteVirtualPixelMethod:
-    case EdgeVirtualPixelMethod:
-    case CheckerTileVirtualPixelMethod:
-    case HorizontalTileVirtualPixelMethod:
-    case VerticalTileVirtualPixelMethod:
+  if (UsesVirtualPixelColor(virtual_pixel_method) != MagickFalse)
     {
-      if (cache_info->metacontent_extent != 0)
-        {
-          /*
-            Acquire a metacontent buffer.
-          */
-          virtual_metacontent=(void *) AcquireQuantumMemory(1,
-            cache_info->metacontent_extent);
-          if (virtual_metacontent == (void *) NULL)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                CacheError,"UnableToGetCacheNexus","`%s'",image->filename);
-              return((const Quantum *) NULL);
-            }
-          (void) memset(virtual_metacontent,0,cache_info->metacontent_extent);
-        }
-      switch (virtual_pixel_method)
-      {
-        case BlackVirtualPixelMethod:
-        {
-          for (i=0; i < (ssize_t) cache_info->number_channels; i++)
-            SetPixelChannel(image,(PixelChannel) i,(Quantum) 0,virtual_pixel);
-          SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
-          break;
-        }
-        case GrayVirtualPixelMethod:
-        {
-          for (i=0; i < (ssize_t) cache_info->number_channels; i++)
-            SetPixelChannel(image,(PixelChannel) i,QuantumRange/2,
-              virtual_pixel);
-          SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
-          break;
-        }
-        case TransparentVirtualPixelMethod:
-        {
-          for (i=0; i < (ssize_t) cache_info->number_channels; i++)
-            SetPixelChannel(image,(PixelChannel) i,(Quantum) 0,virtual_pixel);
-          SetPixelAlpha(image,TransparentAlpha,virtual_pixel);
-          break;
-        }
-        case MaskVirtualPixelMethod:
-        case WhiteVirtualPixelMethod:
-        {
-          for (i=0; i < (ssize_t) cache_info->number_channels; i++)
-            SetPixelChannel(image,(PixelChannel) i,QuantumRange,virtual_pixel);
-          SetPixelAlpha(image,OpaqueAlpha,virtual_pixel);
-          break;
-        }
-        default:
-        {
-          SetPixelRed(image,ClampToQuantum(image->background_color.red),
-            virtual_pixel);
-          SetPixelGreen(image,ClampToQuantum(image->background_color.green),
-            virtual_pixel);
-          SetPixelBlue(image,ClampToQuantum(image->background_color.blue),
-            virtual_pixel);
-          SetPixelBlack(image,ClampToQuantum(image->background_color.black),
-            virtual_pixel);
-          SetPixelAlpha(image,ClampToQuantum(image->background_color.alpha),
-            virtual_pixel);
-          break;
-        }
-      }
-      break;
+      if (AcquireVirtualMetacontent(image,cache_info,&virtual_metacontent,
+            exception) == MagickFalse)
+        return((const Quantum *) NULL);
+      SetVirtualPixelColor(image,cache_info,virtual_pixel_method,
+        virtual_pixel);
     }
-    default:
-      break;
-  }
   {
     const VirtualPixelRows
       virtual_rows = { image, virtual_pixel_method, x, y, columns, rows,
@@ -845,12 +907,6 @@ MagickExport MagickBooleanType PersistPixelCache(Image *image,
   return(status);
 }
 
-static inline MagickBooleanType HasNexusMaskChannels(const Image *image)
-{
-  return(((image->channels & WriteMaskChannel) != 0) ||
-    ((image->channels & CompositeMaskChannel) != 0) ? MagickTrue : MagickFalse);
-}
-
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   Q u e u e A u t h e n t i c P i x e l C a c h e N e x u s                 %

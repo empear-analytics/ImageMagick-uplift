@@ -120,15 +120,24 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute.h \
   MagickCore/blob.c \
   MagickCore/blob-stream.c \
+  MagickCore/blob-raw-write.c \
+  MagickCore/blob-raw-read.c \
+  MagickCore/blob-file.c \
+  MagickCore/blob-open.c \
   MagickCore/blob-query.c \
+  MagickCore/blob-seek.c \
   MagickCore/blob-write.c \
   MagickCore/blob-read.c \
   MagickCore/blob-image.c \
+  MagickCore/blob-file-io.c \
+  MagickCore/blob-to-custom.c \
+  MagickCore/blob-to-blob.c \
   MagickCore/blob-custom.c \
   MagickCore/blob.h \
   MagickCore/blob-private.h \
   MagickCore/blob-info-private.h \
   MagickCore/blob-io-private.h \
+  MagickCore/blob-sync-private.h \
   MagickCore/cache.c \
   MagickCore/cache-access.c \
   MagickCore/cache.h \
@@ -826,6 +835,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/blob-private.h \
   MagickCore/blob-info-private.h \
   MagickCore/blob-io-private.h \
+  MagickCore/blob-sync-private.h \
   MagickCore/cache-private.h \
   MagickCore/cache-private.h \
   MagickCore/cache-clone-private.h \

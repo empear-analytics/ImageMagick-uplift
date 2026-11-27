@@ -89,6 +89,54 @@
 #include "MagickCore/blob-info-private.h"
 #include "MagickCore/blob-io-private.h"
 
+static inline int ReadBlobFileByte(BlobInfo *magick_restrict blob_info)
+{
+  int
+    c;
+
+  c=getc(blob_info->file_info.file);
+  if (c == EOF)
+    {
+      if (ferror(blob_info->file_info.file) != 0)
+        ThrowBlobException(blob_info);
+      return(EOF);
+    }
+  return(c);
+}
+
+static inline int ReadBlobStreamByte(BlobInfo *magick_restrict blob_info)
+{
+  int
+    c;
+
+  if (blob_info->offset >= (MagickOffsetType) blob_info->length)
+    {
+      blob_info->eof=MagickTrue;
+      return(EOF);
+    }
+  c=(int) (*((unsigned char *) blob_info->data+blob_info->offset));
+  blob_info->offset++;
+  return(c);
+}
+
+static inline int ReadBlobDefaultByte(Image *image)
+{
+  int
+    c;
+
+  ssize_t
+    count;
+
+  unsigned char
+    buffer[1];
+
+  count=ReadBlob(image,1,buffer);
+  if (count != 1)
+    return(EOF);
+  c=(int) *buffer;
+  return(c);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -130,38 +178,17 @@ MagickExport int ReadBlobByte(Image *image)
     case FileStream:
     case PipeStream:
     {
-      c=getc(blob_info->file_info.file);
-      if (c == EOF)
-        {
-          if (ferror(blob_info->file_info.file) != 0)
-            ThrowBlobException(blob_info);
-          return(EOF);
-        }
+      c=ReadBlobFileByte(blob_info);
       break;
     }
     case BlobStream:
     {
-      if (blob_info->offset >= (MagickOffsetType) blob_info->length)
-        {
-          blob_info->eof=MagickTrue;
-          return(EOF);
-        }
-      c=(int) (*((unsigned char *) blob_info->data+blob_info->offset));
-      blob_info->offset++;
+      c=ReadBlobStreamByte(blob_info);
       break;
     }
     default:
     {
-      ssize_t
-        count;
-
-      unsigned char
-        buffer[1];
-
-      count=ReadBlob(image,1,buffer);
-      if (count != 1)
-        return(EOF);
-      c=(int) *buffer;
+      c=ReadBlobDefaultByte(image);
       break;
     }
   }
@@ -1017,6 +1044,50 @@ static size_t ReadBlobLine(Image *image,BlobInfo *magick_restrict blob_info,
   return(i);
 }
 
+static MagickBooleanType ReadBlobFileString(
+  BlobInfo *magick_restrict blob_info,char *string,size_t *i)
+{
+  char *p = fgets(string,MagickPathExtent,blob_info->file_info.file);
+  if (p == (char *) NULL)
+    {
+      if (ferror(blob_info->file_info.file) != 0)
+        ThrowBlobException(blob_info);
+      return(MagickFalse);
+    }
+  (*i)=strlen(string);
+  return(MagickTrue);
+}
+
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+static MagickBooleanType ReadBlobGzipString(
+  BlobInfo *magick_restrict blob_info,char *string,size_t *i)
+{
+  char *p = gzgets(blob_info->file_info.gzfile,string,MagickPathExtent);
+  if (p == (char *) NULL)
+    {
+      int status = Z_OK;
+      (void) gzerror(blob_info->file_info.gzfile,&status);
+      if (status != Z_OK)
+        ThrowBlobException(blob_info);
+      return(MagickFalse);
+    }
+  (*i)=strlen(string);
+  return(MagickTrue);
+}
+#endif
+
+static void StripBlobStringNewline(char *string,const size_t i)
+{
+  /*
+    Strip trailing newline.
+  */
+  if ((string[i] == '\r') || (string[i] == '\n'))
+    string[i]='\0';
+  if (i >= 1)
+    if ((string[i-1] == '\r') || (string[i-1] == '\n'))
+      string[i-1]='\0';
+}
+
 MagickExport char *ReadBlobString(Image *image,char *string)
 {
   BlobInfo
@@ -1040,29 +1111,15 @@ MagickExport char *ReadBlobString(Image *image,char *string)
     case StandardStream:
     case FileStream:
     {
-      char *p = fgets(string,MagickPathExtent,blob_info->file_info.file);
-      if (p == (char *) NULL)
-        {
-          if (ferror(blob_info->file_info.file) != 0)
-            ThrowBlobException(blob_info);
-          return((char *) NULL);
-        }
-      i=strlen(string);
+      if (ReadBlobFileString(blob_info,string,&i) == MagickFalse)
+        return((char *) NULL);
       break;
     }
     case ZipStream:
     {
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-      char *p = gzgets(blob_info->file_info.gzfile,string,MagickPathExtent);
-      if (p == (char *) NULL)
-        {
-          int status = Z_OK;
-          (void) gzerror(blob_info->file_info.gzfile,&status);
-          if (status != Z_OK)
-            ThrowBlobException(blob_info);
-          return((char *) NULL);
-        }
-      i=strlen(string);
+      if (ReadBlobGzipString(blob_info,string,&i) == MagickFalse)
+        return((char *) NULL);
       break;
 #endif
     }
@@ -1072,14 +1129,7 @@ MagickExport char *ReadBlobString(Image *image,char *string)
       break;
     }
   }
-  /*
-    Strip trailing newline.
-  */
-  if ((string[i] == '\r') || (string[i] == '\n'))
-    string[i]='\0';
-  if (i >= 1)
-    if ((string[i-1] == '\r') || (string[i-1] == '\n'))
-      string[i-1]='\0';
+  StripBlobStringNewline(string,i);
   if ((*string == '\0') && (blob_info->eof != MagickFalse))
     return((char *) NULL);
   return(string);
