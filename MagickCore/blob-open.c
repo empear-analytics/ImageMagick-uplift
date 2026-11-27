@@ -429,6 +429,23 @@ static inline MagickBooleanType CanMapBlobFile(
     MagickTrue : MagickFalse);
 }
 
+static void AttachMappedBlobFile(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info,void *blob,const size_t length)
+{
+  /*
+    Format supports blobs-- use memory-mapped I/O.
+  */
+  if (image_info->file != (FILE *) NULL)
+    blob_info->exempt=MagickFalse;
+  else
+    {
+      (void) fclose(blob_info->file_info.file);
+      blob_info->file_info.file=(FILE *) NULL;
+    }
+  AttachBlob(blob_info,blob,length);
+  blob_info->mapped=MagickTrue;
+}
+
 static void MapBlobFile(const ImageInfo *image_info,
   BlobInfo *magick_restrict blob_info)
 {
@@ -455,20 +472,7 @@ static void MapBlobFile(const ImageInfo *image_info,
       if (blob == (void *) NULL)
         RelinquishMagickResource(MapResource,length);
       else
-        {
-          /*
-            Format supports blobs-- use memory-mapped I/O.
-          */
-          if (image_info->file != (FILE *) NULL)
-            blob_info->exempt=MagickFalse;
-          else
-            {
-              (void) fclose(blob_info->file_info.file);
-              blob_info->file_info.file=(FILE *) NULL;
-            }
-          AttachBlob(blob_info,blob,length);
-          blob_info->mapped=MagickTrue;
-        }
+        AttachMappedBlobFile(image_info,blob_info,blob,length);
     }
 }
 
