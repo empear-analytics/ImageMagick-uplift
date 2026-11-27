@@ -89,6 +89,54 @@
 #include "MagickCore/blob-info-private.h"
 #include "MagickCore/blob-io-private.h"
 
+static inline int ReadBlobFileByte(BlobInfo *magick_restrict blob_info)
+{
+  int
+    c;
+
+  c=getc(blob_info->file_info.file);
+  if (c == EOF)
+    {
+      if (ferror(blob_info->file_info.file) != 0)
+        ThrowBlobException(blob_info);
+      return(EOF);
+    }
+  return(c);
+}
+
+static inline int ReadBlobStreamByte(BlobInfo *magick_restrict blob_info)
+{
+  int
+    c;
+
+  if (blob_info->offset >= (MagickOffsetType) blob_info->length)
+    {
+      blob_info->eof=MagickTrue;
+      return(EOF);
+    }
+  c=(int) (*((unsigned char *) blob_info->data+blob_info->offset));
+  blob_info->offset++;
+  return(c);
+}
+
+static inline int ReadBlobDefaultByte(Image *image)
+{
+  int
+    c;
+
+  ssize_t
+    count;
+
+  unsigned char
+    buffer[1];
+
+  count=ReadBlob(image,1,buffer);
+  if (count != 1)
+    return(EOF);
+  c=(int) *buffer;
+  return(c);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -130,38 +178,17 @@ MagickExport int ReadBlobByte(Image *image)
     case FileStream:
     case PipeStream:
     {
-      c=getc(blob_info->file_info.file);
-      if (c == EOF)
-        {
-          if (ferror(blob_info->file_info.file) != 0)
-            ThrowBlobException(blob_info);
-          return(EOF);
-        }
+      c=ReadBlobFileByte(blob_info);
       break;
     }
     case BlobStream:
     {
-      if (blob_info->offset >= (MagickOffsetType) blob_info->length)
-        {
-          blob_info->eof=MagickTrue;
-          return(EOF);
-        }
-      c=(int) (*((unsigned char *) blob_info->data+blob_info->offset));
-      blob_info->offset++;
+      c=ReadBlobStreamByte(blob_info);
       break;
     }
     default:
     {
-      ssize_t
-        count;
-
-      unsigned char
-        buffer[1];
-
-      count=ReadBlob(image,1,buffer);
-      if (count != 1)
-        return(EOF);
-      c=(int) *buffer;
+      c=ReadBlobDefaultByte(image);
       break;
     }
   }
