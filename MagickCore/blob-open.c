@@ -817,6 +817,22 @@ static MagickBooleanType AttachImageInfoStream(const ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishOpenBlob(Image *image,
+  BlobInfo *magick_restrict blob_info,const char *filename,
+  ExceptionInfo *exception)
+{
+  blob_info->status=0;
+  blob_info->error_number=0;
+  if (blob_info->type != UndefinedStream)
+    blob_info->size=GetBlobSize(image);
+  else
+    {
+      ThrowFileException(exception,BlobError,"UnableToOpenBlob",filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -948,14 +964,5 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       OpenWriteBlobStream(&request,blob_info,filename,extension);
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
-  blob_info->status=0;
-  blob_info->error_number=0;
-  if (blob_info->type != UndefinedStream)
-    blob_info->size=GetBlobSize(image);
-  else
-    {
-      ThrowFileException(exception,BlobError,"UnableToOpenBlob",filename);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FinishOpenBlob(image,blob_info,filename,exception));
 }
