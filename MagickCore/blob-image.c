@@ -208,6 +208,18 @@ static Image *ReadBlobImage(const BlobReadRequest *request,
   return(image);
 }
 
+static MagickBooleanType CheckBlobLength(const ImageInfo *image_info,
+  const void *blob,const size_t length,ExceptionInfo *exception)
+{
+  if ((blob == (const void *) NULL) || (length == 0))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),BlobError,
+        "ZeroLengthBlobNotPermitted","`%s'",image_info->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -251,12 +263,8 @@ MagickExport Image *BlobToImage(const ImageInfo *image_info,const void *blob,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       image_info->filename);
-  if ((blob == (const void *) NULL) || (length == 0))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),BlobError,
-        "ZeroLengthBlobNotPermitted","`%s'",image_info->filename);
-      return((Image *) NULL);
-    }
+  if (CheckBlobLength(image_info,blob,length,exception) == MagickFalse)
+    return((Image *) NULL);
   blob_info=CloneImageInfo(image_info);
   blob_info->blob=(void *) blob;
   blob_info->length=length;
