@@ -2311,9 +2311,18 @@ static void XCreateBackgroundPixmap(const BackgroundInput *input,
       image->filename);
 }
 
-static void XShowBackgroundPixmap(const int width,XWindowInfo *window_info,
-  const int height,Display *display,Image *image)
+static void XShowBackgroundPixmap(const BackgroundInput *input,
+  const BackgroundTargets *targets,const int width,const int height)
 {
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
   size_t
     delay;
 
@@ -2337,15 +2346,6 @@ static void XShowBackgroundPixmap(const int width,XWindowInfo *window_info,
 static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   const BackgroundTargets *targets,const int width,const int height)
 {
-  Display
-    *const display = input->display;
-
-  Image
-    *const image = input->image;
-
-  XWindowInfo
-    *const window_info = targets->window_info;
-
   /*
     Create the X pixmap.
   */
@@ -2353,7 +2353,7 @@ static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   /*
     Display pixmap on the window.
   */
-  XShowBackgroundPixmap(width,window_info,height,display,image);
+  XShowBackgroundPixmap(input,targets,width,height);
 }
 
 #endif
