@@ -874,7 +874,7 @@ static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
   {
     case BilinearForwardDistortion:
     case BilinearReverseDistortion:
-      return(BilinearCoefficients(coeff,method,context));
+      return(BilinearCoefficients(call));
 #if 0
     case QuadrilateralDistortion:
     {

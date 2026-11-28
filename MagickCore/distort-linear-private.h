@@ -1178,9 +1178,17 @@ static inline void SetBilinearForwardCoefficients(double *coeff,
   }
 }
 
-static inline double *BilinearCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *BilinearCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   ExceptionInfo
     *const exception = context->exception;
 
