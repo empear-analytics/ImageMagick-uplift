@@ -441,6 +441,45 @@ static MagickBooleanType AcquireStretchInput(Image *image,StretchResources *r,
   return(MagickTrue);
 }
 
+static MagickBooleanType CreateStretchHistogramBuffer(StretchResources *r,
+  ExceptionInfo *exception)
+{
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* If the host pointer is aligned to the size of cl_uint,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+  if (ALIGNED(r->histogram,cl_uint4))
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
+    hostPtr = r->histogram;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+    hostPtr = r->histogram;
+  }
+  /* create a CL buffer for histogram  */
+  length = (MaxMap+1);
+  r->histogramBuffer = r->clEnv->library->clCreateBuffer(r->device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -521,27 +560,8 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   if (AcquireStretchInput(image,&r,exception) == MagickFalse)
     goto cleanup;
 
-  /* If the host pointer is aligned to the size of cl_uint,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  if (ALIGNED(r.histogram,cl_uint4))
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-    hostPtr = r.histogram;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = r.histogram;
-  }
-  /* create a CL buffer for histogram  */
-  length = (MaxMap+1);
-  r.histogramBuffer = clEnv->library->clCreateBuffer(r.device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+  if (CreateStretchHistogramBuffer(&r,exception) == MagickFalse)
     goto cleanup;
-  }
 
   {
     const HistogramKernelLaunch
