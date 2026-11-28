@@ -437,9 +437,15 @@ static inline void SetAffineVectors(double **vectors,double *coeff,
     vectors[i] = &(coeff[i*3]);
 }
 
-static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors,
-  const CoefficientContext *context)
+static inline void AddAffineTerms(const CoefficientCall *call,double **matrix,
+  double **vectors)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
@@ -549,7 +555,7 @@ static inline double *AffineCoefficients(const CoefficientCall *call)
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  AddAffineTerms(coeff,matrix,vectors,context);
+  AddAffineTerms(call,matrix,vectors);
   /* Solve for LeastSquares Coefficients */
   status=GaussJordanElimination(matrix,vectors,3UL,number_values);
   matrix = RelinquishMagickMatrix(matrix, 3UL);
