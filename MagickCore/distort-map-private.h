@@ -1146,7 +1146,12 @@ static MagickBooleanType PrintPerspectiveFX(const DistortVerboseFX *fx,
         "DistortCoefficients");
       return(MagickFalse);
     }
-  InvertPerspectiveCoefficients(coeff, inverse);
+  {
+    const CoefficientInversion
+      inversion = { coeff, inverse };
+
+    InvertPerspectiveCoefficients(&inversion);
+  }
   (void) FormatLocaleFile(stderr,"Perspective Projection:\n");
   (void) FormatLocaleFile(stderr,
     "  -distort PerspectiveProjection \\\n      '");

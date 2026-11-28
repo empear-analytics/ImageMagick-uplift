@@ -66,9 +66,15 @@ static inline void InvertAffineCoefficients(
   inverse[5]=determinant*(coeff[2]*coeff[3]-coeff[0]*coeff[5]);
 }
 
-static inline void InvertPerspectiveCoefficients(const double *coeff,
-  double *inverse)
+static inline void InvertPerspectiveCoefficients(
+  const CoefficientInversion *inversion)
 {
+  const double
+    *const coeff = inversion->coeff;
+
+  double
+    *const inverse = inversion->inverse;
+
   /* From "Digital Image Warping" by George Wolberg, page 53 */
   double determinant;
 
@@ -1229,7 +1235,12 @@ static inline double *PerspectiveProjectionCoefficients(
     return((double *) NULL);
   }
   /* FUTURE: trap test  c0*c4-c3*c1 == 0  (determinate = 0, no inverse) */
-  InvertPerspectiveCoefficients(arguments, coeff);
+  {
+    const CoefficientInversion
+      inversion = { arguments, coeff };
+
+    InvertPerspectiveCoefficients(&inversion);
+  }
   /*
     Calculate 9'th coefficient! The ground-sky determination.
     What is sign of the 'ground' in r() denominator affine function?

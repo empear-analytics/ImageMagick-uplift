@@ -264,7 +264,12 @@ static void PerspectiveBestFitBounds(const double *coeff,const Image *image,
     min = (*caller_min),
     s;
 
-  InvertPerspectiveCoefficients(coeff, inverse);
+  {
+    const CoefficientInversion
+      inversion = { coeff, inverse };
+
+    InvertPerspectiveCoefficients(&inversion);
+  }
   s.x = (double) image->page.x;
   s.y = (double) image->page.y;
   scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
