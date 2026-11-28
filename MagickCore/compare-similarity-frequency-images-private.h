@@ -784,6 +784,23 @@ static Image *SIMCloneForwardFourier(const Image *image,
   return(ForwardFourierTransformImage(clone_image,MagickFalse,exception));
 }
 
+static void SIMNormalizeCrossPowerSpectrum(Image *complex_multiplication,
+  const Image *magnitude_image,ExceptionInfo *exception)
+{
+  if (complex_multiplication->next != (Image *) NULL)
+    {
+      /*
+        Normalize the cross-power spectrum by the product magnitude.
+      */
+      DisableCompositeClampUnlessSpecified(complex_multiplication);
+      DisableCompositeClampUnlessSpecified(complex_multiplication->next);
+      (void) CompositeImage(complex_multiplication,magnitude_image,
+        DivideSrcCompositeOp,MagickTrue,0,0,exception);
+      (void) CompositeImage(complex_multiplication->next,magnitude_image,
+        DivideSrcCompositeOp,MagickTrue,0,0,exception);
+    }
+}
+
 static Image *SIMPhaseCorrelationImage(const Image *target_image,
   const Image *reconstruct_image,const Image *magnitude_image,
   ExceptionInfo *exception)
@@ -830,18 +847,8 @@ static Image *SIMPhaseCorrelationImage(const Image *target_image,
   reconstruct_fft=DestroyImageList(reconstruct_fft);
   if (complex_multiplication == (Image *) NULL)
     return((Image *) NULL);
-  if (complex_multiplication->next != (Image *) NULL)
-    {
-      /*
-        Normalize the cross-power spectrum by the product magnitude.
-      */
-      DisableCompositeClampUnlessSpecified(complex_multiplication);
-      DisableCompositeClampUnlessSpecified(complex_multiplication->next);
-      (void) CompositeImage(complex_multiplication,magnitude_image,
-        DivideSrcCompositeOp,MagickTrue,0,0,exception);
-      (void) CompositeImage(complex_multiplication->next,magnitude_image,
-        DivideSrcCompositeOp,MagickTrue,0,0,exception);
-    }
+  SIMNormalizeCrossPowerSpectrum(complex_multiplication,magnitude_image,
+    exception);
   /*
     Do the IFT and return the phase-correlation result.
   */
