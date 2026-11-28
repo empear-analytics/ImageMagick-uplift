@@ -456,51 +456,7 @@ static void SetOpenCLBenchmarkAttribute(
   }
 }
 
-static int EndDoctypeQuote(const char *q,int quote)
-{
-  if (*q == quote)
-    quote=0;
-  return(quote);
-}
-
-static inline MagickBooleanType IsDoctypeQuote(const char *q)
-{
-  return(((*q == '"') || (*q == '\'')) ? MagickTrue : MagickFalse);
-}
-
-static inline MagickBooleanType IsDoctypeEnd(const char *q,
-  const int bracket_depth)
-{
-  return(((*q == '>') && (bracket_depth == 0)) ? MagickTrue : MagickFalse);
-}
-
-static const char *SkipOpenCLBenchmarkDoctype(const char *q)
-{
-  int
-    bracket_depth = 0,
-    quote = 0;
-
-  /*
-    DOCTYPE element.
-  */
-  for ( ; *q != '\0'; q++)
-  {
-    if (quote != 0)
-      quote=EndDoctypeQuote(q,quote);
-    else if (IsDoctypeQuote(q) != MagickFalse)
-      quote=(*q);
-    else if (*q == '[')
-      bracket_depth++;
-    else if (*q == ']')
-      bracket_depth=CloseDoctypeBracket(bracket_depth);
-    else if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
-      {
-        q++;   /* consume final '>' */
-        break;
-      }
-  }
-  return(q);
-}
+#include "MagickCore/opencl-initialize-doctype-private.h"
 
 static void ReadOpenCLBenchmarkAttribute(const OpenCLBenchmarkTokens *tokens,
   MagickCLDeviceBenchmark **device_benchmark,const char **q)
