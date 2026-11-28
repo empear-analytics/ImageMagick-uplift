@@ -13,8 +13,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private colorspace conversions from RGB to CAT02 LMS and CMY;
-  included by colorspace-private.h only.
+  MagickCore private colorspace conversion from RGB to CAT02 LMS; included
+  by colorspace-private.h only.
 */
 #ifndef MAGICKCORE_COLORSPACE_RGB_TO_XYZ_CMY_PRIVATE_H
 #define MAGICKCORE_COLORSPACE_RGB_TO_XYZ_CMY_PRIVATE_H
@@ -33,14 +33,6 @@ static inline void ConvertRGBToCAT02LMS(const double R,const double G,
 
   ConvertRGBToXYZ(R,G,B,&X,&Y,&Z);
   ConvertXYZToCAT02LMS(X,Y,Z,L,M,S);
-}
-
-static inline void ConvertRGBToCMY(const double red,const double green,
-  const double blue,double *cyan,double *magenta,double *yellow)
-{
-  *cyan=QuantumScale*((double) QuantumRange-red);
-  *magenta=QuantumScale*((double) QuantumRange-green);
-  *yellow=QuantumScale*((double) QuantumRange-blue);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

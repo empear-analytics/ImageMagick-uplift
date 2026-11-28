@@ -35,6 +35,7 @@
 #include "MagickCore/colorspace-cie-to-rgb-private.h"
 #include "MagickCore/colorspace-rgb-xyz-cat02-private.h"
 #include "MagickCore/colorspace-rgb-to-xyz-cmy-private.h"
+#include "MagickCore/colorspace-rgb-to-cmy-private.h"
 #include "MagickCore/colorspace-rgb-to-hcl-hsb-private.h"
 #include "MagickCore/colorspace-rgb-to-xyz-private.h"
 #include "MagickCore/colorspace-rgb-to-hue-private.h"
