@@ -26180,6 +26180,39 @@ block stood. Recipe S (whole functions, a branch inside them).
    file and the header (every literal's total unchanged), the scores of the file and of the
    header, and the wide oracle when a case reaches the function.
 
+Kernel-string form (mandate, 2026-11-19; campaign A round 38): `accelerate-kernels-private.h`
+holds no C function. Its two initialisers, `const char *accelerateKernels =` and `const char
+*accelerateKernels2 =`, are runs of top-level `STRINGIFY(...)` and `OPENCL_DEFINE`,
+`OPENCL_IF`, `OPENCL_ELIF`, `OPENCL_ELSE` and `OPENCL_ENDIF` calls whose arguments are OpenCL
+C: the C compiler turns them into two string literals, and the OpenCL runtime compiles the
+strings when a device is used (`CompileOpenCLKernel`, which the wide catalogue reaches through
+pocl). CodeScene scores that text as C functions (2.03). A run of whole top-level calls, with
+the blank lines and banner comments between them, moves byte for byte into a guard-less
+fragment `MagickCore/accelerate-kernels-<theme>-private.h`, named by a column-0 `#include`
+line where the run stood, inside the initialiser. The text is compiled at run time, so this
+form does not rest on step 2's condition: it rests on both strings staying byte-identical,
+which leaves every object of the library unchanged. Conditions:
+(a) a cut falls only between top-level calls, where a script finds the parenthesis depth 0
+outside comments and literals, never inside a call's argument (a directive inside a macro
+argument is undefined behaviour);
+(b) the macro definitions, the `;` lines and `const char *accelerateKernels2 =` stay in the
+file;
+(c) nothing in the run is edited, so the fragment keeps the run's findings (*Excess Number of
+Function Arguments* on `__kernel` signatures that the host binds by `clSetKernelArg`, *Brain
+Method* in `WaveletDenoise`); this form does not clear them;
+(d) one fragment per commit; step 1's probe applies with the bar of the commit gate's split
+rule: the file rises, or the step is flat inside a stub-probed chain ending at 10.0 (rule 2),
+and the fragment scores at least the file's score before the step.
+The fragment's licence comment names the initialiser that includes it. Proof, in place of
+step 5: the reassembly script against `HEAD`; a translation unit that defines
+`MAGICKCORE_OPENCL_SUPPORT`, includes the header and writes both strings, built against
+`HEAD`'s and the working tree's headers, the two outputs equal under `cmp`;
+`opencl-initialize.c`, the one includer, preprocessed (`-E -P`, blank lines dropped) and
+compiled (`HDRS=1 WIDE=1 tools/obj_identical.sh`) against each side's headers, both identical;
+`tools/ci_linux_warnings.sh MagickCore/opencl-initialize.c`; `refactor_guard.py --combined`
+over the file and the fragment, every literal's total unchanged; the wide oracle with
+`--function CompileOpenCLKernel`.
+
 **Before:** (`accelerate-histogram.c`, `ComputeEqualizeImage`)
 
 ```c
@@ -27911,3 +27944,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
 | 2026-11-28 | AMEND | OH | *Upstream shared mid-file form*: in an upstream shared header without an include block, Form A's run may begin after a kept item (a non-`const` file-scope object, a named `typedef`, an external declaration) and end before the next kept item; the header names the new header where the run stood, inside its own `extern "C"` pair (the new header adds none); proof every includer's unit and object identical (`HDRS=1`) in every `ci_linux_warnings` configuration, plus the C++ check | `token-private.h` (9.09; *Overall Code Complexity* and *Complex Method* on `ConvertMacRomanToUTF8`, cc 10): any function added in place costs *Primitive Obsession* (probes 8.28 to 9.09); a probe moving `ConvertLatin1ToUTF8`, `macroman_unicode` and `ConvertMacRomanToUTF8` out from after `utf_info` gives 10.0 and a new header at 9.68, then 10.0 after one Recipe E step (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Upstream shared form, declarations in the run*: the run may also hold `extern MagickPrivate` declarations standing among its items (declarations only, every definition stays in its `.c` file), moved verbatim in order; proof unchanged (every includer's unit and object identical with `HDRS=1` in every `ci_linux_warnings` configuration, plus the C++ check) | `utility-private.h` (8.81; *Code Duplication* on `MagickRead`/`MagickWrite`, *Primitive Obsession*, *String Heavy Function Arguments*): its leading run after the include block, `MagickPathTemplate` to `MagickWrite`, holds the `GetPathComponents` to `ExpandFilename` declarations; a probe moving that run gives 10.0 and a new header at 10.0, both without findings; the shorter cuts that leave the declarations behind (through `MagickRead`) stop at 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | UB | *Kernel-string form*: a run of whole top-level `STRINGIFY`/`OPENCL_*` calls in `accelerate-kernels-private.h`'s two kernel-source initialisers moves byte for byte into a guard-less fragment `accelerate-kernels-<theme>-private.h`, named by a column-0 `#include` where it stood; cuts only at parenthesis depth 0; nothing edited; the fragment scores at least the file's score before the step; proof both kernel strings byte-identical (`cmp`), `opencl-initialize.c`'s unit and object identical (`HDRS=1 WIDE=1`), wide oracle on `CompileOpenCLKernel` | `accelerate-kernels-private.h` (2.03; *Brain Method*, *Complex Method*, *Large Method*, *Excess Number of Function Arguments*, *Code Duplication*, all in OpenCL C): a stub probe of 17 fragments, one per kernel section, takes it to 10.0 with no findings, the fragments 6.61 to 10.0 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
