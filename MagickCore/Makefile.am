@@ -270,6 +270,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-tile-command-private.h \
   MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
   MagickCore/display-image-event-private.h \
@@ -921,6 +922,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-tile-command-private.h \
   MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
   MagickCore/display-image-event-private.h \
