@@ -322,15 +322,52 @@ static void BuildStretchMap(const Image *image,PixelPacket *stretch_map,
   }
 }
 
+typedef struct _StretchResources
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  CacheView
+    *image_view;
+
+  void
+    *inputPixels;
+
+  cl_mem
+    imageBuffer,
+    histogramBuffer,
+    stretchMapBuffer;
+
+  cl_kernel
+    histogramKernel,
+    stretchKernel;
+
+  cl_uint4
+    *histogram;
+
+  PixelPacket
+    *stretch_map;
+
+  cl_float4
+    black,
+    white;
+
+  MagickBooleanType
+    outputReady;
+} StretchResources;
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
-
-  cl_command_queue
-    queue;
+  StretchResources
+    r;
 
   cl_int
     channel_mask=get32BitChannelValue(image->channel_mask),
@@ -339,45 +376,21 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   cl_mem_flags
     mem_flags;
 
-  cl_mem
-    histogramBuffer,
-    imageBuffer,
-    stretchMapBuffer;
-
-  cl_kernel
-    histogramKernel,
-    stretchKernel;
-
   cl_event
     event;
 
   cl_uint
     i;
 
-  cl_uint4
-    *histogram;
-
-  cl_float4
-    black,
-    white;
-
   MagickBooleanType
-    outputReady,
     status;
-
-  MagickCLDevice
-    device;
-
-  PixelPacket
-    *stretch_map;
 
   size_t
     global_work_size[2],
     length;
 
   void
-    *hostPtr,
-    *inputPixels;
+    *hostPtr;
 
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
@@ -387,38 +400,39 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   
-  queue=NULL;
-  image_view=NULL;
-  histogram=NULL;
-  stretch_map=NULL;
-  inputPixels=NULL;
-  imageBuffer=NULL;
-  histogramBuffer=NULL;
-  stretchMapBuffer=NULL;
-  histogramKernel=NULL;
-  stretchKernel=NULL;
-  outputReady=MagickFalse;
+  r.clEnv=clEnv;
+  r.queue=NULL;
+  r.image_view=NULL;
+  r.histogram=NULL;
+  r.stretch_map=NULL;
+  r.inputPixels=NULL;
+  r.imageBuffer=NULL;
+  r.histogramBuffer=NULL;
+  r.stretchMapBuffer=NULL;
+  r.histogramKernel=NULL;
+  r.stretchKernel=NULL;
+  r.outputReady=MagickFalse;
 
   /*
     Initialize opencl environment.
   */
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
+  r.device=RequestOpenCLDevice(clEnv);
+  if (r.device == (MagickCLDevice) NULL)
     goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
+  r.queue=AcquireOpenCLCommandQueue(r.device);
+  if (r.queue == (cl_command_queue) NULL)
     goto cleanup;
 
   /*
     Allocate and initialize histogram arrays.
   */
-  histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*histogram));
+  r.histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*r.histogram));
 
-  if (histogram == (cl_uint4 *) NULL)
+  if (r.histogram == (cl_uint4 *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed", image->filename);
 
   /* reset histogram */
-  (void) memset(histogram,0,(MaxMap+1)*sizeof(*histogram));
+  (void) memset(r.histogram,0,(MaxMap+1)*sizeof(*r.histogram));
 
   /*
   if (IsGrayImage(image,exception) != MagickFalse)
@@ -434,52 +448,52 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /* Create and initialize OpenCL buffers. */
   /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
   /* assume this  will get a writable image */
-  image_view=AcquireAuthenticCacheView(image,exception);
-  inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,image->rows,exception);
+  r.image_view=AcquireAuthenticCacheView(image,exception);
+  r.inputPixels=GetCacheViewAuthenticPixels(r.image_view,0,0,image->columns,image->rows,exception);
 
-  if (inputPixels == (void *) NULL)
+  if (r.inputPixels == (void *) NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+    (void) OpenCLThrowMagickException(r.device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
     goto cleanup;
   }
   /* If the host pointer is aligned to the size of CLPixelPacket,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  mem_flags=GetInputBufferFlags(inputPixels);
+  mem_flags=GetInputBufferFlags(r.inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
+  r.imageBuffer = clEnv->library->clCreateBuffer(r.device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)r.inputPixels, &clStatus);
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
     goto cleanup;
   }
 
   /* If the host pointer is aligned to the size of cl_uint,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(histogram,cl_uint4))
+  if (ALIGNED(r.histogram,cl_uint4))
   {
     mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-    hostPtr = histogram;
+    hostPtr = r.histogram;
   }
   else
   {
     mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = histogram;
+    hostPtr = r.histogram;
   }
   /* create a CL buffer for histogram  */
   length = (MaxMap+1);
-  histogramBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
+  r.histogramBuffer = clEnv->library->clCreateBuffer(r.device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
     goto cleanup;
   }
 
   {
     const HistogramKernelLaunch
-      launch = { clEnv, device, queue, imageBuffer, histogramBuffer };
+      launch = { clEnv, r.device, r.queue, r.imageBuffer, r.histogramBuffer };
 
     status = LaunchHistogramKernel(&launch, image, image->channel_mask,
       exception);
@@ -488,28 +502,28 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     goto cleanup;
 
   /* read from the kernel output */
-  if (ALIGNED(histogram,cl_uint4))
+  if (ALIGNED(r.histogram,cl_uint4))
   {
     length = (MaxMap+1);
-    clEnv->library->clEnqueueMapBuffer(queue, histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
+    clEnv->library->clEnqueueMapBuffer(r.queue, r.histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
   }
   else
   {
     length = (MaxMap+1);
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), histogram, 0, NULL, NULL);
+    clStatus = clEnv->library->clEnqueueReadBuffer(r.queue, r.histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), r.histogram, 0, NULL, NULL);
   }
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
     goto cleanup;
   }
 
   /* unmap, don't block gpu to use this buffer again.  */
-  if (ALIGNED(histogram,cl_uint4))
-    clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
-  if ((ALIGNED(histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
+  if (ALIGNED(r.histogram,cl_uint4))
+    clStatus = clEnv->library->clEnqueueUnmapMemObject(r.queue, r.histogramBuffer, r.histogram, 0, NULL, NULL);
+  if ((ALIGNED(r.histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
     goto cleanup;
   }
 
@@ -522,30 +536,30 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   */
   {
     const StretchLevelSearch
-      search = { image, histogram, points };
+      search = { image, r.histogram, points };
 
-    FindStretchLevels(&search,RedChannel,&black.x,&white.x);
-    FindStretchLevels(&search,GreenChannel,&black.y,&white.y);
-    FindStretchLevels(&search,BlueChannel,&black.z,&white.z);
-    FindStretchLevels(&search,AlphaChannel,&black.w,&white.w);
+    FindStretchLevels(&search,RedChannel,&r.black.x,&r.white.x);
+    FindStretchLevels(&search,GreenChannel,&r.black.y,&r.white.y);
+    FindStretchLevels(&search,BlueChannel,&r.black.z,&r.white.z);
+    FindStretchLevels(&search,AlphaChannel,&r.black.w,&r.white.w);
   }
 
-  stretch_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,
-    sizeof(*stretch_map));
+  r.stretch_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,
+    sizeof(*r.stretch_map));
 
-  if (stretch_map == (PixelPacket *) NULL)
+  if (r.stretch_map == (PixelPacket *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
 
   /*
     Stretch the histogram to create the stretched image mapping.
   */
-  BuildStretchMap(image,stretch_map,black,white);
+  BuildStretchMap(image,r.stretch_map,r.black,r.white);
 
   /*
     Stretch the image.
   */
-  StretchImageClass(image,stretch_map,black,white);
+  StretchImageClass(image,r.stretch_map,r.black,r.white);
 
   /*
     Stretch image.
@@ -560,43 +574,43 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 #include "MagickCore/accelerate-recreate-buffer-private.h"
 
   /* Create and initialize OpenCL buffers. */
-  if (ALIGNED(stretch_map, PixelPacket))
+  if (ALIGNED(r.stretch_map, PixelPacket))
   {
     mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-    hostPtr = stretch_map;
+    hostPtr = r.stretch_map;
   }
   else
   {
     mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = stretch_map;
+    hostPtr = r.stretch_map;
   }
   /* create a CL buffer for stretch_map  */
   length = (MaxMap+1);
-  stretchMapBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
+  r.stretchMapBuffer = clEnv->library->clCreateBuffer(r.device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
     goto cleanup;
   }
 
   /* get the OpenCL kernel */
-  stretchKernel = AcquireOpenCLKernel(device,"ContrastStretch");
-  if (stretchKernel == NULL)
+  r.stretchKernel = AcquireOpenCLKernel(r.device,"ContrastStretch");
+  if (r.stretchKernel == NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
     goto cleanup;
   }
 
   /* set the kernel arguments */
   i=0;
-  clStatus=clEnv->library->clSetKernelArg(stretchKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(stretchKernel,i++,sizeof(cl_int),&channel_mask);
-  clStatus|=clEnv->library->clSetKernelArg(stretchKernel,i++,sizeof(cl_mem),(void *)&stretchMapBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(stretchKernel,i++,sizeof(cl_float4),&white);
-  clStatus|=clEnv->library->clSetKernelArg(stretchKernel,i++,sizeof(cl_float4),&black);
+  clStatus=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_mem),(void *)&r.imageBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_int),&channel_mask);
+  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_mem),(void *)&r.stretchMapBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_float4),&r.white);
+  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_float4),&r.black);
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
     goto cleanup;
   }
 
@@ -604,59 +618,59 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   global_work_size[0] = image->columns;
   global_work_size[1] = image->rows;
 
-  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, stretchKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(r.queue, r.stretchKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
 
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
     goto cleanup;
   }
-  RecordProfileData(device,stretchKernel,event);
+  RecordProfileData(r.device,r.stretchKernel,event);
 
   /* read the data back */
-  if (ALIGNED(inputPixels,CLPixelPacket))
+  if (ALIGNED(r.inputPixels,CLPixelPacket))
   {
     length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+    clEnv->library->clEnqueueMapBuffer(r.queue, r.imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
   }
   else
   {
     length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
+    clStatus = clEnv->library->clEnqueueReadBuffer(r.queue, r.imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), r.inputPixels, 0, NULL, NULL);
   }
   if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
     goto cleanup;
   }
 
-  outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
+  r.outputReady=SyncCacheViewAuthenticPixels(r.image_view,exception);
 
 cleanup:
 
-  image_view=DestroyCacheView(image_view);
+  r.image_view=DestroyCacheView(r.image_view);
 
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
+  if (r.imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(r.imageBuffer);
 
-  if (stretchMapBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(stretchMapBuffer);
-  if (stretch_map!=NULL)
-    stretch_map=(PixelPacket *) RelinquishMagickMemory(stretch_map);
-  if (histogramBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(histogramBuffer);
-  if (histogram!=NULL)
-    histogram=(cl_uint4 *) RelinquishMagickMemory(histogram);
-  if (histogramKernel!=NULL)
-    ReleaseOpenCLKernel(histogramKernel);
-  if (stretchKernel!=NULL)
-    ReleaseOpenCLKernel(stretchKernel);
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
+  if (r.stretchMapBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(r.stretchMapBuffer);
+  if (r.stretch_map!=NULL)
+    r.stretch_map=(PixelPacket *) RelinquishMagickMemory(r.stretch_map);
+  if (r.histogramBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(r.histogramBuffer);
+  if (r.histogram!=NULL)
+    r.histogram=(cl_uint4 *) RelinquishMagickMemory(r.histogram);
+  if (r.histogramKernel!=NULL)
+    ReleaseOpenCLKernel(r.histogramKernel);
+  if (r.stretchKernel!=NULL)
+    ReleaseOpenCLKernel(r.stretchKernel);
+  if (r.queue != NULL)
+    ReleaseOpenCLCommandQueue(r.device,r.queue);
+  if (r.device != NULL)
+    ReleaseOpenCLDevice(r.device);
 
-  return(outputReady);
+  return(r.outputReady);
 }
 
 MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
