@@ -373,7 +373,7 @@ static inline double *PolarCoefficients(const CoefficientCall *call)
   SetPolarCoefficients(coeff,image,arguments,number_arguments);
   /* if radius 0 or negative,  its a special value... */
   if ( coeff[0] < MagickEpsilon )
-    SetPolarSpecialRadius(image,coeff);
+    SetPolarSpecialRadius(call);
   /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
   if (IsInvalidPolarRadius(call) != MagickFalse) {
     (void) ThrowMagickException(exception,GetMagickModule(),OptionError,

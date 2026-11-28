@@ -289,8 +289,17 @@ static inline void SetPolarFurthestRadius(const Image *image,double *coeff)
   }
 }
 
-static inline void SetPolarSpecialRadius(const Image *image,double *coeff)
+static inline void SetPolarSpecialRadius(const CoefficientCall *call)
 {
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  double
+    *const coeff = call->coeff;
+
   /* Use closest edge  if radius == 0 */
   if ( fabs(coeff[0]) < MagickEpsilon ) {
     coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
