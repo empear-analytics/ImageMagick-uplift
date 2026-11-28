@@ -650,8 +650,7 @@ cleanup:
   ReleaseOpenCLBuffer(imageKernelBuffer);
   ReleaseKernel(unsharpMaskKernel);
   ReleaseAccelerateQueue(device,queue);
-  if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
-    filteredImage=DestroyImage(filteredImage);
+  filteredImage=DestroyUnfinishedImage(outputReady,filteredImage);
 
   return(filteredImage);
 }
