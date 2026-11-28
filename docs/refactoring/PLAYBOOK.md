@@ -23839,6 +23839,28 @@ configuration that compiles it, such as `ci-gcc-x` and `ci-clang-x`), `IDENTICAL
 `pp_identical` differing only in indentation, identical under `diff -b`), and `NOTHING
 COMPILED` in the narrow build before and after. Unbuilt branches inside the run (`#ifdef
 _WIN32` in the accelerate timer) move verbatim under the owner's 2026-11-20 ruling.
+A header of the mid-file conditional form may be carved in its middle (mandate, 2026-11-19;
+campaign A round 38): in such a header, which one `.c` file includes
+(`opencl-initialize-benchmark-private.h`), a run that begins directly after a kept top-level
+item and ends directly before the next item that stays, inside the same `#if` branches as
+both (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`) and with every `#if`/`#endif` pair it
+holds inside it, moves verbatim and in order into a new header of the same kind (licence,
+include guard, the run; no wrapping conditional and no `extern "C"` pair of its own), and
+the carved header names the new header on the run's own first line, where the run stood,
+inside the same `#if` branches (a mid-file `#include` in the header). The new header is
+included only by the carved header. The run holds no `#include`, no definition with
+external linkage and no non-`const` file-scope object; an item of the run may name an item
+that stays above it (`SkipOpenCLBenchmarkDoctype` calls `CloseDoctypeBracket`), which is
+still declared before its use. Blank lines at the run's edges stay in the carved header.
+On such a header the recipe also takes the file-level ratio findings *Primitive Obsession*
+and *String Heavy Function Arguments*, as it takes *Overall Code Complexity* above: when a
+probe of the carve leaves the carved header and the new header each at 10.0, or at least
+at the carved header's score before with a stub-probed chain ending at 10.0 for both.
+Step 4's proof: the `.c` file compiled against `HEAD`'s and the working tree's headers
+(both headers placed ahead of every `-I` path), `__LINE__` and `__FILE__` pinned, in every
+build that compiles it (the wide candidate, `ci-gcc-x`, and `ci-clang-x` where it compiles
+standalone): preprocessed unit and object identical (the unit under `diff -b` where
+`clang -E -P` re-indents); `NOTHING COMPILED` in the narrow build before and after.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -27945,3 +27967,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | OH | *Upstream shared mid-file form*: in an upstream shared header without an include block, Form A's run may begin after a kept item (a non-`const` file-scope object, a named `typedef`, an external declaration) and end before the next kept item; the header names the new header where the run stood, inside its own `extern "C"` pair (the new header adds none); proof every includer's unit and object identical (`HDRS=1`) in every `ci_linux_warnings` configuration, plus the C++ check | `token-private.h` (9.09; *Overall Code Complexity* and *Complex Method* on `ConvertMacRomanToUTF8`, cc 10): any function added in place costs *Primitive Obsession* (probes 8.28 to 9.09); a probe moving `ConvertLatin1ToUTF8`, `macroman_unicode` and `ConvertMacRomanToUTF8` out from after `utf_info` gives 10.0 and a new header at 9.68, then 10.0 after one Recipe E step (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Upstream shared form, declarations in the run*: the run may also hold `extern MagickPrivate` declarations standing among its items (declarations only, every definition stays in its `.c` file), moved verbatim in order; proof unchanged (every includer's unit and object identical with `HDRS=1` in every `ci_linux_warnings` configuration, plus the C++ check) | `utility-private.h` (8.81; *Code Duplication* on `MagickRead`/`MagickWrite`, *Primitive Obsession*, *String Heavy Function Arguments*): its leading run after the include block, `MagickPathTemplate` to `MagickWrite`, holds the `GetPathComponents` to `ExpandFilename` declarations; a probe moving that run gives 10.0 and a new header at 10.0, both without findings; the shorter cuts that leave the declarations behind (through `MagickRead`) stop at 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | UB | *Kernel-string form*: a run of whole top-level `STRINGIFY`/`OPENCL_*` calls in `accelerate-kernels-private.h`'s two kernel-source initialisers moves byte for byte into a guard-less fragment `accelerate-kernels-<theme>-private.h`, named by a column-0 `#include` where it stood; cuts only at parenthesis depth 0; nothing edited; the fragment scores at least the file's score before the step; proof both kernel strings byte-identical (`cmp`), `opencl-initialize.c`'s unit and object identical (`HDRS=1 WIDE=1`), wide oracle on `CompileOpenCLKernel` | `accelerate-kernels-private.h` (2.03; *Brain Method*, *Complex Method*, *Large Method*, *Excess Number of Function Arguments*, *Code Duplication*, all in OpenCL C): a stub probe of 17 fragments, one per kernel section, takes it to 10.0 with no findings, the fragments 6.61 to 10.0 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Mid-file conditional form, carved in its middle*: in a header of that form that one `.c` file includes, a run between two kept items, inside the same `#if` branches, moves verbatim into a new header named by an `#include` on the run's first line in the carved header; on such a header OH also takes *Primitive Obsession* and *String Heavy Function Arguments* when the probe leaves both headers at 10.0 (or at the bar with a stub-probed chain ending at 10.0 for both); proof: the `.c` file against `HEAD`'s and the working tree's headers, unit and object identical in every build that compiles it | `opencl-initialize-benchmark-private.h` (9.38; *Primitive Obsession* 45 %, *String Heavy Function Arguments* 40 %): after four Recipe IP steps the header stays at 9.68 (*Primitive Obsession* 36 %); moving the DOCTYPE run `EndDoctypeQuote` to `SkipOpenCLBenchmarkDoctype` into `opencl-initialize-doctype-private.h` gives 10.0 for both (stub probe, cs-mcp 1.5.16, `tools/ch.py`; campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
