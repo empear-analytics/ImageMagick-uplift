@@ -642,9 +642,6 @@ static inline double *ShepardsCoefficients(const CoefficientCall *call)
   const CoefficientContext
     *const context = call->context;
 
-  const Image
-    *const image = context->image;
-
   ExceptionInfo
     *const exception = context->exception;
 
@@ -666,7 +663,7 @@ static inline double *ShepardsCoefficients(const CoefficientCall *call)
     return((double *) NULL);
   }
   /* User defined weighting power for Shepard's Method */
-  return(SetShepardsPower(image,coeff,exception));
+  return(SetShepardsPower(call));
 }
 
 static inline MagickBooleanType GetPolynomialCoefficientCount(const CoefficientContext *context,

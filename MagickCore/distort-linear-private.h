@@ -331,9 +331,20 @@ static inline void SetArcOuterRadius(double *coeff,const size_t number_arguments
   coeff[2] = arguments[2];
 }
 
-static inline double *SetShepardsPower(const Image *image,double *coeff,
-  ExceptionInfo *exception)
+static inline double *SetShepardsPower(const CoefficientCall *call)
 {
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  double
+    *coeff = call->coeff;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   { const char *artifact=GetImageArtifact(image,"shepards:power");
     if ( artifact != (const char *) NULL ) {
       coeff[0]=StringToDouble(artifact,(char **) NULL) / 2.0;
