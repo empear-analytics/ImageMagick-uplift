@@ -717,10 +717,7 @@ static void XColorEditRelease(const ColorEditContext *context,
     *const x = targets->x,
     *const y = targets->y;
 
-  if ((*event).xbutton.button != Button1)
-    return;
-  if (((*event).xbutton.window != context->windows->image.id) &&
-      ((*event).xbutton.window != context->windows->magnify.id))
+  if (IsColorEditButton1(context,event) == MagickFalse)
     return;
   /*
     Update colormap information.
