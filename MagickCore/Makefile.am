@@ -89,6 +89,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-kernels-noise-private.h \
+  MagickCore/accelerate-kernels-pixel-private.h \
   MagickCore/accelerate-kernels-resizehorizontal-private.h \
   MagickCore/accelerate-kernels-resizevertical-private.h \
   MagickCore/accelerate-kernels-wavelet-private.h \
@@ -818,6 +819,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/accelerate-kernels-noise-private.h \
+  MagickCore/accelerate-kernels-pixel-private.h \
   MagickCore/accelerate-kernels-resizehorizontal-private.h \
   MagickCore/accelerate-kernels-resizevertical-private.h \
   MagickCore/accelerate-kernels-wavelet-private.h \
