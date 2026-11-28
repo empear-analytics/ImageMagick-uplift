@@ -24807,6 +24807,24 @@ parameter the callee can read from another.
    (`kernel`, `angle`) or two or more pointers that travel together, primitive ones among
    them (`kernel_string`, `end`); every call passes, for each, the caller's own variable of
    the same name, or `&v` of a plain local `v` of the caller (Recipe B step 4).
+   *Plain identifiers of other names* (mandate (2026-11-19); campaign A round 38,
+   `distort-linear-private.h`): a call may also pass, for a member, a plain identifier of
+   another name, that is a local, a parameter or an array of the caller and no other
+   expression, so that no argument has a side effect: `InvertAffineCoefficients(coeff,inverse)`
+   is called as `(inverse,coeff)` in `ConvertRigidAffineCoefficients` and
+   `InvertPerspectiveCoefficients(coeff,inverse)` as `(arguments,coeff)` in
+   `PerspectiveProjectionCoefficients`. Step 4's initialiser then lists the call's own
+   arguments in the order the call passed them, which is the member order
+   (`inversion = { inverse, coeff };`): each member is initialised from the argument its
+   parameter received. A swapped pair of the same type compiles silently, so the
+   initialiser is checked by reading against the old call, argument by argument. An array
+   argument (`double inverse[6]`) decays to the address of its first element in the
+   initialiser exactly as it did as the argument.
+   *Mixed groups* (the same mandate and file): the group may also be two or more pointers
+   that travel together with the scalars that travel with one of them, as in
+   `SetArcOuterRadius(coeff,number_arguments,arguments)`, the coefficient array beside the
+   argument array and its count. Each member keeps its parameter's exact type, and every
+   rule above applies to each member as in the two plain forms.
 2. Declare `typedef struct _Name { ... } Name;` with one member per group parameter, the
    parameter's type without top-level `const` and its name, directly above the first
    function that will take it, outside every `#if` block (in the commit of the first step;
