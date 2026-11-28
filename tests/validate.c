@@ -234,9 +234,12 @@ static MagickBooleanType ValidateLabToRGB()
     g,
     b;
 
+  const LabRGBTarget
+    target = { D65Illuminant, (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  LabToRGB");
   ConvertLabToRGB(88.456154/100.0,-54.671483/255+0.5,51.662818/255.0+0.5,
-    D65Illuminant,&r,&g,&b);
+    &target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))

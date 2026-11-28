@@ -23,8 +23,30 @@
 extern "C" {
 #endif
 
+typedef struct _LabXYZTarget
+{
+  IlluminantType
+    illuminant;
+
+  double
+    *X,
+    *Y,
+    *Z;
+} LabXYZTarget;
+
+typedef struct _LabRGBTarget
+{
+  IlluminantType
+    illuminant;
+
+  double
+    *red,
+    *green,
+    *blue;
+} LabRGBTarget;
+
 static inline void ConvertLabToXYZ(const double L,const double a,const double b,
-  const IlluminantType illuminant,double *X,double *Y,double *Z)
+  const LabXYZTarget *target)
 {
   double
     x,
@@ -46,15 +68,22 @@ static inline void ConvertLabToXYZ(const double L,const double a,const double b,
     z=(z*z*z);
   else
     z=(116.0*z-16.0)/CIEK;
-  *X=illuminant_tristimulus[illuminant].x*x;
-  *Y=illuminant_tristimulus[illuminant].y*y;
-  *Z=illuminant_tristimulus[illuminant].z*z;
+  *target->X=illuminant_tristimulus[target->illuminant].x*x;
+  *target->Y=illuminant_tristimulus[target->illuminant].y*y;
+  *target->Z=illuminant_tristimulus[target->illuminant].z*z;
 }
 
 static inline void ConvertLabToRGB(const double L,const double a,
-  const double b,const IlluminantType illuminant,double *red,double *green,
-  double *blue)
+  const double b,const LabRGBTarget *target)
 {
+  const IlluminantType
+    illuminant = target->illuminant;
+
+  double
+    *const red = target->red,
+    *const green = target->green,
+    *const blue = target->blue;
+
   double
     X,
     Y,
@@ -63,16 +92,18 @@ static inline void ConvertLabToRGB(const double L,const double a,
   const IlluminantRGBTarget
     rgb = { red, green, blue };
 
-  ConvertLabToXYZ(100.0*L,255.0*(a-0.5),255.0*(b-0.5),illuminant,&X,&Y,&Z);
+  const LabXYZTarget
+    xyz = { illuminant, (&X), (&Y), (&Z) };
+
+  ConvertLabToXYZ(100.0*L,255.0*(a-0.5),255.0*(b-0.5),&xyz);
   ConvertXYZToRGB(X,Y,Z,&rgb);
 }
 
 static inline void ConvertLCHabToXYZ(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *X,double *Y,
-  double *Z)
+  const double hue,const LabXYZTarget *target)
 {
   ConvertLabToXYZ(luma,chroma*cos(DegreesToRadians(hue)),chroma*
-    sin(DegreesToRadians(hue)),illuminant,X,Y,Z);
+    sin(DegreesToRadians(hue)),target);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

@@ -276,7 +276,10 @@ static void ConvertLabThroughLuvToRGB(const GenericToRGBInput *input)
   {
     case LabColorspace:
     {
-      ConvertLabToRGB(X,Y,Z,illuminant,R,G,B);
+      const LabRGBTarget
+        target = { illuminant, R, G, B };
+
+      ConvertLabToRGB(X,Y,Z,&target);
       break;
     }
     case LCHColorspace:
