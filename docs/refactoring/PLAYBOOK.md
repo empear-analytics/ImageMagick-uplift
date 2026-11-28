@@ -9480,6 +9480,15 @@ whole `switch` with the tail of the function.
    label stands once, in the first or the second; the two runs are adjacent in the original
    order. Step 5's script is `python3 tools/label_set_check.py --split <file> <First>
    <Second>`.
+   *Head form* (2026-11-28): the second predicate may instead take the leading run
+   `L1 ... Lk` (`2 <= k <= n-2`), written directly above the first in the same shape;
+   the first keeps `L(k+1) ... Ln` in its `switch`, and directly before that `switch`
+   gains `if (<Name2>(x) != MagickFalse)` followed by `return(MagickTrue);` two columns
+   deeper; its tail `return(MagickFalse);` stays. Every label stands once, the two runs
+   adjacent in the original order. For a predicate in a private header both are
+   `static inline`, as the first was. Step 5's script checks the head form the same
+   way: the second's labels followed by the first's are the old labels, in order, each
+   once, both runs of at least two, and the rest of the file is unchanged.
 
 **Before:**
 
@@ -9575,10 +9584,20 @@ static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
   what runs. Each keeps `default: break;`, so `-Wswitch` stays quiet; each run is sized so that
   its function has cc 8 or less (six labels at most), which is what takes the label run out of
   *Complex Method*.
+- Why the head form of step 7 behaves the same. A value among `L1 ... Lk`: the second
+  predicate returns `MagickTrue` for it, and the first returns `MagickTrue` at once, as its
+  one `switch` did for that label. Any other value: the second returns `MagickFalse`, having
+  only read its argument, and the first's `switch` selects on the same value (a parameter,
+  which nothing writes); it returns `MagickTrue` for `L(k+1) ... Ln` and reaches
+  `default: break;` and `return(MagickFalse);` for every value outside `L1 ... Ln`, as before.
+  The extra call and test are the only change of what runs; in a header predicate that a
+  per-pixel loop calls, the step is measured under the timing rule (reading 1) and its
+  exceptions.
 
 **Evidence level:** oracle (the cases that reach each caller), with `refactor_guard.py
 --calls` (`+2` for the new function, `+1` for each further site, nothing else moved) and
-step 5's script (`tools/label_set_check.py`, with `--split` for step 7).
+step 5's script (`tools/label_set_check.py`, with `--split` for step 7; for the head form a
+script of the same checks, quoted in the commit message).
 
 **Provenance:** 2026-11-10, from `colorspace.c`'s `sRGBTransformImage` and
 `GenericOrLogTosRGB` (campaign A, W16 lane c): the same twenty-eight-label generic group,
@@ -9597,6 +9616,11 @@ round thirteen lane c, wide build): the eight arrow labels of the key switch of 
 cc 10, the file's only *Complex Method*; a probe of the split into the vertical and the horizontal run
 (four labels each, cc 6) 5.36 to 5.52, no finding on either predicate. Added by Claude Code (Claude
 Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+Step 7 (head form): 2026-11-28, from `colorspace-rgb-predicates-private.h`'s
+`IssRGBCompatibleColorspace` (campaign A, W51 round 38, lane e): nine labels, cc 10, the
+header's only finding (9.68); the six RGB-model labels peeled into `IsRGBModelColorspace`
+take it to 10.0 with no finding. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-11-19.
 
 ---
 
@@ -28173,3 +28197,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | OH | *Upstream shared form, declarations in the run*: the run may also hold `extern MagickPrivate` declarations standing among its items (declarations only, every definition stays in its `.c` file), moved verbatim in order; proof unchanged (every includer's unit and object identical with `HDRS=1` in every `ci_linux_warnings` configuration, plus the C++ check) | `utility-private.h` (8.81; *Code Duplication* on `MagickRead`/`MagickWrite`, *Primitive Obsession*, *String Heavy Function Arguments*): its leading run after the include block, `MagickPathTemplate` to `MagickWrite`, holds the `GetPathComponents` to `ExpandFilename` declarations; a probe moving that run gives 10.0 and a new header at 10.0, both without findings; the shorter cuts that leave the declarations behind (through `MagickRead`) stop at 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | UB | *Kernel-string form*: a run of whole top-level `STRINGIFY`/`OPENCL_*` calls in `accelerate-kernels-private.h`'s two kernel-source initialisers moves byte for byte into a guard-less fragment `accelerate-kernels-<theme>-private.h`, named by a column-0 `#include` where it stood; cuts only at parenthesis depth 0; nothing edited; the fragment scores at least the file's score before the step; proof both kernel strings byte-identical (`cmp`), `opencl-initialize.c`'s unit and object identical (`HDRS=1 WIDE=1`), wide oracle on `CompileOpenCLKernel` | `accelerate-kernels-private.h` (2.03; *Brain Method*, *Complex Method*, *Large Method*, *Excess Number of Function Arguments*, *Code Duplication*, all in OpenCL C): a stub probe of 17 fragments, one per kernel section, takes it to 10.0 with no findings, the fragments 6.61 to 10.0 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file conditional form, carved in its middle*: in a header of that form that one `.c` file includes, a run between two kept items, inside the same `#if` branches, moves verbatim into a new header named by an `#include` on the run's first line in the carved header; on such a header OH also takes *Primitive Obsession* and *String Heavy Function Arguments* when the probe leaves both headers at 10.0 (or at the bar with a stub-probed chain ending at 10.0 for both); proof: the `.c` file against `HEAD`'s and the working tree's headers, unit and object identical in every build that compiles it | `opencl-initialize-benchmark-private.h` (9.38; *Primitive Obsession* 45 %, *String Heavy Function Arguments* 40 %): after four Recipe IP steps the header stays at 9.68 (*Primitive Obsession* 36 %); moving the DOCTYPE run `EndDoctypeQuote` to `SkipOpenCLBenchmarkDoctype` into `opencl-initialize-doctype-private.h` gives 10.0 for both (stub probe, cs-mcp 1.5.16, `tools/ch.py`; campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | LP | Step 7, *head form*: the second predicate may take the leading run `L1 ... Lk` instead of the trailing one; the first keeps `L(k+1) ... Ln` and tests `if (<Second>(x) != MagickFalse) return(MagickTrue);` before its `switch`, its tail `return(MagickFalse);` unchanged; both `static inline` in a header. *Careful* gives the argument (a value of the leading run returns `MagickTrue` at once; any other reaches the same `switch` on the unwritten parameter) and the timing duty for a per-pixel caller; checked by a script of `--split`'s checks | `colorspace-rgb-predicates-private.h`'s `IssRGBCompatibleColorspace` (campaign A, W51 round 38, lane e): nine labels, cc 10; the six RGB-model labels as `IsRGBModelColorspace` 9.68 to 10.0, no finding; the txt/sparse-color writers are reached per pixel and histogram text output once per colour (owner ruling 2026-11-28, extended the same day) | mandate (2026-11-19) |
