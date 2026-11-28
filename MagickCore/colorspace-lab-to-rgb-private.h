@@ -13,8 +13,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private colorspace conversions to XYZ and RGB: Lab and LCHab;
-  included by colorspace-private.h only.
+  MagickCore private colorspace conversions to XYZ: Lab and LCHab, and from
+  Lab to RGB; included by colorspace-private.h only.
 */
 #ifndef MAGICKCORE_COLORSPACE_LAB_TO_RGB_PRIVATE_H
 #define MAGICKCORE_COLORSPACE_LAB_TO_RGB_PRIVATE_H
@@ -73,29 +73,6 @@ static inline void ConvertLCHabToXYZ(const double luma,const double chroma,
 {
   ConvertLabToXYZ(luma,chroma*cos(DegreesToRadians(hue)),chroma*
     sin(DegreesToRadians(hue)),illuminant,X,Y,Z);
-}
-
-static inline void ConvertLCHabToRGB(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *red,double *green,
-  double *blue)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  const IlluminantRGBTarget
-    rgb = { red, green, blue };
-
-  /*
-    Convert LCHab to RGB colorspace.
-  */
-  assert(red != (double *) NULL);
-  assert(green != (double *) NULL);
-  assert(blue != (double *) NULL);
-  ConvertLCHabToXYZ(100.0*luma,255.0*(chroma-0.5),360.0*hue,illuminant,
-    &X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,&rgb);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
