@@ -24047,6 +24047,23 @@ against the headers of `HEAD` and of the working tree (the carved and the new he
 ahead of every `-I` path), wide candidate's flags, `__LINE__` and `__FILE__` pinned:
 preprocessed unit and object both identical. Step 1's bar is the carved header's score
 before the step; both products must reach it and one must rise above it.
+Trailing run of a carved-again mid-file header (mandate (2026-11-19), added 2026-11-28;
+please confirm). A header of the mid-file form may instead give up its last run: from
+directly after a top-level item to the line before the blank line that precedes its
+include guard's `#endif`, with every `#if`/`#endif` pair it holds inside it. The run moves
+verbatim into a new header of the same kind (licence, include guard, the run), and the
+`.c` file names the new header on the line directly below its `#include` of the carved
+one, so the translation unit has the same tokens in the same order. The blank line before
+the run stays in the carved header, above its `#endif`. Use it when the items that must
+leave trail the header (`display-image-apply-private.h`'s magnify family after
+`XMagickCommand`): the leading-run form would move the rest instead and leave the carved
+header holding only the trailing items under a name that no longer says what it holds. A
+`%` banner in the run that documents a function left in the carved header moves to
+directly above that function. Step 4's proof and step 1's bar are the carved-again form's:
+the `.c` file compiled against the headers of `HEAD` and of the working tree, wide
+candidate's flags, `__LINE__` and `__FILE__` pinned, preprocessed unit and object both
+identical; both products reach the carved header's score before the step and one rises
+above it; the `.c` file keeps its score.
 Nested placement (mandate (2026-11-19), please confirm). When the `.c` file's `#include` of
 the new header would lower the `.c` file's score, the carved header names the new header
 instead, on the line directly after its include guard's `#define` and the blank line after
@@ -28187,3 +28204,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | MA | Step 3, *new input struct, two bases*: the input struct may be a new `typedef` (one `const`-pointee pointer member per pointer the copies read through), its `const` local initialised by `{ ... }` in a compound statement holding only the calls; a `const` binding of `p->n` is read as `s->m->n` and leaves the caller; role (c)'s two lvalues may be `e1.m` and `e2.m` of two distinct struct locals, the member differing between copies (`T *value1,T *value2`) | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s four black/white level blocks (`FindStretchLevels`), seven parameters without the struct; 7.61 -> 7.69, first step of a chain ending at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 8, *precomputed levels form*: copies in one loop body that are `if`-`else` chains whose every test opens with the same side-effect-free conjunct `C` (reading nothing the loop writes) may get a new levels struct (a flag for `C`, the role (d) operands) filled before the loop by a new `static` function, one `const` local per copy; the new function takes the struct, binds the operands to `const` locals, returns first when the flag is `MagickFalse` and runs the chain with `C` dropped | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `BuildStretchMap`'s four channel chains (`SetStretchMapValue`, `GetStretchChannelLevels`); 7.67 -> 8.24, a step of a chain ending at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | KV | *N-signature form*: the table groups may call functions of more than two signatures, and a group may assign the call's result to an object the chain passes on by pointer; one pointer member per signature, exactly one set per element, a `static void` runner tests them in order and makes the group's call text; kept groups gather unchanged into the innermost helper's `switch`, which stays as the fallback (a parameter no kept group reads is dropped); step 6's pairing is scripted; step 8's coverage may be read per callee, and elements and runner branches no case runs are listed as checked by the reading | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): `XMagickCommand` and its 16 SD helpers dispatch 86 labels, 82 of them to one command each of six signatures (`run`, `run_color`, `run_flags`, `run_quantize`, `next_image`, `new_image`); CodeScene counts the look-alike helpers as *Code Duplication* (14 functions). A probe of the table: 7.55 -> 9.38, only *Overall Code Complexity* left, which a carve of the magnify family clears (both products 10.0) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, trailing run: a header of that form may give up its last run (after a top-level item, to the blank line before its guard's `#endif`) into a new header of the same kind, which the `.c` file names on the line directly below the carved header's `#include`; same proof (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) and bar (both products at least the carved header's score before, one above it; the `.c` file keeps its score) | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): after the Recipe KV table it is 9.38 (*Overall Code Complexity*), and its magnify family (`XUpdateMagnifyInfo` to `XMoveMagnifyRightDown`) trails `XMagickCommand`; a probe of the trailing carve: both products 10.0, `display-image.c` 9.68 unchanged. The leading-run form would leave the apply header holding only the magnify family | mandate (2026-11-19) |
