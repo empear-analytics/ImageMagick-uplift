@@ -368,6 +368,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/property-set-pixel-private.h \
   MagickCore/property-set-xmp-private.h \
   MagickCore/histogram.c \
+  MagickCore/histogram-stretch.c \
   MagickCore/histogram.h \
   MagickCore/identify.c \
   MagickCore/identify.h \

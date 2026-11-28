@@ -137,6 +137,7 @@ $call Make geometry-meta.c
 $call Make geometry-parse.c
 $call Make hashmap.c
 $call Make histogram.c
+$call Make histogram-stretch.c
 $call Make identify.c
 $call Make image.c
 $call Make image-mask.c
