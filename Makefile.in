@@ -421,7 +421,7 @@ am__DEPENDENCIES_1 =
 am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURCES_DIST =  \
 	MagickCore/MagickCore.h MagickCore/accelerate.c MagickCore/accelerate-point.c MagickCore/accelerate-local-contrast.c MagickCore/accelerate-motion-blur.c MagickCore/accelerate-blur.c MagickCore/accelerate-rotational-blur.c MagickCore/accelerate-unsharp.c MagickCore/accelerate-denoise.c MagickCore/accelerate-despeckle.c MagickCore/accelerate-histogram.c MagickCore/accelerate-contrast-stretch.c MagickCore/accelerate-resize.c \
 	MagickCore/accelerate-private.h \
-	MagickCore/accelerate-kernels-private.h MagickCore/accelerate-kernels-blur-private.h MagickCore/accelerate-kernels-contraststretch-private.h MagickCore/accelerate-kernels-despeckle-private.h MagickCore/accelerate-kernels-function-private.h MagickCore/accelerate-kernels-localcontrast-private.h MagickCore/accelerate-kernels-modulate-private.h MagickCore/accelerate-kernels-motionblur-private.h MagickCore/accelerate-kernels-noise-private.h MagickCore/accelerate-kernels-pixel-private.h MagickCore/accelerate-kernels-resizefilter-private.h MagickCore/accelerate-kernels-resizehorizontal-private.h MagickCore/accelerate-kernels-resizevertical-private.h MagickCore/accelerate-kernels-rotationalblur-private.h MagickCore/accelerate-kernels-unsharpmask-private.h MagickCore/accelerate-kernels-wavelet-private.h MagickCore/accelerate-blur-private.h MagickCore/accelerate-core-private.h MagickCore/accelerate-histogram-private.h MagickCore/accelerate-recreate-buffer-private.h MagickCore/accelerate-recreate-release-private.h MagickCore/animate.c MagickCore/animate-window.c \
+	MagickCore/accelerate-kernels-private.h MagickCore/accelerate-kernels-blur-private.h MagickCore/accelerate-kernels-contraststretch-private.h MagickCore/accelerate-kernels-despeckle-private.h MagickCore/accelerate-kernels-equalize-private.h MagickCore/accelerate-kernels-function-private.h MagickCore/accelerate-kernels-localcontrast-private.h MagickCore/accelerate-kernels-modulate-private.h MagickCore/accelerate-kernels-motionblur-private.h MagickCore/accelerate-kernels-noise-private.h MagickCore/accelerate-kernels-pixel-private.h MagickCore/accelerate-kernels-resizefilter-private.h MagickCore/accelerate-kernels-resizehorizontal-private.h MagickCore/accelerate-kernels-resizevertical-private.h MagickCore/accelerate-kernels-rotationalblur-private.h MagickCore/accelerate-kernels-unsharpmask-private.h MagickCore/accelerate-kernels-wavelet-private.h MagickCore/accelerate-blur-private.h MagickCore/accelerate-core-private.h MagickCore/accelerate-histogram-private.h MagickCore/accelerate-recreate-buffer-private.h MagickCore/accelerate-recreate-release-private.h MagickCore/animate.c MagickCore/animate-window.c \
 	MagickCore/animate.h MagickCore/animate-private.h MagickCore/animate-window-command-private.h MagickCore/animate-window-menu-private.h MagickCore/animate-window-scene-private.h MagickCore/animate-window-events-private.h MagickCore/animate-window-session-private.h \
 	MagickCore/annotate.c MagickCore/annotate-metrics.c MagickCore/annotate.h MagickCore/annotate-type-private.h MagickCore/annotate-raqm-private.h MagickCore/annotate-freetype-private.h MagickCore/annotate-freetype-render-private.h MagickCore/annotate-render-private.h \
 	MagickCore/artifact.c MagickCore/artifact.h \
@@ -5759,6 +5759,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-kernels-blur-private.h \
   MagickCore/accelerate-kernels-contraststretch-private.h \
   MagickCore/accelerate-kernels-despeckle-private.h \
+  MagickCore/accelerate-kernels-equalize-private.h \
   MagickCore/accelerate-kernels-function-private.h \
   MagickCore/accelerate-kernels-localcontrast-private.h \
   MagickCore/accelerate-kernels-modulate-private.h \
@@ -6494,6 +6495,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-kernels-blur-private.h \
   MagickCore/accelerate-kernels-contraststretch-private.h \
   MagickCore/accelerate-kernels-despeckle-private.h \
+  MagickCore/accelerate-kernels-equalize-private.h \
   MagickCore/accelerate-kernels-function-private.h \
   MagickCore/accelerate-kernels-localcontrast-private.h \
   MagickCore/accelerate-kernels-modulate-private.h \

@@ -476,67 +476,7 @@ OPENCL_ENDIF()
 
 #include "MagickCore/accelerate-kernels-contraststretch-private.h"
 #include "MagickCore/accelerate-kernels-despeckle-private.h"
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%     E q u a l i z e                                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-*/
-
-    STRINGIFY(
-    /*
-    */
-    __kernel void Equalize(__global CLPixelType * restrict im,
-      const ChannelType channel,
-      __global CLPixelType * restrict equalize_map,
-      const float4 white, const float4 black)
-      {
-        const int x = get_global_id(0);
-        const int y = get_global_id(1);
-        const int columns = get_global_size(0);
-        const int c = x + y * columns;
-
-        uint ePos;
-        CLPixelType oValue, eValue;
-        CLQuantum red, green, blue, alpha;
-
-        //read from global
-        oValue=im[c];
-
-        if ((channel & SyncChannels) != 0)
-        {
-          if (getRedF4(white) != getRedF4(black))
-          {
-            ePos = ScaleQuantumToMap(getRed(oValue));
-            eValue = equalize_map[ePos];
-            red = getRed(eValue);
-            ePos = ScaleQuantumToMap(getGreen(oValue));
-            eValue = equalize_map[ePos];
-            green = getRed(eValue);
-            ePos = ScaleQuantumToMap(getBlue(oValue));
-            eValue = equalize_map[ePos];
-            blue = getRed(eValue);
-            ePos = ScaleQuantumToMap(getAlpha(oValue));
-            eValue = equalize_map[ePos];
-            alpha = getRed(eValue);
-
-            //write back
-            im[c]=(CLPixelType)(blue, green, red, alpha);
-          }
-
-        }
-
-        // for equalizing, we always need all channels?
-        // otherwise something more
-
-     }
-    )
-
+#include "MagickCore/accelerate-kernels-equalize-private.h"
 #include "MagickCore/accelerate-kernels-function-private.h"
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
