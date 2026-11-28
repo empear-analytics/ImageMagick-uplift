@@ -1161,9 +1161,14 @@ static inline MagickBooleanType SolveBilinearCoefficients(double *coeff,
   return(status);
 }
 
-static inline void SetBilinearForwardCoefficients(double *coeff,
-  const DistortMethod *method)
+static inline void SetBilinearForwardCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
   if ( *method == BilinearForwardDistortion ) {
      /* Bilinear Forward Mapped Distortion
 
@@ -1280,7 +1285,7 @@ static inline double *BilinearCoefficients(const CoefficientCall *call)
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
     return((double *) NULL);
   }
-  SetBilinearForwardCoefficients(coeff,method);
+  SetBilinearForwardCoefficients(call);
   return(coeff);
 }
 
