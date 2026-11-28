@@ -283,7 +283,10 @@ in place of item 3:
 
 A block whose exit throws through `GetMagickModule()` moves at this level only in step
 8's form, the throwing exit left in the caller unchanged, so the function name it
-reports does not change; a throw inside the moved text stops the step (item 1). The type
+reports does not change; a throw inside the moved text stops the step (item 1).
+Exception (owner 2026-11-28, answering PR #135 Q4): a guard-level Recipe E or I step may
+move an `OpenCLThrowMagickException(...,GetMagickModule(),...)` statement into its
+`static` helper, unchanged; the warning's reported location then names the helper. The type
 of each member against its variable's declaration (step 3) and the precedence of `*v`
 against `->`, `.` and `[]` are checked by reading; the members Recipe I carries are
 pointers to pointers or to structs, so a wrong precedence does not compile.
@@ -2069,7 +2072,11 @@ merges code, not parameters.
    holds the step: report it. The owner may release a reported function; its callers in
    the other campaign's files then change in the same commit (owner 2026-11-24, "If you
    can do these changes without breaking any test cases, sure", for `LeastSquaresAddTerms`
-   and campaign A's `distort-private.h` and `distort-linear-private.h`). A caller in the
+   and campaign A's `distort-private.h` and `distort-linear-private.h`). A released
+   function whose only call is commented out keeps that comment's text verbatim: the call
+   is not compiled, so it does not change, and the message quotes it (owner 2026-11-28,
+   answering PR #135 Q3, for `AccelerateUnsharpMaskImage`, whose only call stands in
+   `effect-sharpen.c` inside `/* This kernel appears to be broken. ... */`). A caller in the
    oracle driver (`tools/oracle/driver/imdriver.c`) declares the function by hand and is
    linked against the baseline library too, so it keeps both calls: `driver/build.sh`
    defines `IMDRIVER_<FUNCTION>` when the build's private header declares the typedef
@@ -28173,3 +28180,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | OH | *Upstream shared form, declarations in the run*: the run may also hold `extern MagickPrivate` declarations standing among its items (declarations only, every definition stays in its `.c` file), moved verbatim in order; proof unchanged (every includer's unit and object identical with `HDRS=1` in every `ci_linux_warnings` configuration, plus the C++ check) | `utility-private.h` (8.81; *Code Duplication* on `MagickRead`/`MagickWrite`, *Primitive Obsession*, *String Heavy Function Arguments*): its leading run after the include block, `MagickPathTemplate` to `MagickWrite`, holds the `GetPathComponents` to `ExpandFilename` declarations; a probe moving that run gives 10.0 and a new header at 10.0, both without findings; the shorter cuts that leave the declarations behind (through `MagickRead`) stop at 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | UB | *Kernel-string form*: a run of whole top-level `STRINGIFY`/`OPENCL_*` calls in `accelerate-kernels-private.h`'s two kernel-source initialisers moves byte for byte into a guard-less fragment `accelerate-kernels-<theme>-private.h`, named by a column-0 `#include` where it stood; cuts only at parenthesis depth 0; nothing edited; the fragment scores at least the file's score before the step; proof both kernel strings byte-identical (`cmp`), `opencl-initialize.c`'s unit and object identical (`HDRS=1 WIDE=1`), wide oracle on `CompileOpenCLKernel` | `accelerate-kernels-private.h` (2.03; *Brain Method*, *Complex Method*, *Large Method*, *Excess Number of Function Arguments*, *Code Duplication*, all in OpenCL C): a stub probe of 17 fragments, one per kernel section, takes it to 10.0 with no findings, the fragments 6.61 to 10.0 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file conditional form, carved in its middle*: in a header of that form that one `.c` file includes, a run between two kept items, inside the same `#if` branches, moves verbatim into a new header named by an `#include` on the run's first line in the carved header; on such a header OH also takes *Primitive Obsession* and *String Heavy Function Arguments* when the probe leaves both headers at 10.0 (or at the bar with a stub-probed chain ending at 10.0 for both); proof: the `.c` file against `HEAD`'s and the working tree's headers, unit and object identical in every build that compiles it | `opencl-initialize-benchmark-private.h` (9.38; *Primitive Obsession* 45 %, *String Heavy Function Arguments* 40 %): after four Recipe IP steps the header stays at 9.68 (*Primitive Obsession* 36 %); moving the DOCTYPE run `EndDoctypeQuote` to `SkipOpenCLBenchmarkDoctype` into `opencl-initialize-doctype-private.h` gives 10.0 for both (stub probe, cs-mcp 1.5.16, `tools/ch.py`; campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | B, I, E | Recipe B step 1 (b): a function the owner released although its only call is commented out keeps that comment verbatim; *Unreached functions: Recipe I*: a guard-level E or I step may move an `OpenCLThrowMagickException(...,GetMagickModule(),...)` statement into its helper, the reported location then naming the helper | `accelerate-unsharp.c` (campaign A, W51 round 38): `AccelerateUnsharpMaskImage`'s only call is commented out in `effect-sharpen.c`, and its kernel acquisitions throw through `OpenCLThrowMagickException` | owner |
