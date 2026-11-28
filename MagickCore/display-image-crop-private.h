@@ -298,33 +298,30 @@ static void XDrawKeyPress(const DrawEditContext *context,
   }
 }
 
+static void XFitSelectionSpan(const unsigned int limit,const int pointer,
+  ssize_t *offset,size_t *extent)
+{
+  if ((*offset) < 0)
+    (*offset)=0;
+  else
+    if ((*offset) > (ssize_t) limit)
+      (*offset)=(ssize_t) limit;
+  if ((int) (*offset) < pointer)
+    (*extent)=(unsigned int) (pointer-(*offset));
+  else
+    {
+      (*extent)=(unsigned int) ((*offset)-pointer);
+      (*offset)=(ssize_t) pointer;
+    }
+}
+
 static RectangleInfo XFitSelectionRectangle(XWindows *windows,const int x,
   const int y,RectangleInfo rectangle_info)
 {
-  if (rectangle_info.x < 0)
-    rectangle_info.x=0;
-  else
-    if (rectangle_info.x > (ssize_t) windows->image.width)
-      rectangle_info.x=(ssize_t) windows->image.width;
-  if ((int) rectangle_info.x < x)
-    rectangle_info.width=(unsigned int) (x-rectangle_info.x);
-  else
-    {
-      rectangle_info.width=(unsigned int) (rectangle_info.x-x);
-      rectangle_info.x=(ssize_t) x;
-    }
-  if (rectangle_info.y < 0)
-    rectangle_info.y=0;
-  else
-    if (rectangle_info.y > (ssize_t) windows->image.height)
-      rectangle_info.y=(ssize_t) windows->image.height;
-  if ((int) rectangle_info.y < y)
-    rectangle_info.height=(unsigned int) (y-rectangle_info.y);
-  else
-    {
-      rectangle_info.height=(unsigned int) (rectangle_info.y-y);
-      rectangle_info.y=(ssize_t) y;
-    }
+  XFitSelectionSpan(windows->image.width,x,&rectangle_info.x,
+    &rectangle_info.width);
+  XFitSelectionSpan(windows->image.height,y,&rectangle_info.y,
+    &rectangle_info.height);
   return(rectangle_info);
 }
 
