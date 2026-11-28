@@ -1044,9 +1044,7 @@ static void XReleaseColorEditCursor(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XColorEditImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception)
+static MagickBooleanType XColorEditImage(const XImageCacheContext *edit)
 {
   static PaintMethod
     method = PointMethod;
@@ -1096,31 +1094,31 @@ static MagickBooleanType XColorEditImage(Display *display,
   /*
     Map Command widget.
   */
-  XMapColorEditCommand(display,windows);
+  XMapColorEditCommand(edit->display,edit->windows);
   /*
     Make cursor.
   */
   {
     const XCursorColors
-      cursor_colors = { resource_info->background_color,
-        resource_info->foreground_color };
+      cursor_colors = { edit->resource_info->background_color,
+        edit->resource_info->foreground_color };
 
-    cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
-      &cursor_colors);
+    cursor=XMakeCursor(edit->display,edit->windows->image.id,
+      edit->windows->map_info->colormap,&cursor_colors);
   }
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (void) XCheckDefineCursor(edit->display,edit->windows->image.id,cursor);
   /*
     Track pointer until button 1 is pressed.
   */
-  XQueryPosition(display,windows->image.id,&x,&y);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask | PointerMotionMask);
+  XQueryPosition(edit->display,edit->windows->image.id,&x,&y);
+  (void) XSelectInput(edit->display,edit->windows->image.id,
+    edit->windows->image.attributes.event_mask | PointerMotionMask);
   state=DefaultState;
-  context.display=display;
-  context.resource_info=resource_info;
-  context.windows=windows;
-  context.image=image;
-  context.exception=exception;
+  context.display=edit->display;
+  context.resource_info=edit->resource_info;
+  context.windows=edit->windows;
+  context.image=edit->image;
+  context.exception=edit->exception;
   context.ColorEditCommands=ColorEditCommands;
   context.ColorEditMenu=ColorEditMenu;
   context.command=command;
@@ -1134,7 +1132,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     if (XColorEditStep(&context,&targets) == MagickFalse)
       return(MagickFalse);
   } while ((state & ExitState) == 0);
-  XReleaseColorEditCursor(display,windows,cursor);
+  XReleaseColorEditCursor(edit->display,edit->windows,cursor);
   return(MagickTrue);
 }
 typedef struct _ComposeMenuInfo

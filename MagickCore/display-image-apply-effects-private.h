@@ -74,11 +74,14 @@ static void XApplyColorCommand(const XMagickCommandContext *context)
   MagickStatusType
     status;
 
+  const XImageCacheContext
+    edit_context = { context->display, context->resource_info,
+      context->windows, context->image, context->exception };
+
   /*
     Color edit.
   */
-  status=XColorEditImage(context->display,context->resource_info,
-    context->windows,context->image,context->exception);
+  status=XColorEditImage(&edit_context);
   XNoticeEditFailure(context,status,"Unable to pixel edit X image");
 }
 
