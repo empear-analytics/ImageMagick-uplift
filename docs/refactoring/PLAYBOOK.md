@@ -11160,6 +11160,23 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    and `T *value` for role (c)
    (`T1 *value1,T2 *value2` for two lvalues), at most four in all (roles (a) beyond that in
    Recipe SC's `const` struct).
+   *New input struct, two bases* (mandate (2026-11-19), added 2026-11-28; please confirm):
+   when the copies read more caller variables than the four parameters leave room for,
+   the input struct may be new, written in the same commit: a `typedef struct` directly
+   above the new function with one member per pointer the copies read through, of that
+   pointer's declared type with `const` added to the pointed-to type (`const Image
+   *image`), and in the caller one `const` local `s` of it, initialised at its declaration
+   by `{ ... }` from those pointers, in a compound statement of its own that holds the
+   calls and nothing else. A `const` local `v` that the caller bound at its declaration
+   from `p->n` (`p` one of the struct's pointers, never assigned in the caller, `p->n` not
+   written between the binding and the last call) is read in the body as `s->m->n`, and
+   the binding leaves the caller when nothing else reads it; a read of a pointer `v` that
+   is a member is written `s->v`. The two lvalues of role (c) may also be `e1.m` and
+   `e2.m` of two different objects (two distinct locals of one struct type, neither inside
+   the other, nothing in `s` pointing into them), the member `m` differing between copies
+   and `e1`, `e2` the same in every copy; the parameters are `T *value1,T *value2`.
+   Step 4's body is then the copy's text with these reads and the two lvalues rewritten,
+   nothing else changed, and step 7's script substitutes them back.
 4. Its body is one copy's text with each role (a), (b) and (d) run replaced by its
    parameter's name and every `e.m` of role (c) by `(*value)`, nothing else changed;
    bindings of an input struct stay as they were.
@@ -11262,6 +11279,13 @@ static void EqualizeColormapValue(const EqualizeColors *colors,
   object at the call (step 7), since the call computes it even on the paths where the
   copy never reached `e.m`. The block took no other address of `e.m` and wrote no other
   lvalue that could alias it differently than before.
+- New input struct, two bases (2026-11-28): each member of `s` holds the pointer the
+  caller held, `const` added only to the pointed-to type, and nothing writes `s` after its
+  initialiser, so `s->m` is the same pointer value and `s->m->n` reads the very member the
+  binding `v` copied, which nothing wrote since. `e1` and `e2` are distinct objects and
+  nothing the body reads through `s` lies in them, so `&e1.m` and `&e2.m` never alias each
+  other or the inputs; the copy wrote `e1.m` and `e2.m` where `(*value1)` and `(*value2)`
+  now do, in the same order, with the same conversions.
 - The removed helper of step 1 had one caller in the file, which now calls the function
   holding its text: nothing outside the file could call it.
 - `refactor_guard.py` reports the copies' literals and callees once (`WARN`,
@@ -11303,6 +11327,14 @@ block's head, and the first also in the parameter `x` or `y` it compares with. N
 fits role (b). A probe of the chain after Recipe CF: 9.38, 9.38, 10.0, with no finding
 left. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19, for the
 owner's confirmation.
+Step 3's new input struct and two-base form (2026-11-28, campaign A, W51 round 38, lane
+b), from `accelerate-contrast-stretch.c`'s `ComputeContrastStretchImage`: its four
+black/white level blocks read `image`, `histogram` and the two `const` bindings of
+`points->black_point` and `points->white_point`, and assign `black.m` and `white.m` of two
+`cl_float4` locals; with role (a) and two role (c) pointers that is seven parameters.
+`FindStretchLevels(&search,RedChannel,&black.x,&white.x)` and its siblings: 7.61 to 7.69
+(`tools/ch.py`, cs-mcp), the first step of a chain that ends at 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
@@ -28085,3 +28117,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, nested placement: when the `.c` file's `#include` of the new header would lower the `.c` file, the carved header names the new header on the line after its guard's `#define` and blank line, where the run stood (an include block of its own; a later carve names its header last in that block); the `.c` file is unchanged; proof as for the carved-again form (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) | `display-image-tile-private.h` (campaign A, W51 round 38, lane b): its seventh carve (the translate command) probes the header at 10.0, but a seventh mid-file `#include` in `display-image.c` is counted into `XDisplayBackgroundImage` (70 lines, *Large Method*, 9.68 -> 9.31); nested in the tile header, `display-image.c` stays 9.68 and the tile header measures 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | rule | *Two levels of evidence*, new paragraph *Unreached functions: the worker of a wrapper no code calls*: in a `static` worker whose only caller is a `MagickPrivate` wrapper no code calls (WP step 8's `git grep` test, `casemap.py` 0), and in the helpers its steps add, Recipes H, E, V, W, MA, LM, JN and D may be taken at guard level, `Verified: guard`, with the recipe's steps checked by reading and quoted, `refactor_guard.py` (and `--calls`, only new or reused helpers moving), `WIDE=1 NOINLINE=F obj_modulo.sh` `IDENTICAL` or `MODULO-IDENTICAL`, and the CI and NDEBUG warning checks; a block throwing or logging through `GetMagickModule()` may move (the location names the helper, as the 2026-11-12/13 rulings allow); throw macros that return stay in the worker; unbuilt UB fragments stay unedited | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`, 7.61, no caller of its wrapper; a stub probe of `ComputeEqualizeImage`'s decomposition scores 10.0, but V, W, MA, LM and JN have no guard-level form and the GPU stages throw through `GetMagickModule()` | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | LM | Step 8, *gather form*: locals a function's cleanup releases (or that later steps hand together to helpers) may be gathered into a new struct local `r` of a new typedef, one member per local of its exact type (plus at most one member copying a never-assigned parameter, set by `r.p=p;` before the first of the moved `v=c;` statements), every use written `r.m`; no copy into an existing struct needed; a local an unbuilt fragment names stays unchosen except under *Unreached functions: the worker of a wrapper no code calls* | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s fourteen cleanup and stage locals; the probed chain (E, D, V, W, JN, D) ends at 10.0 from 8.24, the gather itself flat | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | MA | Step 3, *new input struct, two bases*: the input struct may be a new `typedef` (one `const`-pointee pointer member per pointer the copies read through), its `const` local initialised by `{ ... }` in a compound statement holding only the calls; a `const` binding of `p->n` is read as `s->m->n` and leaves the caller; role (c)'s two lvalues may be `e1.m` and `e2.m` of two distinct struct locals, the member differing between copies (`T *value1,T *value2`) | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s four black/white level blocks (`FindStretchLevels`), seven parameters without the struct; 7.61 -> 7.69, first step of a chain ending at 10.0 | mandate (2026-11-19) |
