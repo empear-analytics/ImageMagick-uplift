@@ -878,18 +878,19 @@ static void XDrawShapeEvent(const DrawEditContext *context,
   }
 }
 
+static void XClampLineCoordinate(const unsigned int limit,short *coordinate)
+{
+  if ((*coordinate) < 0)
+    (*coordinate)=0;
+  else
+    if ((*coordinate) > (int) limit)
+      (*coordinate)=(short) limit;
+}
+
 static void XClampLineEnd(const XWindows *windows,XSegment *line_info)
 {
-  if ((*line_info).x2 < 0)
-    (*line_info).x2=0;
-  else
-    if ((*line_info).x2 > (int) windows->image.width)
-      (*line_info).x2=(short) windows->image.width;
-  if ((*line_info).y2 < 0)
-    (*line_info).y2=0;
-  else
-    if ((*line_info).y2 > (int) windows->image.height)
-      (*line_info).y2=(short) windows->image.height;
+  XClampLineCoordinate(windows->image.width,&(*line_info).x2);
+  XClampLineCoordinate(windows->image.height,&(*line_info).y2);
 }
 
 static void XSizeDrawRegion(const DrawEditContext *context,
