@@ -51,7 +51,12 @@ static inline void ConvertJzazbzToRGB(const JzazbzToRGBInput *jzazbz)
 
     ConvertJzazbzToXYZ(&xyz);
   }
-  ConvertXYZToRGB(X,Y,Z,jzazbz->red,jzazbz->blue,jzazbz->green);
+  {
+    const IlluminantRGBTarget
+      rgb = { jzazbz->red, jzazbz->blue, jzazbz->green };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

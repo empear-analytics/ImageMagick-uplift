@@ -46,8 +46,24 @@ static const PrimaryInfo
 extern "C" {
 #endif
 
+typedef struct _IlluminantXYZTarget
+{
+  double
+    *X,
+    *Y,
+    *Z;
+} IlluminantXYZTarget;
+
+typedef struct _IlluminantRGBTarget
+{
+  double
+    *red,
+    *green,
+    *blue;
+} IlluminantRGBTarget;
+
 static inline void ConvertAdobe98ToXYZ(const double red,const double green,
-  const double blue,double *X,double *Y,double *Z)
+  const double blue,const IlluminantXYZTarget *target)
 {
   double
     b,
@@ -60,13 +76,13 @@ static inline void ConvertAdobe98ToXYZ(const double red,const double green,
   r=QuantumScale*DecodePixelGamma((double) QuantumRange*red);
   g=QuantumScale*DecodePixelGamma((double) QuantumRange*green);
   b=QuantumScale*DecodePixelGamma((double) QuantumRange*blue);
-  *X=0.57666904291013050*r+0.18555823790654630*g+0.18822864623499470*b;
-  *Y=0.29734497525053605*r+0.62736356625546610*g+0.07529145849399788*b;
-  *Z=0.02703136138641234*r+0.07068885253582723*g+0.99133753683763880*b;
+  *target->X=0.57666904291013050*r+0.18555823790654630*g+0.18822864623499470*b;
+  *target->Y=0.29734497525053605*r+0.62736356625546610*g+0.07529145849399788*b;
+  *target->Z=0.02703136138641234*r+0.07068885253582723*g+0.99133753683763880*b;
 }
 
 static inline void ConvertXYZToRGB(const double X,const double Y,const double Z,
-  double *red,double *green,double *blue)
+  const IlluminantRGBTarget *target)
 {
   double
     b,
@@ -84,9 +100,9 @@ static inline void ConvertXYZToRGB(const double X,const double Y,const double Z,
       g-=min;
       b-=min;
     }
-  *red=EncodePixelGamma((double) QuantumRange*r);
-  *green=EncodePixelGamma((double) QuantumRange*g);
-  *blue=EncodePixelGamma((double) QuantumRange*b);
+  *target->red=EncodePixelGamma((double) QuantumRange*r);
+  *target->green=EncodePixelGamma((double) QuantumRange*g);
+  *target->blue=EncodePixelGamma((double) QuantumRange*b);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

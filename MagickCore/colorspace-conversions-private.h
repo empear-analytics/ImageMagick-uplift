@@ -85,7 +85,12 @@ static inline void ConvertxyYToRGB(const double low_x,const double low_y,
   X=gamma*cap_Y*low_x;
   Y=cap_Y;
   Z=gamma*cap_Y*(1.0-low_x-low_y);
-  ConvertXYZToRGB(X,Y,Z,target->red,target->green,target->blue);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertYUVToRGB(const double Y,const double U,const double V,

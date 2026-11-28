@@ -229,7 +229,10 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
     }
     case XYZColorspace:
     {
-      ConvertXYZToRGB(X,Y,Z,R,G,B);
+      const IlluminantRGBTarget
+        rgb = { R, G, B };
+
+      ConvertXYZToRGB(X,Y,Z,&rgb);
       break;
     }
     case YCbCrColorspace:

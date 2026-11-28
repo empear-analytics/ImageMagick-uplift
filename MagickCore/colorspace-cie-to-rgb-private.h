@@ -78,7 +78,12 @@ static inline void ConvertDisplayP3ToRGB(const double r,const double g,
     xyz = { (&X), (&Y), (&Z) };
 
   ConvertDisplayP3ToXYZ(r,g,b,&xyz);
-  ConvertXYZToRGB(X,Y,Z,target->red,target->green,target->blue);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertLuvToRGB(const CIELuvInput *luv,
@@ -91,7 +96,12 @@ static inline void ConvertLuvToRGB(const CIELuvInput *luv,
 
   ConvertLuvToXYZ(100.0*luv->L,354.0*luv->u-134.0,262.0*luv->v-140.0,
     illuminant,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,target->red,target->green,target->blue);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertProPhotoToXYZ(const double red,const double green,
@@ -129,7 +139,12 @@ static inline void ConvertProPhotoToRGB(const double r,const double g,
     xyz = { (&X), (&Y), (&Z) };
 
   ConvertProPhotoToXYZ(r,g,b,&xyz);
-  ConvertXYZToRGB(X,Y,Z,target->red,target->green,target->blue);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

@@ -392,8 +392,11 @@ static MagickBooleanType ValidateXYZToRGB()
     g,
     b;
 
+  const IlluminantRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  XYZToRGB");
-  ConvertXYZToRGB(0.470646,0.730178,0.288324,&r,&g,&b);
+  ConvertXYZToRGB(0.470646,0.730178,0.288324,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))

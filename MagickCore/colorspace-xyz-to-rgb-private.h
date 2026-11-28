@@ -55,8 +55,16 @@ static inline void ConvertAdobe98ToRGB(const double r,const double g,
     Y,
     Z;
 
-  ConvertAdobe98ToXYZ(r,g,b,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,target->red,target->green,target->blue);
+  const IlluminantXYZTarget
+    xyz = { (&X), (&Y), (&Z) };
+
+  ConvertAdobe98ToXYZ(r,g,b,&xyz);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertCAT02LMSToXYZ(const double L,const double M,
@@ -82,7 +90,12 @@ static inline void ConvertCAT02LMSToRGB(const double L,const double M,
     xyz = { (&X), (&Y), (&Z) };
 
   ConvertCAT02LMSToXYZ(L,M,S,&xyz);
-  ConvertXYZToRGB(X,Y,Z,target->R,target->G,target->B);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->R, target->G, target->B };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertCMYKToRGB(PixelInfo *pixel)

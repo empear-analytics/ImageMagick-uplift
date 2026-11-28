@@ -67,6 +67,9 @@ static inline void ConvertLCHuvToRGB(const double luma,const double chroma,
     Y,
     Z;
 
+  const IlluminantRGBTarget
+    rgb = { red, green, blue };
+
   /*
     Convert LCHuv to RGB colorspace.
   */
@@ -75,7 +78,7 @@ static inline void ConvertLCHuvToRGB(const double luma,const double chroma,
   assert(blue != (double *) NULL);
   ConvertLCHuvToXYZ(100.0*luma,255.0*(chroma-0.5),360.0*hue,illuminant,
     &X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  ConvertXYZToRGB(X,Y,Z,&rgb);
 }
 
 static inline void ConvertLMSToXYZ(const double L,const double M,const double S,
@@ -94,8 +97,11 @@ static inline void ConvertLMSToRGB(const double L,const double M,
     Y,
     Z;
 
+  const IlluminantRGBTarget
+    rgb = { red, green, blue };
+
   ConvertLMSToXYZ(L,M,S,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  ConvertXYZToRGB(X,Y,Z,&rgb);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
