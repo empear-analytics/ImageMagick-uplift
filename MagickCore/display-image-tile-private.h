@@ -2292,9 +2292,18 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
     }
 }
 
-static void XCreateBackgroundPixmap(XWindowInfo *window_info,Display *display,
-  const int width,const int height,Image *image)
+static void XCreateBackgroundPixmap(const BackgroundInput *input,
+  const BackgroundTargets *targets,const int width,const int height)
 {
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
   (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
     (unsigned int) width,(unsigned int) height,(*window_info).depth);
   if ((*window_info).pixmap == (Pixmap) NULL)
@@ -2340,7 +2349,7 @@ static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   /*
     Create the X pixmap.
   */
-  XCreateBackgroundPixmap(window_info,display,width,height,image);
+  XCreateBackgroundPixmap(input,targets,width,height);
   /*
     Display pixmap on the window.
   */
