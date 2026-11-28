@@ -294,7 +294,10 @@ MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
       const CAT02LMSXYZTarget
         target = { X, Y, Z };
 
-      ConvertRGBToCAT02LMS(R,G,B,&L,&M,&S);
+      const CAT02LMSTarget
+        lms = { (&L), (&M), (&S) };
+
+      ConvertRGBToCAT02LMS(R,G,B,&lms);
       ConvertCAT02LMSToXYZ(L,M,S,&target);
       break;
     }

@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 static inline void ConvertRGBToCAT02LMS(const double R,const double G,
-  const double B,double *L,double *M,double *S)
+  const double B,const CAT02LMSTarget *target)
 {
   double
     X,
@@ -32,7 +32,7 @@ static inline void ConvertRGBToCAT02LMS(const double R,const double G,
     Z;
 
   ConvertRGBToXYZ(R,G,B,&X,&Y,&Z);
-  ConvertXYZToCAT02LMS(X,Y,Z,L,M,S);
+  ConvertXYZToCAT02LMS(X,Y,Z,target);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

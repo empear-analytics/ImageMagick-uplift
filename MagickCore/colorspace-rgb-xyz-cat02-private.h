@@ -23,12 +23,20 @@
 extern "C" {
 #endif
 
-static inline void ConvertXYZToCAT02LMS(const double X,const double Y,
-  const double Z,double *L,double *M,double *S)
+typedef struct _CAT02LMSTarget
 {
-  *L=0.7328*X+0.4296*Y-0.1624*Z;
-  *M=(-0.7036)*X+1.6975*Y+0.0061*Z;
-  *S=0.0030*X+0.0136*Y+0.9834*Z;
+  double
+    *L,
+    *M,
+    *S;
+} CAT02LMSTarget;
+
+static inline void ConvertXYZToCAT02LMS(const double X,const double Y,
+  const double Z,const CAT02LMSTarget *target)
+{
+  *target->L=0.7328*X+0.4296*Y-0.1624*Z;
+  *target->M=(-0.7036)*X+1.6975*Y+0.0061*Z;
+  *target->S=0.0030*X+0.0136*Y+0.9834*Z;
 }
 
 static inline void ConvertRGBToXYZ(const double red,const double green,
