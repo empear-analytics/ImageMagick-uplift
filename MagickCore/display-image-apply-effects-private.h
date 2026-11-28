@@ -42,53 +42,25 @@ static void XNoticeEditFailure(const XMagickCommandContext *context,
 
 static void XApplyAnnotateCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   /*
     Annotate the image with text.
   */
-  status=XAnnotateEditImage(display,resource_info,windows,*image,exception);
+  status=XAnnotateEditImage(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
   XNoticeEditFailure(context,status,"Unable to annotate X image");
 }
 
 static void XApplyDrawCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   const XImageCacheContext
-    edit_context = { display, resource_info, windows, image, exception };
+    edit_context = { context->display, context->resource_info,
+      context->windows, context->image, context->exception };
 
   /*
     Draw image.
@@ -99,83 +71,40 @@ static void XApplyDrawCommand(const XMagickCommandContext *context)
 
 static void XApplyColorCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   /*
     Color edit.
   */
-  status=XColorEditImage(display,resource_info,windows,image,exception);
+  status=XColorEditImage(context->display,context->resource_info,
+    context->windows,context->image,context->exception);
   XNoticeEditFailure(context,status,"Unable to pixel edit X image");
 }
 
 static void XApplyMatteCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   /*
     Matte edit.
   */
-  status=XMatteEditImage(display,resource_info,windows,image,exception);
+  status=XMatteEditImage(context->display,context->resource_info,
+    context->windows,context->image,context->exception);
   XNoticeEditFailure(context,status,"Unable to matte edit X image");
 }
 
 static void XApplyCompositeCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   /*
     Composite image.
   */
-  status=XCompositeImage(display,resource_info,windows,*image,
-    exception);
+  status=XCompositeImage(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
   XNoticeEditFailure(context,status,"Unable to composite X image");
 }
 
