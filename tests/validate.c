@@ -352,9 +352,15 @@ static MagickBooleanType ValidateLuvToRGB()
     g,
     b;
 
+  const CIELuvInput
+    luv = { 88.456154/100.0, (-51.330414+134.0)/354.0,
+      (76.405526+140.0)/262.0 };
+
+  const CIEToRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  LuvToRGB");
-  ConvertLuvToRGB(88.456154/100.0,(-51.330414+134.0)/354.0,
-    (76.405526+140.0)/262.0,D65Illuminant,&r,&g,&b);
+  ConvertLuvToRGB(&luv,D65Illuminant,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))

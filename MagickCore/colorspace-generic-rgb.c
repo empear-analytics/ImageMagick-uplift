@@ -216,7 +216,10 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
     }
     case ProPhotoColorspace:
     {
-      ConvertProPhotoToRGB(X,Y,Z,R,G,B);
+      const CIEToRGBTarget
+        rgb = { R, G, B };
+
+      ConvertProPhotoToRGB(X,Y,Z,&rgb);
       break;
     }
     case xyYColorspace:
@@ -285,7 +288,13 @@ static void ConvertLabThroughLuvToRGB(const GenericToRGBInput *input)
     }
     case LuvColorspace:
     {
-      ConvertLuvToRGB(X,Y,Z,illuminant,R,G,B);
+      const CIELuvInput
+        luv = { X, Y, Z };
+
+      const CIEToRGBTarget
+        rgb = { R, G, B };
+
+      ConvertLuvToRGB(&luv,illuminant,&rgb);
       break;
     }
     default:
@@ -405,7 +414,10 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
     }
     case DisplayP3Colorspace:
     {
-      ConvertDisplayP3ToRGB(X,Y,Z,R,G,B);
+      const CIEToRGBTarget
+        rgb = { R, G, B };
+
+      ConvertDisplayP3ToRGB(X,Y,Z,&rgb);
       break;
     }
     case HCLColorspace:
