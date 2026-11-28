@@ -15941,6 +15941,22 @@ block leaves through `goto`.
    the new function, which declares `v` and ends with `return(v);` (steps 1, 3 and 4 otherwise
    hold); in the caller `v=Helper(...);` is followed by a copy of the block's first guard,
    `if (v == (T *) NULL) return(v);`.
+8. Exits with releases, a transformed clone, twin heads (mandate (2026-11-19), added
+   2026-11-28 for `compare-similarity-frequency-images-private.h`'s
+   `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage`, please confirm). (a) An exit
+   of the block may be `{ S return(R); }`, `S` statements that only release objects the
+   block neither reads nor writes (`complex_conjugate=DestroyImageList(complex_conjugate);`),
+   when the caller's next statement is `if (v == (T *) NULL) { S return(R); }` with the
+   same `S` and `R`; the exit becomes `return((T *) NULL);`. (b) `v` may also be written
+   by the block's first statement, the object its last call transforms (`v=CloneImage(...);`,
+   its test, `v=Last(v,...);`, nothing else writing `v`): the helper holds that object in a
+   local of its own declared as `v` was (`clone_image`) and ends
+   `return(Last(clone_image,...));`. When no release follows step 2's last call, the helper
+   may likewise end `return(Call(...));` instead of declaring `v`. An object the block
+   overwrote without releasing it stays unreleased: no fix rides along. (c) A guard of the
+   block may spell the null pointer `NULL` or `(T *) NULL`; the helper writes `(T *) NULL`.
+   (d) Two copies in one caller that are the same text under Recipe D's renaming but for
+   their exits' `S` call the same helper in one commit, as Recipe W step 7 lets a copy do.
 
 **Before:**
 
@@ -15982,6 +15998,14 @@ block leaves through `goto`.
   which holds that `NULL`: the value the caller returned before, at the same point. On the
   path that passes every guard the helper returns `v` and the caller goes on with it as
   before; the guard reads `v` once more and has no side effect.
+- Step 8: (a) the helper returns `(T *) NULL` where the block ran `S` and returned `R`, after
+  the same statements, and the caller's next statement runs the same `S` and returns `R`;
+  `S` touches nothing the block wrote, so it releases the same objects. (b) The helper
+  returns the value the block's last statement left in `v`; the clone that `v` held before
+  was read only inside the block, now through the helper's own local. (c) `NULL` is a null
+  pointer constant, converted to the pointer's type when compared (C11 6.3.2.3p3, 6.5.9p5),
+  so `p == NULL` and `p == (T *) NULL` have the same value. (d) Each copy's call runs the
+  one helper on its own arguments, as each copy ran its own text.
 - The early returns are allocation failures that no case reaches: checked by reading, each
   `return(R);` against its `return((T *) NULL);`; the last path is checked by the oracle.
 
@@ -15992,7 +16016,7 @@ checked by reading.
 after Recipe RD it is a *Large Method* of 73 lines whose head builds `mean_image` from a crop and
 a difference sum; the head as a helper takes it out of the finding, 3.58 to 3.70 in a probe, no
 finding on the helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
-to evolve the recipes. Step 7 (the self-guarded head): 2026-11-19, from `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a), cc 10 to 9 and 8.87 to 8.89 in a probe; added by Claude Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are fine").
+to evolve the recipes. Step 7 (the self-guarded head): 2026-11-19, from `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a), cc 10 to 9 and 8.87 to 8.89 in a probe; added by Claude Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are fine"). Step 8 (exits with releases, a transformed clone, twin heads): 2026-11-28, from the same header's `SIMCrossCorrelationImage` (two FFT heads, the second releasing `complex_conjugate` at both exits) and `SIMPhaseCorrelationImage` (two FFT heads that overwrite their clones), campaign A, W51 round 38, lane a; with two Recipe E steps the header's Overall Code Complexity clears, 9.38 flat to 10.0 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19.
 
 ---
 
@@ -27888,3 +27912,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
+| 2026-11-28 | AMEND | HN | Step 8: (a) an exit `{ S return(R); }` whose `S` only releases objects the block does not touch, when the caller's next test has the same body; (b) `v` also written by the block's first statement, the clone its last call transforms, kept in a helper local, the helper ending `return(Last(...));` (and `return(Call(...));` with no release after the last call); (c) `NULL` or `(T *) NULL` in a guard; (d) two copies in one caller in one commit | `compare-similarity-frequency-images-private.h`'s `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage` (campaign A, W51 round 38, lane a): their FFT heads as helpers, with two Recipe E steps, clear the header's Overall Code Complexity, 9.38 flat to 10.0 in a probe | mandate (2026-11-19) |
