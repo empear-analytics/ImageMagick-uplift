@@ -9583,6 +9583,15 @@ whole `switch` with the tail of the function.
    label stands once, in the first or the second; the two runs are adjacent in the original
    order. Step 5's script is `python3 tools/label_set_check.py --split <file> <First>
    <Second>`.
+   *Head form* (2026-11-28): the second predicate may instead take the leading run
+   `L1 ... Lk` (`2 <= k <= n-2`), written directly above the first in the same shape;
+   the first keeps `L(k+1) ... Ln` in its `switch`, and directly before that `switch`
+   gains `if (<Name2>(x) != MagickFalse)` followed by `return(MagickTrue);` two columns
+   deeper; its tail `return(MagickFalse);` stays. Every label stands once, the two runs
+   adjacent in the original order. For a predicate in a private header both are
+   `static inline`, as the first was. Step 5's script checks the head form the same
+   way: the second's labels followed by the first's are the old labels, in order, each
+   once, both runs of at least two, and the rest of the file is unchanged.
 
 **Before:**
 
@@ -9678,10 +9687,20 @@ static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
   what runs. Each keeps `default: break;`, so `-Wswitch` stays quiet; each run is sized so that
   its function has cc 8 or less (six labels at most), which is what takes the label run out of
   *Complex Method*.
+- Why the head form of step 7 behaves the same. A value among `L1 ... Lk`: the second
+  predicate returns `MagickTrue` for it, and the first returns `MagickTrue` at once, as its
+  one `switch` did for that label. Any other value: the second returns `MagickFalse`, having
+  only read its argument, and the first's `switch` selects on the same value (a parameter,
+  which nothing writes); it returns `MagickTrue` for `L(k+1) ... Ln` and reaches
+  `default: break;` and `return(MagickFalse);` for every value outside `L1 ... Ln`, as before.
+  The extra call and test are the only change of what runs; in a header predicate that a
+  per-pixel loop calls, the step is measured under the timing rule (reading 1) and its
+  exceptions.
 
 **Evidence level:** oracle (the cases that reach each caller), with `refactor_guard.py
 --calls` (`+2` for the new function, `+1` for each further site, nothing else moved) and
-step 5's script (`tools/label_set_check.py`, with `--split` for step 7).
+step 5's script (`tools/label_set_check.py`, with `--split` for step 7; for the head form a
+script of the same checks, quoted in the commit message).
 
 **Provenance:** 2026-11-10, from `colorspace.c`'s `sRGBTransformImage` and
 `GenericOrLogTosRGB` (campaign A, W16 lane c): the same twenty-eight-label generic group,
@@ -9700,6 +9719,11 @@ round thirteen lane c, wide build): the eight arrow labels of the key switch of 
 cc 10, the file's only *Complex Method*; a probe of the split into the vertical and the horizontal run
 (four labels each, cc 6) 5.36 to 5.52, no finding on either predicate. Added by Claude Code (Claude
 Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+Step 7 (head form): 2026-11-28, from `colorspace-rgb-predicates-private.h`'s
+`IssRGBCompatibleColorspace` (campaign A, W51 round 38, lane e): nine labels, cc 10, the
+header's only finding (9.68); the six RGB-model labels peeled into `IsRGBModelColorspace`
+take it to 10.0 with no finding. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-11-19.
 
 ---
 
@@ -28422,3 +28446,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | KV | *N-signature form*: the table groups may call functions of more than two signatures, and a group may assign the call's result to an object the chain passes on by pointer; one pointer member per signature, exactly one set per element, a `static void` runner tests them in order and makes the group's call text; kept groups gather unchanged into the innermost helper's `switch`, which stays as the fallback (a parameter no kept group reads is dropped); step 6's pairing is scripted; step 8's coverage may be read per callee, and elements and runner branches no case runs are listed as checked by the reading | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): `XMagickCommand` and its 16 SD helpers dispatch 86 labels, 82 of them to one command each of six signatures (`run`, `run_color`, `run_flags`, `run_quantize`, `next_image`, `new_image`); CodeScene counts the look-alike helpers as *Code Duplication* (14 functions). A probe of the table: 7.55 -> 9.38, only *Overall Code Complexity* left, which a carve of the magnify family clears (both products 10.0) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, trailing run: a header of that form may give up its last run (after a top-level item, to the blank line before its guard's `#endif`) into a new header of the same kind, which the `.c` file names on the line directly below the carved header's `#include`; same proof (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) and bar (both products at least the carved header's score before, one above it; the `.c` file keeps its score) | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): after the Recipe KV table it is 9.38 (*Overall Code Complexity*), and its magnify family (`XUpdateMagnifyInfo` to `XMoveMagnifyRightDown`) trails `XMagickCommand`; a probe of the trailing carve: both products 10.0, `display-image.c` 9.68 unchanged. The leading-run form would leave the apply header holding only the magnify family | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | S | Step 2, *a shared header with conditional members*: a header that a Recipe OH Form A step made of the original's define and typedef blocks may be the split's shared header as it stands although its struct holds `#if`/`#else`/`#endif` member lines, its define block holds a conditional, and a moving function redefines one of its macros identically; conditions: every condition names only macros the header defines above it or a macro nothing in the tree or the generated config headers defines, the header holds no function, object or `#include` and is not edited, the `-E -dM` dump of its macros and the preprocessed struct are the same in the original and both products; proof the split's `split_branch_check.py` | `resample.c` (9.68, *Excess Number of Function Arguments* on the MagickExport `ResamplePixelColor` and `ScaleResampleFilter`): every partition probed leaves the product below 9.68 except the one moving Acquire, Destroy and both families, which needs `struct _ResampleFilter` (its `#if FILTER_LUT` members) in both files; probe resample.c 10.0, product 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | LP | Step 7, *head form*: the second predicate may take the leading run `L1 ... Lk` instead of the trailing one; the first keeps `L(k+1) ... Ln` and tests `if (<Second>(x) != MagickFalse) return(MagickTrue);` before its `switch`, its tail `return(MagickFalse);` unchanged; both `static inline` in a header. *Careful* gives the argument (a value of the leading run returns `MagickTrue` at once; any other reaches the same `switch` on the unwritten parameter) and the timing duty for a per-pixel caller; checked by a script of `--split`'s checks | `colorspace-rgb-predicates-private.h`'s `IssRGBCompatibleColorspace` (campaign A, W51 round 38, lane e): nine labels, cc 10; the six RGB-model labels as `IsRGBModelColorspace` 9.68 to 10.0, no finding; the txt/sparse-color writers are reached per pixel and histogram text output once per colour (owner ruling 2026-11-28, extended the same day) | mandate (2026-11-19) |
