@@ -652,8 +652,13 @@ static void XPressImageButton3(const DisplayEventContext *context,
       /*
         Open or delete a tile from a visual image directory.
       */
-      (*nexus)=XTileImage(display,resource_info,windows,
-        (*display_image),event,exception);
+      {
+        const XTileImageInput
+          tile_input = { display, resource_info, windows, (*display_image),
+            event, exception };
+
+        (*nexus)=XTileImage(&tile_input);
+      }
       if ((*nexus) != (Image *) NULL)
         *state|=MontageImageState | NextImageState | ExitState;
       (*vid_info).x=(short int) windows->image.x;

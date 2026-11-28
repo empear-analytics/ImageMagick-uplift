@@ -1177,8 +1177,7 @@ static Image *XTileCommand(const XTileInput *input)
   return(tile_image);
 }
 
-static Image *XTileImage(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
+static Image *XTileImage(const XTileImageInput *tile_input)
 {
   const char
     *const VerbMenu[] =
@@ -1224,8 +1223,9 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   const XTileLocationTargets
     location = { &width, &height, &x, &y, &p };
 
-  XScaleTileEvent(image,windows,event);
-  if (XLocateTile(display,image,event,&location) == MagickFalse)
+  XScaleTileEvent(tile_input->image,tile_input->windows,tile_input->event);
+  if (XLocateTile(tile_input->display,tile_input->image,tile_input->event,
+      &location) == MagickFalse)
     return((Image *) NULL);
   /*
     Select a command from the pop-up menu.
@@ -1234,7 +1234,7 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
     const XMenuRequest
       menu_request = { "Tile Verb", VerbMenu, command };
 
-    id=XMenuWidget(display,windows,&menu_request);
+    id=XMenuWidget(tile_input->display,tile_input->windows,&menu_request);
   }
   if (id < 0)
     return((Image *) NULL);
@@ -1243,11 +1243,11 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
          ((size_t) (q-p+1) < sizeof(filename)))
     q++;
   (void) CopyMagickString(filename,p,(size_t) (q-p+1));
-  input.display=display;
-  input.resource_info=resource_info;
-  input.windows=windows;
-  input.image=image;
-  input.exception=exception;
+  input.display=tile_input->display;
+  input.resource_info=tile_input->resource_info;
+  input.windows=tile_input->windows;
+  input.image=tile_input->image;
+  input.exception=tile_input->exception;
   input.x=x;
   input.y=y;
   input.height=height;

@@ -1509,6 +1509,27 @@ typedef struct _XImageCommandInput
     *exception;
 } XImageCommandInput;
 
+typedef struct _XTileImageInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  XEvent
+    *event;
+
+  ExceptionInfo
+    *exception;
+} XTileImageInput;
+
 /*
   Forward declarations.
 */
@@ -1518,8 +1539,7 @@ static DisplayCommand
 static Image
   *XMagickCommand(const XImageCacheContext *,const DisplayCommand),
   *XOpenImage(Display *,XResourceInfo *,XWindows *,const MagickBooleanType),
-  *XTileImage(Display *,XResourceInfo *,XWindows *,Image *,XEvent *,
-    ExceptionInfo *),
+  *XTileImage(const XTileImageInput *),
   *XVisualDirectoryImage(Display *,XResourceInfo *,XWindows *,
     ExceptionInfo *);
 static MagickBooleanType
