@@ -23898,6 +23898,22 @@ against the headers of `HEAD` and of the working tree (the carved and the new he
 ahead of every `-I` path), wide candidate's flags, `__LINE__` and `__FILE__` pinned:
 preprocessed unit and object both identical. Step 1's bar is the carved header's score
 before the step; both products must reach it and one must rise above it.
+Nested placement (mandate (2026-11-19), please confirm). When the `.c` file's `#include` of
+the new header would lower the `.c` file's score, the carved header names the new header
+instead, on the line directly after its include guard's `#define` and the blank line after
+it, where the run stood (blank and form-feed lines at that edge stay below the new line).
+CodeScene counts the lines of the last mid-file include group into the length of the
+function that follows it: `display-image.c`'s `XDisplayBackgroundImage` is under the bar
+with six carved-again headers of `display-image-tile-private.h` named above that header's
+`#include`, and a seventh makes it 70 lines, a *Large Method*, 9.68 -> 9.31; named by the tile
+header instead, the `.c` file stays 9.68 and the tile header measures 10.0 with the line.
+The carved header then has an include block of its own, and a later carve of it names its
+new header as the last line of that block (the rule above for a header with an include
+block). The `.c` file is unchanged; the new header has one includer, the carved header,
+which one `.c` file includes; the translation unit has the same tokens in the same order.
+Step 4's proof is the carved-again form's: the `.c` file compiled against the headers of
+`HEAD` and of the working tree, preprocessed unit and object both identical. Step 1's bar
+holds, scored with the new line in the carved header.
 Mid-file conditional form (mandate, 2026-11-19; campaign A round 36; owner 2026-11-20, "private
 headers may be ... included mid-file", read by the main session as covering mid-file includes
 in general, not only in X11 files, and flagged in the PR): Form A also applies to a `.c` file
@@ -27995,3 +28011,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | IC | Step 5, dereferenced read: the one read of a member binding `v` may be the whole operand of a unary `*` whose `*v` is a whole argument or a whole member initialiser; it becomes `*p->m` (`*context->image`), which parses as `*(p->m)`; every other condition of step 5 holds | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): after Recipe D and B share the five edit commands' failure notice, `XApplyAnnotateCommand` and `XApplyCompositeCommand` pass `*image`; a probe keeping those bindings stays at 9.09 with Code Duplication, the chain (D, B, IC, and E, D, B, IC on two more groups) ends at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | IC | *Evidence level*, oracle form: when `obj_identical.sh` prints `DIFFERENT` and oracle cases execute every function whose locals the step inlines, the oracle `--function` on each (0 diverged, counts quoted) proves the step, `Verified: oracle`; the message names the functions whose code differs; steps 1 to 3 and 5 by reading, step 4's warning checks `OK` | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): inlining the bindings of the five edit commands leaves Draw, Color and Matte identical one by one, but Annotate and Composite change `XApplyFXCommands`'s stack frame (+16 bytes). Kept out of line, `XApplyCompositeCommand` differs only in the order of two member loads. The commands are reached by 22, 15, 23, 9 and 3 wide cases; the chain needs those two inlined (a probe keeping either binding: 9.09 or 9.38) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | W | Step 7, twin form with a buffer per copy: two `void` functions whose leading blocks are one text may share the new function in one commit when each block holds, in a compound statement of its own, a `static char` array that only the block names (moved unchanged to its function's opening declarations and passed by name as `char *`, so each function keeps its own buffer) and both bind the block's other inputs from one `const Name *name` parameter (the new function takes `name` and binds them, Recipe SM step 4); bindings only the block read go with it | `display-image-annotate-private.h` (campaign A, W51 round 38, lane b): `XSelectColorBorder` and `XSelectPenColor` share `XSelectEditPen`; Recipe F refuses the buffers (the colour dialog writes them) and one shared buffer would change each command's remembered reply. Probed chain 9.38, 9.38, 9.38, 9.38, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, nested placement: when the `.c` file's `#include` of the new header would lower the `.c` file, the carved header names the new header on the line after its guard's `#define` and blank line, where the run stood (an include block of its own; a later carve names its header last in that block); the `.c` file is unchanged; proof as for the carved-again form (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) | `display-image-tile-private.h` (campaign A, W51 round 38, lane b): its seventh carve (the translate command) probes the header at 10.0, but a seventh mid-file `#include` in `display-image.c` is counted into `XDisplayBackgroundImage` (70 lines, *Large Method*, 9.68 -> 9.31); nested in the tile header, `display-image.c` stays 9.68 and the tile header measures 10.0 | mandate (2026-11-19) |
