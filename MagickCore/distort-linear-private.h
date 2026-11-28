@@ -946,9 +946,21 @@ static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
   }
 }
 
-static inline void SetPerspectiveGroundSign(double *coeff,const double *arguments,
-  const size_t cp_x,const size_t cp_y)
+static inline void SetPerspectiveGroundSign(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    cp_x = context->cp_x,
+    cp_y = context->cp_y;
+
   /*
     Calculate 9'th coefficient! The ground-sky determination.
     What is sign of the 'ground' in r() denominator affine function?
@@ -971,17 +983,12 @@ static inline double *PerspectiveCoefficients(const CoefficientCall *call)
   const CoefficientContext
     *const context = call->context;
 
-  const double
-    *const arguments = context->arguments;
-
   ExceptionInfo
     *const exception = context->exception;
 
   const size_t
     number_arguments = context->number_arguments,
-    cp_size = context->cp_size,
-    cp_x = context->cp_x,
-    cp_y = context->cp_y;
+    cp_size = context->cp_size;
 
   /*
      Perspective Distortion (a ratio of affine distortions)
@@ -1050,7 +1057,7 @@ static inline double *PerspectiveCoefficients(const CoefficientCall *call)
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
     return((double *) NULL);
   }
-  SetPerspectiveGroundSign(coeff,arguments,cp_x,cp_y);
+  SetPerspectiveGroundSign(call);
 
   return(coeff);
 }
