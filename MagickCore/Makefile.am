@@ -266,6 +266,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-save-private.h \
   MagickCore/display-image-screen-button-private.h \
   MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
   MagickCore/display-image-tile-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
@@ -914,6 +915,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-save-private.h \
   MagickCore/display-image-screen-button-private.h \
   MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
   MagickCore/display-image-tile-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
