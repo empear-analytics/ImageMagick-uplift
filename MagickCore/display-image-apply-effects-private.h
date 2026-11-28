@@ -108,6 +108,28 @@ static void XApplyCompositeCommand(const XMagickCommandContext *context)
   XNoticeEditFailure(context,status,"Unable to composite X image");
 }
 
+static void XReplaceBorderedImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image **image,
+  ExceptionInfo *exception,Image *border_image)
+{
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
+
+  if (border_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=border_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  XConfigureImageColormap(&cmap_target,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   char *color)
 {
@@ -138,9 +160,6 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
-  const XImageColormapTarget
-    cmap_target = { display, resource_info, windows };
-
   /*
     Query user for border color and geometry.
   */
@@ -167,19 +186,8 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
     exception);
   border_image=BorderImage(*image,&page_geometry,(*image)->compose,
     exception);
-  if (border_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=border_image;
-    }
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  windows->image.window_changes.width=(int) (*image)->columns;
-  windows->image.window_changes.height=(int) (*image)->rows;
-  XConfigureImageColormap(&cmap_target,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XReplaceBorderedImage(display,resource_info,windows,image,exception,
+    border_image);
 }
 
 static void XApplyAddFrameCommand(const XMagickCommandContext *context,
