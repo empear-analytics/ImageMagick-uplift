@@ -9935,7 +9935,11 @@ that clones the first (the *Code Duplication* cliff, W14).
    `magick` on a command that runs every copy, alternating the baseline and candidate
    binaries for at least nine runs each, and quote both medians in the message; a
    candidate slower by more than 3% stops the step. Check with `objdump -d` on the
-   file's object that no new indirect call (`call *`) appears.
+   file's object that no new indirect call (`call *`) appears. Event form (2026-11-28):
+   when no copy runs per pixel or per channel, only once per user command or pointer
+   event of the X11 programs, a new indirect call is allowed (owner 2026-11-18 evening,
+   Recipe DC); the message gives the `call *` count of the gcc `-O2 -fopenmp` object
+   before and after and names the function that holds the new call.
 8. Check by script that each copy equals the new function's body with that copy's
    callee and variables substituted, and by reading that every argument fills its
    parameter.
@@ -10017,6 +10021,11 @@ static void WhiteThresholdIntensity(const Image *image,
   same code, so the outlined region is optimised the same way. That argument holds in
   optimised builds only; step 7's timing and `objdump` check are the evidence, and a
   build without optimisation keeps the indirect call, which changes speed, not values.
+- Event form (step 7, 2026-11-28). A compiler may keep the new function out of line
+  (gcc's `.isra` clone), and the call through `method` then stays indirect. It still
+  calls the copy's callee with the same arguments (first bullet), so no value changes.
+  It costs one indirect call per event, in code that waits on the X server anyway: the
+  cost the owner accepted for Recipe DC's dialog commands (2026-11-18 evening).
 - Methods in a struct (step 4). The struct is a `const` local of the copy's function
   initialised with designators, and the `static inline` function binds its members to
   `const` locals before any call, so once inlined the compiler loads each method from an
@@ -10058,7 +10067,13 @@ new function, no indirect call in the object. Step 4's shared struct (2026-11-10
 `morphology.c`'s `MorphologyPrimitive`: its Convolve and IterativeDistance walks differ
 only in `ConvolveChannelValue`/`MinimizeKernelDistance` and read the channel body's walk
 struct; a probe 3.28 to 3.33 (after Recipe Q on the hit-and-miss walk), no finding on a
-new function.
+new function. Step 7's event form (2026-11-28, campaign A, W51 round 38, lane b), from
+`display-image-crop-private.h`'s `XPreviewRectangle` and `XPreviewEllipse` and their
+`Erase` twins, X11 pointer-event handlers: gcc keeps the new `XPreviewBox` out of line
+as `XPreviewBox.isra.0`, and the `call *` count of `display-image.c`'s gcc `-O2
+-fopenmp` object goes 11 to 12; the clang `-O2` object is identical. A probe of the
+chain (CF, MA, MA): 8.28, 9.38, 9.38, 10.0. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
@@ -27888,3 +27903,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
+| 2026-11-28 | AMEND | CF | Step 7, event form: when no copy runs per pixel or per channel, only once per user command or pointer event of the X11 programs, a new indirect call (`call *`) is allowed; the message gives the count in the gcc `-O2 -fopenmp` object before and after and names the function holding the new call. *Careful* gives the argument (the same callee with the same arguments; one indirect call per event) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XPreviewRectangle`, `XPreviewEllipse` and their `Erase` twins differ only in `XHighlightRectangle` against `XHighlightEllipse`; gcc keeps `XPreviewBox` out of line as `XPreviewBox.isra.0`, `call *` 11 to 12 in `display-image.c`'s object, the clang object identical. The owner accepted the same cost for Recipe DC's X11 dialog commands (2026-11-18 evening). Probed chain 8.28, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
