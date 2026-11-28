@@ -533,6 +533,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resample-private.h \
   MagickCore/resize.c \
   MagickCore/resize-rescale.c \
+  MagickCore/resize-liquid.c \
   MagickCore/resize-sample.c \
   MagickCore/resize-scale.c \
   MagickCore/resize-image.c \

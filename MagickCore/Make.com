@@ -210,6 +210,7 @@ $call Make registry.c
 $call Make resample.c
 $call Make resize.c
 $call Make resize-rescale.c
+$call Make resize-liquid.c
 $call Make resize-sample.c
 $call Make resize-scale.c
 $call Make resize-image.c

@@ -140,6 +140,7 @@ if ( ! GetOptions(
 	 'transform-tiles.c',
 	 'resize.c',
 	 'resize-rescale.c',
+	 'resize-liquid.c',
 	 'resize-sample.c',
 	 'resize-scale.c',
 	 'resize-image.c',
