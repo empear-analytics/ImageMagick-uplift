@@ -119,6 +119,21 @@ typedef struct _HCubeInfo
   HNodes
     *node_queue;
 } HCubeInfo;
+
+typedef struct _HUniqueTraversal
+{
+  Image
+    *unique_image;
+
+  CacheView
+    *unique_view;
+
+  HCubeInfo
+    *cube_info;
+
+  ExceptionInfo
+    *exception;
+} HUniqueTraversal;
 
 /*
   Forward declarations.
@@ -1704,8 +1719,8 @@ static void UpdateUniqueColorsProgress(Image *unique_image,
     return;
 }
 
-static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
-  HCubeInfo *cube_info,const HNodeInfo *node_info,ExceptionInfo *exception)
+static void UniqueColorsToImage(const HUniqueTraversal *traversal,
+  const HNodeInfo *node_info)
 {
   MagickBooleanType
     status;
@@ -1719,24 +1734,25 @@ static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
   /*
     Traverse any children.
   */
-  number_children=unique_image->alpha_trait == UndefinedPixelTrait ? 8UL : 16UL;
+  number_children=traversal->unique_image->alpha_trait ==
+    UndefinedPixelTrait ? 8UL : 16UL;
   for (i=0; i < (ssize_t) number_children; i++)
     if (node_info->child[i] != (HNodeInfo *) NULL)
-      UniqueColorsToImage(unique_image,unique_view,cube_info,
-        node_info->child[i],exception);
+      UniqueColorsToImage(traversal,node_info->child[i]);
   if (node_info->level == (MaxTreeDepth-1))
     {
       HUniqueColors
         unique;
 
       status=MagickTrue;
-      unique.unique_image=unique_image;
-      unique.unique_view=unique_view;
-      unique.cube_info=cube_info;
+      unique.unique_image=traversal->unique_image;
+      unique.unique_view=traversal->unique_view;
+      unique.cube_info=traversal->cube_info;
       unique.node_info=node_info;
-      unique.exception=exception;
+      unique.exception=traversal->exception;
       SetUniqueColorPixels(&unique);
-      UpdateUniqueColorsProgress(unique_image,cube_info,status);
+      UpdateUniqueColorsProgress(traversal->unique_image,traversal->cube_info,
+        status);
     }
 }
 
@@ -1764,8 +1780,12 @@ MagickExport Image *UniqueImageColors(const Image *image,
       return((Image *) NULL);
     }
   unique_view=AcquireAuthenticCacheView(unique_image,exception);
-  UniqueColorsToImage(unique_image,unique_view,cube_info,cube_info->root,
-    exception);
+  {
+    const HUniqueTraversal
+      traversal = { unique_image, unique_view, cube_info, exception };
+
+    UniqueColorsToImage(&traversal,cube_info->root);
+  }
   unique_view=DestroyCacheView(unique_view);
   cube_info=DestroyHCubeInfo(image,cube_info);
   return(unique_image);
