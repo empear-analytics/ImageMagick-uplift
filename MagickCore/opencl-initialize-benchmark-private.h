@@ -392,8 +392,13 @@ static void SetOpenCLBenchmarkScoreAttribute(
 }
 
 static void SetOpenCLBenchmarkNamePlatformAttribute(
-  MagickCLDeviceBenchmark *device_benchmark,char *keyword,char *token)
+  MagickCLDeviceBenchmark *device_benchmark,
+  const OpenCLBenchmarkTokens *tokens)
 {
+  char
+    *const keyword = tokens->keyword,
+    *const token = tokens->token;
+
   switch (*keyword)
   {
     case 'N':
@@ -445,7 +450,7 @@ static void SetOpenCLBenchmarkAttribute(
     }
     default:
     {
-      SetOpenCLBenchmarkNamePlatformAttribute(device_benchmark,keyword,token);
+      SetOpenCLBenchmarkNamePlatformAttribute(device_benchmark,tokens);
       break;
     }
   }
