@@ -1098,7 +1098,12 @@ static MagickBooleanType PrintAffineFX(const DistortVerboseFX *fx,
         ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
       return(MagickFalse);
     }
-  InvertAffineCoefficients(coeff, inverse);
+  {
+    const CoefficientInversion
+      inversion = { coeff, inverse };
+
+    InvertAffineCoefficients(&inversion);
+  }
   CoefficientsToAffineArgs(inverse);
   PrintAffineProjection(inverse);
   inverse=(double *) RelinquishMagickMemory(inverse);

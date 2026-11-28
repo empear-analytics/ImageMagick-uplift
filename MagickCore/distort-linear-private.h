@@ -36,8 +36,24 @@ static inline void AffineArgsToCoefficients(double *affine)
   affine[3]=tmp[0]; affine[1]=tmp[1]; affine[4]=tmp[2]; affine[2]=tmp[3];
 }
 
-static inline void InvertAffineCoefficients(const double *coeff,double *inverse)
+typedef struct _CoefficientInversion
 {
+  const double
+    *coeff;
+
+  double
+    *inverse;
+} CoefficientInversion;
+
+static inline void InvertAffineCoefficients(
+  const CoefficientInversion *inversion)
+{
+  const double
+    *const coeff = inversion->coeff;
+
+  double
+    *const inverse = inversion->inverse;
+
   /* From "Digital Image Warping" by George Wolberg, page 50 */
   double determinant;
 
@@ -678,7 +694,12 @@ static inline void ConvertRigidAffineCoefficients(const CoefficientCall *call)
   inverse[4]=coeff[2];
   inverse[5]=coeff[3];
   AffineArgsToCoefficients(inverse);
-  InvertAffineCoefficients(inverse,coeff);
+  {
+    const CoefficientInversion
+      inversion = { inverse, coeff };
+
+    InvertAffineCoefficients(&inversion);
+  }
 }
 
 static inline double *RigidAffineCoefficients(const CoefficientCall *call)
@@ -777,7 +798,12 @@ static inline void SetAffineProjectionCoefficients(const CoefficientCall *call)
   for(i=0; i<6UL; i++ )
     inverse[i] = arguments[i];
   AffineArgsToCoefficients(inverse); /* map into coefficients */
-  InvertAffineCoefficients(inverse, coeff); /* invert */
+  {
+    const CoefficientInversion
+      inversion = { inverse, coeff };
+
+    InvertAffineCoefficients(&inversion); /* invert */
+  }
 }
 
 static inline double *AffineProjectionCoefficients(const CoefficientCall *call)

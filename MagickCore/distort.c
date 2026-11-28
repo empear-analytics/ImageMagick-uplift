@@ -221,7 +221,12 @@ static void AffineBestFitBounds(const double *coeff,const Image *image,
     min = (*caller_min),
     s;
 
-  InvertAffineCoefficients(coeff, inverse);
+  {
+    const CoefficientInversion
+      inversion = { coeff, inverse };
+
+    InvertAffineCoefficients(&inversion);
+  }
   s.x = (double) image->page.x;
   s.y = (double) image->page.y;
   d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
