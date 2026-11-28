@@ -125,6 +125,7 @@
 #include "MagickCore/display-image-matte-private.h"
 
 #include "MagickCore/display-image-save-private.h"
+#include "MagickCore/display-image-screen-button-private.h"
 #include "MagickCore/display-image-tile-private.h"
 
 
