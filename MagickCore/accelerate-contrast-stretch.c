@@ -362,6 +362,31 @@ typedef struct _StretchResources
     outputReady;
 } StretchResources;
 
+static void ReleaseStretchResources(StretchResources *r)
+{
+  r->image_view=DestroyCacheView(r->image_view);
+
+  if (r->imageBuffer!=NULL)
+    r->clEnv->library->clReleaseMemObject(r->imageBuffer);
+
+  if (r->stretchMapBuffer!=NULL)
+    r->clEnv->library->clReleaseMemObject(r->stretchMapBuffer);
+  if (r->stretch_map!=NULL)
+    r->stretch_map=(PixelPacket *) RelinquishMagickMemory(r->stretch_map);
+  if (r->histogramBuffer!=NULL)
+    r->clEnv->library->clReleaseMemObject(r->histogramBuffer);
+  if (r->histogram!=NULL)
+    r->histogram=(cl_uint4 *) RelinquishMagickMemory(r->histogram);
+  if (r->histogramKernel!=NULL)
+    ReleaseOpenCLKernel(r->histogramKernel);
+  if (r->stretchKernel!=NULL)
+    ReleaseOpenCLKernel(r->stretchKernel);
+  if (r->queue != NULL)
+    ReleaseOpenCLCommandQueue(r->device,r->queue);
+  if (r->device != NULL)
+    ReleaseOpenCLDevice(r->device);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -648,27 +673,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
 cleanup:
 
-  r.image_view=DestroyCacheView(r.image_view);
-
-  if (r.imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(r.imageBuffer);
-
-  if (r.stretchMapBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(r.stretchMapBuffer);
-  if (r.stretch_map!=NULL)
-    r.stretch_map=(PixelPacket *) RelinquishMagickMemory(r.stretch_map);
-  if (r.histogramBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(r.histogramBuffer);
-  if (r.histogram!=NULL)
-    r.histogram=(cl_uint4 *) RelinquishMagickMemory(r.histogram);
-  if (r.histogramKernel!=NULL)
-    ReleaseOpenCLKernel(r.histogramKernel);
-  if (r.stretchKernel!=NULL)
-    ReleaseOpenCLKernel(r.stretchKernel);
-  if (r.queue != NULL)
-    ReleaseOpenCLCommandQueue(r.device,r.queue);
-  if (r.device != NULL)
-    ReleaseOpenCLDevice(r.device);
+  ReleaseStretchResources(&r);
 
   return(r.outputReady);
 }
