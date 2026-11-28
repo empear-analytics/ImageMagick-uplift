@@ -753,12 +753,6 @@ static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
   XWindows
     *const windows = context->windows;
 
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
@@ -768,15 +762,7 @@ static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
   status=XPreferencesWidget(display,resource_info,windows);
   if (status == MagickFalse)
     return(nexus);
-  nexus=CloneImage(*image,0,0,MagickTrue,exception);
-  if (nexus != (Image *) NULL)
-    {
-      const XClientReason
-        reason = { windows->im_next_image, CurrentTime };
-
-      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
-    }
-  return(nexus);
+  return(XCloneNextImage(context));
 }
 
 static void XApplyBrowseDocumentationCommand(
