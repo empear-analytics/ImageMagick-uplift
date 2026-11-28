@@ -335,7 +335,10 @@ static void ConvertHSBThroughJzazbzToRGB(const GenericToRGBInput *input)
     }
     case JzazbzColorspace:
     {
-      ConvertJzazbzToRGB(X,Y,Z,white_luminance,R,G,B);
+      const JzazbzToRGBInput
+        jzazbz = { X, Y, Z, white_luminance, R, G, B };
+
+      ConvertJzazbzToRGB(&jzazbz);
       break;
     }
     default:
