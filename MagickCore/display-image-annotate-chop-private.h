@@ -1491,6 +1491,24 @@ typedef struct _MagnifyWindowInput
     *exception;
 } MagnifyWindowInput;
 
+typedef struct _XImageCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} XImageCommandInput;
+
 /*
   Forward declarations.
 */
@@ -1524,7 +1542,7 @@ static MagickBooleanType
   XRotateImage(Display *,XResourceInfo *,XWindows *,double,Image **,
     ExceptionInfo *),
   XROIImage(Display *,XResourceInfo *,XWindows *,Image **,ExceptionInfo *),
-  XSaveImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
+  XSaveImage(const XImageCommandInput *),
   XTrimImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
 static void
   XDrawPanRectangle(Display *,XWindows *),

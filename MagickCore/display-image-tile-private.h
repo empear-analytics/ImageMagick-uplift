@@ -186,10 +186,23 @@ static void XGetSaveFilename(const XResourceInfo *resource_info,
     }
 }
 
-static MagickBooleanType XSaveImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+static MagickBooleanType XSaveImage(const XImageCommandInput *command_input)
 {
+  Display
+    *const display = command_input->display;
+
+  XResourceInfo
+    *const resource_info = command_input->resource_info;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  Image
+    *const image = command_input->image;
+
+  ExceptionInfo
+    *const exception = command_input->exception;
+
   char
     filename[MagickPathExtent],
     geometry[MagickPathExtent];
