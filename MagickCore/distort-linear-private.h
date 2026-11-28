@@ -661,9 +661,17 @@ static inline void SetAffineProjectionCoefficients(double *coeff,
   InvertAffineCoefficients(inverse, coeff); /* invert */
 }
 
-static inline double *AffineProjectionCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *AffineProjectionCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
