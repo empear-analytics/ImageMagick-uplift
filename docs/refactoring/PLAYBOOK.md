@@ -1546,6 +1546,33 @@ is worth it.
    the read-only accessor above remains the form for a `static const` object that no moving
    helper names. An `#if`/`#else` macro block moves verbatim under the terms of the
    `CacheShift` sentence above.
+   *A shared header with conditional members* (mandate (2026-11-19); campaign A round 38,
+   `resample.c`): a header that a Recipe OH Form A step made of the original's leading run
+   (its define and typedef blocks: `resample-filter-private.h` holds `resample.c`'s EWA
+   options and `struct _ResampleFilter`, which `resample.h` completes into `ResampleFilter`)
+   may serve the split as its shared header as it stands, the original naming it as the last
+   line of its include block so that `split_source.py` copies the line into the new file,
+   although (a) its struct definition holds preprocessor lines (`#if FILTER_LUT` / `#else` /
+   `#endif` around the LUT members), (b) its define block holds a conditional (`#if !
+   FILTER_DIRECT` / `#define WLUT_WIDTH 1024` / `#endif`), and (c) a function that moves
+   redefines one of its macros with the same replacement list (`ResamplePixelColor`'s
+   `# define DEBUG_HIT_MISS 0` in the `#else` of `#if DEBUG_ELLIPSE`). Its conditions: every
+   condition in (a) and (b) names only macros that the header itself defines above it, or a
+   macro that no file of the tree and no generated configuration header defines
+   (`FILTER_DIRECT`, checked by `grep` over the sources and every `build-oracle/*/config`),
+   so every including unit takes the same branches; the header holds no function, no object
+   and no `#include`, and is edited by neither step of the split; the `-E -dM` dump of the
+   header's macros, taken at the end of the include block, is the same in the original before
+   the split and in both products; and the struct definition in the preprocessed unit
+   (`clang -E -P`, from `struct TAG` to its `};`) is the same tokens in the original before the
+   split and in both products. Each unit then holds one definition of the struct from one text,
+   with the same members in the same order, so the two definitions are compatible types (C11
+   6.2.7) and a pointer that one file's function returns (`AcquireResampleFilter`) and the
+   other's takes (`SetResampleFilter`) names one type with one layout; the identical
+   redefinition of (c) is allowed by C11 6.10.3p2, as it was in the original, and expands to
+   the tokens it expanded to before. The object proof is the split's own
+   (`tools/split_branch_check.py`, every moved function IDENTICAL-MODULO-LAYOUT, and the kept
+   ones compared the same way), which shows that no member offset or size moved.
    A later split may put the helpers it shares into a second private header instead of the
    first (a reading of the core-header and shared-header rulings of 2026-11-16, for the
    owner's confirmation): `MagickCore/<stem>-<family>-private.h`, which includes the first
@@ -28394,3 +28421,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | D | *A helper in an included private header*: in form (b), *Unreached functions* and *Object code that differs only in the caller*, the existing helper may be a `static inline` function of a non-installed private header the file includes directly, unchanged by the step; `tools/reuse_check.py` reads it there (babde966f) and `obj_modulo.sh` takes `NOINLINE=<Caller>` when the caller is inlined into its own caller | `accelerate-unsharp.c`'s `ComputeUnsharpMaskImageSingle` (campaign A, W51 round 38, lane d): its cleanup block is the body of `accelerate-core-private.h`'s `DestroyUnfinishedImage`, which `ComputeUnsharpMaskImage` already calls; the function is reached by no case. 8.83 to 8.84, the function's Complex Method (cc 9) no longer reported | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | KV | *N-signature form*: the table groups may call functions of more than two signatures, and a group may assign the call's result to an object the chain passes on by pointer; one pointer member per signature, exactly one set per element, a `static void` runner tests them in order and makes the group's call text; kept groups gather unchanged into the innermost helper's `switch`, which stays as the fallback (a parameter no kept group reads is dropped); step 6's pairing is scripted; step 8's coverage may be read per callee, and elements and runner branches no case runs are listed as checked by the reading | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): `XMagickCommand` and its 16 SD helpers dispatch 86 labels, 82 of them to one command each of six signatures (`run`, `run_color`, `run_flags`, `run_quantize`, `next_image`, `new_image`); CodeScene counts the look-alike helpers as *Code Duplication* (14 functions). A probe of the table: 7.55 -> 9.38, only *Overall Code Complexity* left, which a carve of the magnify family clears (both products 10.0) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, trailing run: a header of that form may give up its last run (after a top-level item, to the blank line before its guard's `#endif`) into a new header of the same kind, which the `.c` file names on the line directly below the carved header's `#include`; same proof (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) and bar (both products at least the carved header's score before, one above it; the `.c` file keeps its score) | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): after the Recipe KV table it is 9.38 (*Overall Code Complexity*), and its magnify family (`XUpdateMagnifyInfo` to `XMoveMagnifyRightDown`) trails `XMagickCommand`; a probe of the trailing carve: both products 10.0, `display-image.c` 9.68 unchanged. The leading-run form would leave the apply header holding only the magnify family | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | S | Step 2, *a shared header with conditional members*: a header that a Recipe OH Form A step made of the original's define and typedef blocks may be the split's shared header as it stands although its struct holds `#if`/`#else`/`#endif` member lines, its define block holds a conditional, and a moving function redefines one of its macros identically; conditions: every condition names only macros the header defines above it or a macro nothing in the tree or the generated config headers defines, the header holds no function, object or `#include` and is not edited, the `-E -dM` dump of its macros and the preprocessed struct are the same in the original and both products; proof the split's `split_branch_check.py` | `resample.c` (9.68, *Excess Number of Function Arguments* on the MagickExport `ResamplePixelColor` and `ScaleResampleFilter`): every partition probed leaves the product below 9.68 except the one moving Acquire, Destroy and both families, which needs `struct _ResampleFilter` (its `#if FILTER_LUT` members) in both files; probe resample.c 10.0, product 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |

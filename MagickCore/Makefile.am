@@ -568,8 +568,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/registry.c \
   MagickCore/registry.h \
   MagickCore/resample.c \
+  MagickCore/resample-ewa.c \
   MagickCore/resample.h \
   MagickCore/resample-private.h \
+  MagickCore/resample-filter-private.h \
   MagickCore/resize.c \
   MagickCore/resize-rescale.c \
   MagickCore/resize-liquid.c \
@@ -1107,6 +1109,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/random-private.h \
   MagickCore/registry-private.h \
   MagickCore/resample-private.h \
+  MagickCore/resample-filter-private.h \
   MagickCore/resize-private.h \
   MagickCore/resource-private.h \
   MagickCore/resource-private.h \

@@ -45,6 +45,7 @@ MagickCore/property-set-iptc-private.h 5fba6243527b87602fb74ab97cb660d2391446e5 
 MagickCore/property-set-pixel-private.h b91619f983e7f0a2eec65d7662744b608dc69bf2  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
 MagickCore/property-set-xmp-private.h ed747d1e61829595c43d3ad6baa4799ef7fd6449  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
 MagickCore/registry-private.h 02378c83f0c1ee59cf033d651c83e31a293e5554  # declarations only
+MagickCore/resample-filter-private.h 86e181d9a472b361f5609e1daa4378ae07317da8  # macros and a struct (resample.c's EWA option defines and struct _ResampleFilter)
 MagickCore/resize-private.h 638b891ee4631624c433973f49f1f7c3b30a1308  # an enum and declarations
 MagickCore/resource-private.h 0965d639613e7b32a63e0c65aefe8f23234bfa15  # declarations only
 MagickCore/semaphore-private.h 5ede08477f418a9663eaa301e19207ec29b6d714  # declarations only
