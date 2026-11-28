@@ -406,6 +406,41 @@ static MagickBooleanType AcquireStretchHistogram(StretchResources *r)
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireStretchInput(Image *image,StretchResources *r,
+  ExceptionInfo *exception)
+{
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  r->image_view=AcquireAuthenticCacheView(image,exception);
+  r->inputPixels=GetCacheViewAuthenticPixels(r->image_view,0,0,image->columns,image->rows,exception);
+
+  if (r->inputPixels == (void *) NULL)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+    return(MagickFalse);
+  }
+  /* If the host pointer is aligned to the size of CLPixelPacket,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+  mem_flags=GetInputBufferFlags(r->inputPixels);
+  /* create a CL buffer from image pixel buffer */
+  length = image->columns * image->rows;
+  r->imageBuffer = r->clEnv->library->clCreateBuffer(r->device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)r->inputPixels, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -483,26 +518,8 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /* Create and initialize OpenCL buffers. */
   /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
   /* assume this  will get a writable image */
-  r.image_view=AcquireAuthenticCacheView(image,exception);
-  r.inputPixels=GetCacheViewAuthenticPixels(r.image_view,0,0,image->columns,image->rows,exception);
-
-  if (r.inputPixels == (void *) NULL)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+  if (AcquireStretchInput(image,&r,exception) == MagickFalse)
     goto cleanup;
-  }
-  /* If the host pointer is aligned to the size of CLPixelPacket,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  mem_flags=GetInputBufferFlags(r.inputPixels);
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  r.imageBuffer = clEnv->library->clCreateBuffer(r.device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)r.inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
-  }
 
   /* If the host pointer is aligned to the size of cl_uint,
      then use the host buffer directly from the GPU; otherwise,
