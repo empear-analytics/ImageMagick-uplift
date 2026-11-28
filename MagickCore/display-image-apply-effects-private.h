@@ -53,7 +53,11 @@ static void XApplyAnnotateCommand(const XMagickCommandContext *context)
   XNoticeEditFailure(context,status,"Unable to annotate X image");
 }
 
-static void XApplyDrawCommand(const XMagickCommandContext *context)
+typedef MagickBooleanType
+  (*XImageCacheEditMethod)(const XImageCacheContext *);
+
+static inline MagickStatusType XRunImageCacheEdit(
+  const XMagickCommandContext *context,const XImageCacheEditMethod method)
 {
   MagickStatusType
     status;
@@ -62,10 +66,19 @@ static void XApplyDrawCommand(const XMagickCommandContext *context)
     edit_context = { context->display, context->resource_info,
       context->windows, context->image, context->exception };
 
+  status=method(&edit_context);
+  return(status);
+}
+
+static void XApplyDrawCommand(const XMagickCommandContext *context)
+{
+  MagickStatusType
+    status;
+
   /*
     Draw image.
   */
-  status=XDrawEditImage(&edit_context);
+  status=XRunImageCacheEdit(context,XDrawEditImage);
   XNoticeEditFailure(context,status,"Unable to draw on the X image");
 }
 
@@ -74,14 +87,10 @@ static void XApplyColorCommand(const XMagickCommandContext *context)
   MagickStatusType
     status;
 
-  const XImageCacheContext
-    edit_context = { context->display, context->resource_info,
-      context->windows, context->image, context->exception };
-
   /*
     Color edit.
   */
-  status=XColorEditImage(&edit_context);
+  status=XRunImageCacheEdit(context,XColorEditImage);
   XNoticeEditFailure(context,status,"Unable to pixel edit X image");
 }
 
