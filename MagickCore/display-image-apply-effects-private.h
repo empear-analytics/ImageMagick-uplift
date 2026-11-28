@@ -645,9 +645,20 @@ static void XApplyShowMatteCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
 }
 
-static Image *XCloneNextImage(Display *display,XWindows *windows,
-  Image **image,ExceptionInfo *exception)
+static Image *XCloneNextImage(const XMagickCommandContext *context)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   Image
     *nexus;
 
@@ -692,7 +703,7 @@ static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
   status=XBackgroundImage(&window_input);
   if (status == MagickFalse)
     return(nexus);
-  return(XCloneNextImage(display,windows,image,exception));
+  return(XCloneNextImage(context));
 }
 
 static void XApplySlideShowCommand(const XMagickCommandContext *context)
