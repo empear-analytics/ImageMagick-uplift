@@ -44,7 +44,12 @@ static void XApplySaveCommand(const XMagickCommandContext *context)
   /*
     Save image.
   */
-  status=XSaveImage(display,resource_info,windows,*image,exception);
+  {
+    const XImageCommandInput
+      command_input = { display, resource_info, windows, *image, exception };
+
+    status=XSaveImage(&command_input);
+  }
   if (status == MagickFalse)
     {
       char

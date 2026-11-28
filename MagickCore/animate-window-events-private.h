@@ -1136,12 +1136,14 @@ static void XCreateContextWindow(const AnimateWindowSetup *setup)
   const XMakeWindowHints
     hints = { argv, argc, class_hints, manager_hints };
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   /*
     Initialize graphic context.
   */
   windows->context.id=(Window) NULL;
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->context);
+  XGetWindowInfo(display,&source,resource_info,&windows->context);
   (void) CloneString(&class_hints->res_name,resource_info->client_name);
   (void) CloneString(&class_hints->res_class,resource_info->client_name);
   class_hints->res_class[0]=(char) LocaleToUppercase((int)
@@ -1202,8 +1204,12 @@ static void XCreateIconWindow(const AnimateWindowSetup *setup)
   /*
     Initialize icon window.
   */
-  XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
-    icon_resources,&windows->icon);
+  {
+    const XWindowInfoSource
+      source = { icon_visual, icon_map, icon_pixel, (XFontStruct *) NULL };
+
+    XGetWindowInfo(display,&source,icon_resources,&windows->icon);
+  }
   windows->icon.geometry=resource_info->icon_geometry;
   XBestIconSize(display,&windows->icon,display_image);
   windows->icon.attributes.colormap=
@@ -1256,11 +1262,13 @@ static void XCreateInfoWindow(const AnimateWindowSetup *setup)
   const XMakeWindowHints
     hints = { argv, argc, class_hints, manager_hints };
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   /*
     Initialize Info widget.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->info);
+  XGetWindowInfo(display,&source,resource_info,&windows->info);
   (void) CloneString(&windows->info.name,"Info");
   (void) CloneString(&windows->info.icon_name,"Info");
   windows->info.border_width=1;
@@ -1331,11 +1339,13 @@ static void XCreateCommandWindow(const AnimateWindowSetup *setup)
   const XMakeWindowHints
     hints = { argv, argc, class_hints, manager_hints };
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   /*
     Initialize Command widget.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->command);
+  XGetWindowInfo(display,&source,resource_info,&windows->command);
   windows->command.data=MagickMenus;
   (void) XCommandWidget(display,windows,CommandMenu,(XEvent *) NULL);
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.command",

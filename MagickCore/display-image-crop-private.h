@@ -298,33 +298,30 @@ static void XDrawKeyPress(const DrawEditContext *context,
   }
 }
 
+static void XFitSelectionSpan(const unsigned int limit,const int pointer,
+  ssize_t *offset,size_t *extent)
+{
+  if ((*offset) < 0)
+    (*offset)=0;
+  else
+    if ((*offset) > (ssize_t) limit)
+      (*offset)=(ssize_t) limit;
+  if ((int) (*offset) < pointer)
+    (*extent)=(unsigned int) (pointer-(*offset));
+  else
+    {
+      (*extent)=(unsigned int) ((*offset)-pointer);
+      (*offset)=(ssize_t) pointer;
+    }
+}
+
 static RectangleInfo XFitSelectionRectangle(XWindows *windows,const int x,
   const int y,RectangleInfo rectangle_info)
 {
-  if (rectangle_info.x < 0)
-    rectangle_info.x=0;
-  else
-    if (rectangle_info.x > (ssize_t) windows->image.width)
-      rectangle_info.x=(ssize_t) windows->image.width;
-  if ((int) rectangle_info.x < x)
-    rectangle_info.width=(unsigned int) (x-rectangle_info.x);
-  else
-    {
-      rectangle_info.width=(unsigned int) (rectangle_info.x-x);
-      rectangle_info.x=(ssize_t) x;
-    }
-  if (rectangle_info.y < 0)
-    rectangle_info.y=0;
-  else
-    if (rectangle_info.y > (ssize_t) windows->image.height)
-      rectangle_info.y=(ssize_t) windows->image.height;
-  if ((int) rectangle_info.y < y)
-    rectangle_info.height=(unsigned int) (y-rectangle_info.y);
-  else
-    {
-      rectangle_info.height=(unsigned int) (rectangle_info.y-y);
-      rectangle_info.y=(ssize_t) y;
-    }
+  XFitSelectionSpan(windows->image.width,x,&rectangle_info.x,
+    &rectangle_info.width);
+  XFitSelectionSpan(windows->image.height,y,&rectangle_info.y,
+    &rectangle_info.height);
   return(rectangle_info);
 }
 
@@ -634,8 +631,11 @@ static void XPreviewPoint(const DrawEditContext *context,
     }
 }
 
-static void XPreviewRectangle(const DrawEditContext *context,
-  const DrawPreviewInput *preview)
+typedef void
+  (*HighlightBoxMethod)(Display *,Window,GC,const RectangleInfo *);
+
+static inline void XPreviewBox(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const HighlightBoxMethod method)
 {
   Display
     *const display = context->display;
@@ -659,18 +659,30 @@ static void XPreviewRectangle(const DrawEditContext *context,
         (double) rectangle_info.height,(double) rectangle_info.x,
         (double) rectangle_info.y);
       XInfoWidget(display,windows,text);
-      XHighlightRectangle(display,windows->image.id,
+      method(display,windows->image.id,
         windows->image.highlight_context,&rectangle_info);
     }
   else
     if (windows->info.mapped != MagickFalse)
       (void) XWithdrawWindow(display,windows->info.id,
         windows->info.screen);
+}
+
+static void XPreviewRectangle(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  XPreviewBox(context,preview,XHighlightRectangle);
 }
 
 static void XPreviewEllipse(const DrawEditContext *context,
   const DrawPreviewInput *preview)
 {
+  XPreviewBox(context,preview,XHighlightEllipse);
+}
+
+static inline void XPreviewBoxErase(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const HighlightBoxMethod method)
+{
   Display
     *const display = context->display;
 
@@ -680,60 +692,21 @@ static void XPreviewEllipse(const DrawEditContext *context,
   const RectangleInfo
     rectangle_info = preview->rectangle_info;
 
-  char
-    text[MagickPathExtent];
-
   if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-    {
-      /*
-        Display info and draw drawing rectangle.
-      */
-      (void) FormatLocaleString(text,MagickPathExtent,
-        " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
-        (double) rectangle_info.height,(double) rectangle_info.x,
-        (double) rectangle_info.y);
-      XInfoWidget(display,windows,text);
-      XHighlightEllipse(display,windows->image.id,
-        windows->image.highlight_context,&rectangle_info);
-    }
-  else
-    if (windows->info.mapped != MagickFalse)
-      (void) XWithdrawWindow(display,windows->info.id,
-        windows->info.screen);
+    method(display,windows->image.id,
+      windows->image.highlight_context,&rectangle_info);
 }
 
 static void XPreviewRectangleErase(const DrawEditContext *context,
   const DrawPreviewInput *preview)
 {
-  Display
-    *const display = context->display;
-
-  XWindows
-    *const windows = context->windows;
-
-  const RectangleInfo
-    rectangle_info = preview->rectangle_info;
-
-  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&rectangle_info);
+  XPreviewBoxErase(context,preview,XHighlightRectangle);
 }
 
 static void XPreviewEllipseErase(const DrawEditContext *context,
   const DrawPreviewInput *preview)
 {
-  Display
-    *const display = context->display;
-
-  XWindows
-    *const windows = context->windows;
-
-  const RectangleInfo
-    rectangle_info = preview->rectangle_info;
-
-  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-    XHighlightEllipse(display,windows->image.id,
-      windows->image.highlight_context,&rectangle_info);
+  XPreviewBoxErase(context,preview,XHighlightEllipse);
 }
 
 static void XDrawCommandAction(const DrawEditContext *context,const int id,
@@ -905,18 +878,19 @@ static void XDrawShapeEvent(const DrawEditContext *context,
   }
 }
 
+static void XClampLineCoordinate(const unsigned int limit,short *coordinate)
+{
+  if ((*coordinate) < 0)
+    (*coordinate)=0;
+  else
+    if ((*coordinate) > (int) limit)
+      (*coordinate)=(short) limit;
+}
+
 static void XClampLineEnd(const XWindows *windows,XSegment *line_info)
 {
-  if ((*line_info).x2 < 0)
-    (*line_info).x2=0;
-  else
-    if ((*line_info).x2 > (int) windows->image.width)
-      (*line_info).x2=(short) windows->image.width;
-  if ((*line_info).y2 < 0)
-    (*line_info).y2=0;
-  else
-    if ((*line_info).y2 > (int) windows->image.height)
-      (*line_info).y2=(short) windows->image.height;
+  XClampLineCoordinate(windows->image.width,&(*line_info).x2);
+  XClampLineCoordinate(windows->image.height,&(*line_info).y2);
 }
 
 static void XSizeDrawRegion(const DrawEditContext *context,

@@ -290,8 +290,8 @@ typedef struct _ColorBorderTargets
     *border_color;
 } ColorBorderTargets;
 
-static void XSelectColorBorder(const EditMenuInput *menu,
-  XResourceInfo *resource_info,const ColorBorderTargets *targets)
+static MagickBooleanType XSelectEditPen(const EditMenuInput *menu,
+  XResourceInfo *resource_info,char *color_name,int *pen_number)
 {
   Display
     *const display = menu->display;
@@ -308,14 +308,8 @@ static void XSelectColorBorder(const EditMenuInput *menu,
   char
     *const command = menu->command;
 
-  XColor
-    *const border_color = targets->border_color;
-
   const char
     *ColorMenu[MaxNumberPens];
-
-  int
-    pen_number;
 
   ssize_t
     i;
@@ -334,23 +328,43 @@ static void XSelectColorBorder(const EditMenuInput *menu,
     const XMenuRequest
       menu_request = { ColorEditMenu[id], (const char **) ColorMenu, command };
 
-    pen_number=XMenuWidget(display,windows,&menu_request);
+    (*pen_number)=XMenuWidget(display,windows,&menu_request);
   }
-  if (pen_number < 0)
-    return;
-  if (pen_number == (MaxNumberPens-2))
+  if ((*pen_number) < 0)
+    return(MagickFalse);
+  if ((*pen_number) == (MaxNumberPens-2))
     {
-      static char
-        color_name[MagickPathExtent] = "gray";
-
       /*
         Select a pen color from a dialog.
       */
-      resource_info->pen_colors[pen_number]=color_name;
+      resource_info->pen_colors[(*pen_number)]=color_name;
       XColorBrowserWidget(display,windows,"Select",color_name);
       if (*color_name == '\0')
-        return;
+        return(MagickFalse);
     }
+  return(MagickTrue);
+}
+
+static void XSelectColorBorder(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const ColorBorderTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  static char
+    color_name[MagickPathExtent] = "gray";
+
+  int
+    pen_number;
+
+  if (XSelectEditPen(menu,resource_info,color_name,&pen_number) == MagickFalse)
+    return;
   /*
     Set border color.
   */
@@ -376,61 +390,20 @@ static void XSelectPenColor(const EditMenuInput *menu,
   XWindows
     *const windows = menu->windows;
 
-  const char
-    *const *const ColorEditMenu = menu->MatteEditMenu;
-
-  const int
-    id = menu->id;
-
-  char
-    *const command = menu->command;
-
   XColor
     *const color = targets->color;
 
   unsigned int
     *const pen_id = targets->pen_id;
 
-  const char
-    *ColorMenu[MaxNumberPens];
+  static char
+    color_name[MagickPathExtent] = "gray";
 
   int
     pen_number;
 
-  ssize_t
-    i;
-
-  /*
-    Initialize menu selections.
-  */
-  for (i=0; i < (int) (MaxNumberPens-2); i++)
-    ColorMenu[i]=resource_info->pen_colors[i];
-  ColorMenu[MaxNumberPens-2]="Browser...";
-  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-  /*
-    Select a pen color from the pop-up menu.
-  */
-  {
-    const XMenuRequest
-      menu_request = { ColorEditMenu[id], (const char **) ColorMenu, command };
-
-    pen_number=XMenuWidget(display,windows,&menu_request);
-  }
-  if (pen_number < 0)
+  if (XSelectEditPen(menu,resource_info,color_name,&pen_number) == MagickFalse)
     return;
-  if (pen_number == (MaxNumberPens-2))
-    {
-      static char
-        color_name[MagickPathExtent] = "gray";
-
-      /*
-        Select a pen color from a dialog.
-      */
-      resource_info->pen_colors[pen_number]=color_name;
-      XColorBrowserWidget(display,windows,"Select",color_name);
-      if (*color_name == '\0')
-        return;
-    }
   /*
     Set pen color.
   */
@@ -690,6 +663,17 @@ static void XColorEditCommand(const ColorEditContext *context,
     context->cursor);
 }
 
+static MagickBooleanType IsColorEditButton1(const ColorEditContext *context,
+  const XEvent *event)
+{
+  if ((*event).xbutton.button != Button1)
+    return(MagickFalse);
+  if (((*event).xbutton.window != context->windows->image.id) &&
+      ((*event).xbutton.window != context->windows->magnify.id))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void XColorEditPress(const ColorEditContext *context,
   const ColorEditTargets *targets)
 {
@@ -703,10 +687,7 @@ static void XColorEditPress(const ColorEditContext *context,
     *const x = targets->x,
     *const y = targets->y;
 
-  if ((*event).xbutton.button != Button1)
-    return;
-  if (((*event).xbutton.window != context->windows->image.id) &&
-      ((*event).xbutton.window != context->windows->magnify.id))
+  if (IsColorEditButton1(context,event) == MagickFalse)
     return;
   /*
     exit loop.
@@ -736,10 +717,7 @@ static void XColorEditRelease(const ColorEditContext *context,
     *const x = targets->x,
     *const y = targets->y;
 
-  if ((*event).xbutton.button != Button1)
-    return;
-  if (((*event).xbutton.window != context->windows->image.id) &&
-      ((*event).xbutton.window != context->windows->magnify.id))
+  if (IsColorEditButton1(context,event) == MagickFalse)
     return;
   /*
     Update colormap information.
@@ -858,6 +836,17 @@ static void XColorEditEvent(const ColorEditContext *context,
   }
 }
 
+static MagickBooleanType IsColorEditOffsetInside(
+  const ColorEditContext *context,int x_offset,int y_offset)
+{
+  if ((x_offset < 0) || (y_offset < 0))
+    return(MagickFalse);
+  if ((x_offset >= (int) (*context->image)->columns) ||
+      (y_offset >= (int) (*context->image)->rows))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
   const ColorEditTargets *targets,int x_offset,int y_offset)
 {
@@ -911,10 +900,7 @@ static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
         context->windows->image.ximage->width+x);
       y_offset=((int) height*(context->windows->image.y+y_offset)/(int)
         context->windows->image.ximage->height+y);
-      if ((x_offset < 0) || (y_offset < 0))
-        return(MagickTrue);
-      if ((x_offset >= (int) (*context->image)->columns) ||
-          (y_offset >= (int) (*context->image)->rows))
+      if (IsColorEditOffsetInside(context,x_offset,y_offset) == MagickFalse)
         return(MagickTrue);
       image_view=AcquireAuthenticCacheView(*context->image,context->exception);
       pixel_input.image=context->image;
@@ -1044,9 +1030,7 @@ static void XReleaseColorEditCursor(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XColorEditImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception)
+static MagickBooleanType XColorEditImage(const XImageCacheContext *edit)
 {
   static PaintMethod
     method = PointMethod;
@@ -1096,31 +1080,31 @@ static MagickBooleanType XColorEditImage(Display *display,
   /*
     Map Command widget.
   */
-  XMapColorEditCommand(display,windows);
+  XMapColorEditCommand(edit->display,edit->windows);
   /*
     Make cursor.
   */
   {
     const XCursorColors
-      cursor_colors = { resource_info->background_color,
-        resource_info->foreground_color };
+      cursor_colors = { edit->resource_info->background_color,
+        edit->resource_info->foreground_color };
 
-    cursor=XMakeCursor(display,windows->image.id,windows->map_info->colormap,
-      &cursor_colors);
+    cursor=XMakeCursor(edit->display,edit->windows->image.id,
+      edit->windows->map_info->colormap,&cursor_colors);
   }
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (void) XCheckDefineCursor(edit->display,edit->windows->image.id,cursor);
   /*
     Track pointer until button 1 is pressed.
   */
-  XQueryPosition(display,windows->image.id,&x,&y);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask | PointerMotionMask);
+  XQueryPosition(edit->display,edit->windows->image.id,&x,&y);
+  (void) XSelectInput(edit->display,edit->windows->image.id,
+    edit->windows->image.attributes.event_mask | PointerMotionMask);
   state=DefaultState;
-  context.display=display;
-  context.resource_info=resource_info;
-  context.windows=windows;
-  context.image=image;
-  context.exception=exception;
+  context.display=edit->display;
+  context.resource_info=edit->resource_info;
+  context.windows=edit->windows;
+  context.image=edit->image;
+  context.exception=edit->exception;
   context.ColorEditCommands=ColorEditCommands;
   context.ColorEditMenu=ColorEditMenu;
   context.command=command;
@@ -1134,7 +1118,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     if (XColorEditStep(&context,&targets) == MagickFalse)
       return(MagickFalse);
   } while ((state & ExitState) == 0);
-  XReleaseColorEditCursor(display,windows,cursor);
+  XReleaseColorEditCursor(edit->display,edit->windows,cursor);
   return(MagickTrue);
 }
 typedef struct _ComposeMenuInfo
@@ -1493,6 +1477,16 @@ static void XCompositeKeyPress(const CompositeCommandInput *input,
   }
 }
 
+static MagickBooleanType IsCompositeButton1(const XWindows *windows,
+  const XEvent *event)
+{
+  if ((*event).xbutton.button != Button1)
+    return(MagickFalse);
+  if ((*event).xbutton.window != windows->image.id)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void XCompositePress(const CompositeCommandInput *input,
   const XEvent *event,const Cursor cursor,const CompositeEventTargets *targets)
 {
@@ -1515,9 +1509,7 @@ static void XCompositePress(const CompositeCommandInput *input,
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
       (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
-  if ((*event).xbutton.button != Button1)
-    return;
-  if ((*event).xbutton.window != windows->image.id)
+  if (IsCompositeButton1(windows,event) == MagickFalse)
     return;
   /*
     Change cursor.
@@ -1548,9 +1540,7 @@ static void XCompositeRelease(const CompositeCommandInput *input,
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
       (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
-  if ((*event).xbutton.button != Button1)
-    return;
-  if ((*event).xbutton.window != windows->image.id)
+  if (IsCompositeButton1(windows,event) == MagickFalse)
     return;
   if (((*composite_info).width != 0) && ((*composite_info).height != 0))
     {

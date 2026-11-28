@@ -652,8 +652,13 @@ static void XPressImageButton3(const DisplayEventContext *context,
       /*
         Open or delete a tile from a visual image directory.
       */
-      (*nexus)=XTileImage(display,resource_info,windows,
-        (*display_image),event,exception);
+      {
+        const XTileImageInput
+          tile_input = { display, resource_info, windows, (*display_image),
+            event, exception };
+
+        (*nexus)=XTileImage(&tile_input);
+      }
       if ((*nexus) != (Image *) NULL)
         *state|=MontageImageState | NextImageState | ExitState;
       (*vid_info).x=(short int) windows->image.x;
@@ -1049,8 +1054,10 @@ static void XNameImageWindow(const DisplayEventContext *context,
   XFontStruct
     *const font_info = context->font_info;
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,resource_info,
-    &windows->image);
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
+  XGetWindowInfo(display,&source,resource_info,&windows->image);
   windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
   if (resource_info->use_shared_memory == MagickFalse)
     windows->image.shared_memory=MagickFalse;
@@ -1179,8 +1186,10 @@ static void XInitializeBackdropWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->backdrop);
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
+  XGetWindowInfo(display,&source,resource_info,&windows->backdrop);
   XMakeBackdropWindow(resource_info,windows,display,visual_info,manager_hints,
     root_window,argv,argc,class_hints);
 }

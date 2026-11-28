@@ -124,6 +124,12 @@
 #include "MagickCore/display-image-matte-roi-private.h"
 #include "MagickCore/display-image-matte-private.h"
 
+#include "MagickCore/display-image-save-private.h"
+#include "MagickCore/display-image-screen-button-private.h"
+#include "MagickCore/display-image-screen-configure-private.h"
+#include "MagickCore/display-image-screen-event-private.h"
+#include "MagickCore/display-image-tile-load-private.h"
+#include "MagickCore/display-image-tile-command-private.h"
 #include "MagickCore/display-image-tile-private.h"
 
 
@@ -415,6 +421,8 @@ static DisplayCommand
     HelpCommands
   };
 
+#include "MagickCore/display-image-event-handle-private.h"
+#include "MagickCore/display-image-event-windows-private.h"
 #include "MagickCore/display-image-event-private.h"
 
 

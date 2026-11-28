@@ -443,7 +443,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/delegate.h MagickCore/delegate-private.h MagickCore/delegate-invoke-private.h MagickCore/delegate-property-private.h \
 	MagickCore/deprecate.c MagickCore/deprecate.h \
 	MagickCore/display.c MagickCore/display-image.c MagickCore/display.h \
-	MagickCore/display-private.h MagickCore/display-image-annotate-private.h MagickCore/display-image-annotate-chop-private.h MagickCore/display-image-crop-private.h MagickCore/display-image-composite-crop-private.h MagickCore/display-image-draw-private.h MagickCore/display-image-draw-undo-private.h MagickCore/display-image-apply-private.h MagickCore/display-image-apply-effects-private.h MagickCore/display-image-apply-filters-private.h MagickCore/display-image-matte-private.h MagickCore/display-image-matte-roi-private.h MagickCore/display-image-tile-private.h MagickCore/display-image-window-private.h MagickCore/display-image-window-setup-private.h MagickCore/display-image-event-private.h MagickCore/distort.c MagickCore/distort-sparse.c MagickCore/distort-affine.c MagickCore/distort-resize.c \
+	MagickCore/display-private.h MagickCore/display-image-annotate-private.h MagickCore/display-image-annotate-chop-private.h MagickCore/display-image-crop-private.h MagickCore/display-image-composite-crop-private.h MagickCore/display-image-draw-private.h MagickCore/display-image-draw-undo-private.h MagickCore/display-image-apply-private.h MagickCore/display-image-apply-effects-private.h MagickCore/display-image-apply-filters-private.h MagickCore/display-image-matte-private.h MagickCore/display-image-matte-roi-private.h MagickCore/display-image-save-private.h MagickCore/display-image-screen-button-private.h MagickCore/display-image-screen-configure-private.h MagickCore/display-image-screen-event-private.h MagickCore/display-image-tile-command-private.h MagickCore/display-image-tile-load-private.h MagickCore/display-image-tile-private.h MagickCore/display-image-translate-private.h MagickCore/display-image-window-private.h MagickCore/display-image-window-setup-private.h MagickCore/display-image-event-handle-private.h MagickCore/display-image-event-private.h MagickCore/display-image-event-windows-private.h MagickCore/distort.c MagickCore/distort-sparse.c MagickCore/distort-affine.c MagickCore/distort-resize.c \
 	MagickCore/distort.h MagickCore/distort-linear-private.h MagickCore/distort-private.h MagickCore/distort-map-private.h MagickCore/distribute-cache.c \
 	MagickCore/distribute-cache.h \
 	MagickCore/distribute-cache-private.h MagickCore/draw.c MagickCore/draw-primitive.c MagickCore/draw-info.c MagickCore/draw-gradient.c MagickCore/draw-affine.c \
@@ -536,7 +536,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/visual-effects.c MagickCore/visual-effects-pixel.c MagickCore/visual-effects-pixel-methods.c MagickCore/visual-effects-polaroid.c MagickCore/visual-effects-color-matrix.c MagickCore/visual-effects-morph.c MagickCore/visual-effects-sepia.c MagickCore/visual-effects-colorize.c MagickCore/visual-effects-blueshift.c MagickCore/visual-effects-noise.c MagickCore/visual-effects-wavelet.c MagickCore/visual-effects-plasma.c MagickCore/visual-effects-stegano.c MagickCore/visual-effects.h MagickCore/visual-effects-pixel-methods-private.h \
 	MagickCore/vision.c MagickCore/vision-components.c MagickCore/vision.h MagickCore/vision-components-object-private.h MagickCore/vision-components-label-private.h MagickCore/widget.c MagickCore/widget-text.c MagickCore/widget-command.c MagickCore/widget-menu.c MagickCore/widget-list.c MagickCore/widget-font.c MagickCore/widget-file.c MagickCore/widget-color.c MagickCore/widget-prefs.c MagickCore/widget-confirm.c MagickCore/widget-dialog.c \
 	MagickCore/widget.h MagickCore/widget-core-private.h MagickCore/widget-browser-private.h MagickCore/widget-color-actions-private.h MagickCore/widget-font-actions-private.h MagickCore/widget-file-actions-private.h MagickCore/widget-text-view-private.h MagickCore/widget-list-actions-private.h MagickCore/widget-list-entries-private.h MagickCore/widget-private.h \
-	MagickCore/xml-tree.c MagickCore/xml-tree-file.c MagickCore/xml-tree.h \n	MagickCore/xml-tree-private.h MagickCore/xml-tree-text-private.h MagickCore/xml-tree-declarations-private.h MagickCore/xml-tree-markup-private.h MagickCore/xwindow.c MagickCore/xwindow-image.c MagickCore/xwindow-annotate.c MagickCore/xwindow-info.c MagickCore/xwindow-image-private.h MagickCore/xwindow-pixel.c MagickCore/xwindow-text.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c MagickCore/xwindow-import-image.c MagickCore/xwindow-import-private.h MagickCore/xwindow-import-image-window-private.h MagickCore/xwindow-search.c \n	MagickCore/xwindow.h MagickCore/nt-feature.c \
+	MagickCore/xml-tree.c MagickCore/xml-tree-file.c MagickCore/xml-tree.h \n	MagickCore/xml-tree-private.h MagickCore/xml-tree-text-private.h MagickCore/xml-tree-declarations-private.h MagickCore/xml-tree-markup-private.h MagickCore/xwindow.c MagickCore/xwindow-image.c MagickCore/xwindow-annotate.c MagickCore/xwindow-info.c MagickCore/xwindow-free.c MagickCore/xwindow-image-private.h MagickCore/xwindow-pixel.c MagickCore/xwindow-text.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c MagickCore/xwindow-import-image.c MagickCore/xwindow-import-private.h MagickCore/xwindow-import-image-window-private.h MagickCore/xwindow-search.c \n	MagickCore/xwindow.h MagickCore/nt-feature.c \
 	MagickCore/nt-base.c coders/aai.c coders/aai.h coders/art.c \
 	coders/art.h coders/ase.c coders/ase.h coders/ashlar.c \
 	coders/ashlar.h coders/avs.c coders/avs.h coders/bayer.c \
@@ -878,6 +878,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-image.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-annotate.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-text.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo \
@@ -2700,6 +2701,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-image.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-annotate.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-text.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo \
@@ -5928,10 +5930,19 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-apply-filters-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-save-private.h \
+  MagickCore/display-image-screen-button-private.h \
+  MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
+  MagickCore/display-image-tile-command-private.h \
+  MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -6342,6 +6353,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-image.c \
   MagickCore/xwindow-annotate.c \
   MagickCore/xwindow-info.c \
+  MagickCore/xwindow-free.c \
   MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-pixel.c \
   MagickCore/xwindow-text.c \
@@ -6571,10 +6583,19 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-apply-filters-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-save-private.h \
+  MagickCore/display-image-screen-button-private.h \
+  MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
+  MagickCore/display-image-tile-command-private.h \
+  MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
@@ -8501,6 +8522,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-a
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -10203,6 +10227,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-image.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-annotate.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-text.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo@am__quote@ # am--include-marker
@@ -12408,6 +12433,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-i
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow-info.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.lo `test -f 'MagickCore/xwindow-info.c' || echo '$(srcdir)/'`MagickCore/xwindow-info.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo: MagickCore/xwindow-free.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo `test -f 'MagickCore/xwindow-free.c' || echo '$(srcdir)/'`MagickCore/xwindow-free.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow-free.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.lo `test -f 'MagickCore/xwindow-free.c' || echo '$(srcdir)/'`MagickCore/xwindow-free.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.lo: MagickCore/xwindow-pixel.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.lo `test -f 'MagickCore/xwindow-pixel.c' || echo '$(srcdir)/'`MagickCore/xwindow-pixel.c
@@ -16333,6 +16365,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-annotate.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-text.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo
@@ -17023,6 +17056,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-annotate.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-info.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-free.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-pixel.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-text.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo

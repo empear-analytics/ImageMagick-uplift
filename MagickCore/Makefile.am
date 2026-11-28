@@ -266,10 +266,19 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-apply-filters-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-save-private.h \
+  MagickCore/display-image-screen-button-private.h \
+  MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
+  MagickCore/display-image-tile-command-private.h \
+  MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -680,6 +689,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-image.c \
   MagickCore/xwindow-annotate.c \
   MagickCore/xwindow-info.c \
+  MagickCore/xwindow-free.c \
   MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-pixel.c \
   MagickCore/xwindow-text.c \
@@ -914,10 +924,19 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-apply-filters-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-save-private.h \
+  MagickCore/display-image-screen-button-private.h \
+  MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
+  MagickCore/display-image-tile-command-private.h \
+  MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \

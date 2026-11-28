@@ -270,7 +270,12 @@ static void XApplyTrimCommand(const XMagickCommandContext *context)
   /*
     Trim image.
   */
-  status=XTrimImage(display,resource_info,windows,*image,exception);
+  {
+    const XImageCommandInput
+      command_input = { display, resource_info, windows, *image, exception };
+
+    status=XTrimImage(&command_input);
+  }
   if (status == MagickFalse)
     {
       XNoticeWidget(display,windows,"Unable to trim X image",

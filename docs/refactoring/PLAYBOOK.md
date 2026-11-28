@@ -5425,6 +5425,19 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    block's own `R`, and check every argument against its parameter by reading.
 7. Another copy of the block, identical but for the expression of step 5 and its own `R`,
    may call the same function the same way (Recipe D), one commit per caller.
+   Twin form with a buffer per copy (mandate (2026-11-19), please confirm). Two `void`
+   functions of one file whose leading blocks (step 8) are the same token sequence,
+   checked by script, may share the new function in one commit when (a) each block holds,
+   in a compound statement of its own, a `static char` array declaration with its
+   initialiser (the same text in both) that only the block names, and (b) each function
+   binds the block's other inputs as `const` locals from the members of one `const Name
+   *name` parameter of the same type in both. The array declaration moves, unchanged, to
+   its function's opening declarations, and the call passes the array's name; the new
+   function takes it as `char *` under the array's name, so the block's text is
+   unchanged. The new function takes `name` and binds the members the block reads as
+   `const` locals of their old names and types (Recipe SM step 4); a binding of a caller
+   that only the block read goes with it (`-Wunused-variable` shows one left behind).
+   Steps 1 to 5 hold for the rest, at most four parameters in all.
 8. In a `void` caller the block's exits are `return;` (2026-11-11): step 1 reads
    `return;` for `return(R);` (every `return` in the block is `return;`), step 2 has no
    `R` to check, and step 6 writes `if (Helper(...) == MagickFalse) return;`. Steps 3 to
@@ -5486,6 +5499,15 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 - The failure paths are mostly allocation failures that no case reaches: the oracle
   checks the success path; the failure path is checked by reading, each `return(R);`
   against its `return(MagickFalse);`, and `refactor_guard.py --calls`.
+- Step 7's twin form. A `static` array declared at block scope or among the function's
+  opening declarations has static storage duration, no linkage and its initialiser
+  applied once before the program starts, in either place; only the scope of its name
+  widens, to the rest of its own function. Each function keeps its own array, so the text
+  it holds from one command to the next is what it held before, and the new function
+  receives its address, as the callees in the block did: every store through it lands in
+  the same array, and a pointer the block stores (`pen_colors[...]=color_name;`) is the
+  same address. The bindings are the same members of the same struct, which nothing
+  writes, read once more in the new function.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 and 5
 checked by reading; or, for a function no case reaches, guard with `tools/obj_identical.sh`
@@ -5509,6 +5531,13 @@ Step 3's `return(v);` exception (2026-11-14, campaign B, M127 lane b round 13):
 leaves through `return(flags);` at its `default:`; a probe 7.90 to 8.04. Added by Claude
 Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 Lane: b
+Step 7's twin form with a buffer per copy (2026-11-28, campaign A, W51 round 38 lane b):
+`display-image-annotate-private.h`'s `XSelectColorBorder` and `XSelectPenColor`, whose
+pen-menu heads (menu, pop-up, `Browser...` dialog into a `static char color_name[]` of
+each function, two `return;` exits) are one text. Recipe F does not apply: the dialog
+writes the buffer, and one shared buffer would change the remembered reply of each
+command. Probed chain: 9.38, 9.38 (the twin merge), then four W leaf steps to 10.0.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19.
 
 ---
 
@@ -9952,7 +9981,11 @@ that clones the first (the *Code Duplication* cliff, W14).
    `magick` on a command that runs every copy, alternating the baseline and candidate
    binaries for at least nine runs each, and quote both medians in the message; a
    candidate slower by more than 3% stops the step. Check with `objdump -d` on the
-   file's object that no new indirect call (`call *`) appears.
+   file's object that no new indirect call (`call *`) appears. Event form (2026-11-28):
+   when no copy runs per pixel or per channel, only once per user command or pointer
+   event of the X11 programs, a new indirect call is allowed (owner 2026-11-18 evening,
+   Recipe DC); the message gives the `call *` count of the gcc `-O2 -fopenmp` object
+   before and after and names the function that holds the new call.
 8. Check by script that each copy equals the new function's body with that copy's
    callee and variables substituted, and by reading that every argument fills its
    parameter.
@@ -10034,6 +10067,11 @@ static void WhiteThresholdIntensity(const Image *image,
   same code, so the outlined region is optimised the same way. That argument holds in
   optimised builds only; step 7's timing and `objdump` check are the evidence, and a
   build without optimisation keeps the indirect call, which changes speed, not values.
+- Event form (step 7, 2026-11-28). A compiler may keep the new function out of line
+  (gcc's `.isra` clone), and the call through `method` then stays indirect. It still
+  calls the copy's callee with the same arguments (first bullet), so no value changes.
+  It costs one indirect call per event, in code that waits on the X server anyway: the
+  cost the owner accepted for Recipe DC's dialog commands (2026-11-18 evening).
 - Methods in a struct (step 4). The struct is a `const` local of the copy's function
   initialised with designators, and the `static inline` function binds its members to
   `const` locals before any call, so once inlined the compiler loads each method from an
@@ -10075,7 +10113,13 @@ new function, no indirect call in the object. Step 4's shared struct (2026-11-10
 `morphology.c`'s `MorphologyPrimitive`: its Convolve and IterativeDistance walks differ
 only in `ConvolveChannelValue`/`MinimizeKernelDistance` and read the channel body's walk
 struct; a probe 3.28 to 3.33 (after Recipe Q on the hit-and-miss walk), no finding on a
-new function.
+new function. Step 7's event form (2026-11-28, campaign A, W51 round 38, lane b), from
+`display-image-crop-private.h`'s `XPreviewRectangle` and `XPreviewEllipse` and their
+`Erase` twins, X11 pointer-event handlers: gcc keeps the new `XPreviewBox` out of line
+as `XPreviewBox.isra.0`, and the `call *` count of `display-image.c`'s gcc `-O2
+-fopenmp` object goes 11 to 12; the clang `-O2` object is identical. A probe of the
+chain (CF, MA, MA): 8.28, 9.38, 9.38, 10.0. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
@@ -11024,6 +11068,8 @@ that opens the block: `enhance-tone.c`'s `EqualizeColormap`, whose four colormap
 each test `GetPixel<X>Traits(image)`, look up `<X>PixelChannel` and rewrite
 `image->colormap[j].<x>` from itself. Moved one by one they would be helpers that clone
 each other.
+It also serves *Overall Code Complexity* (2026-11-28): the copies' decisions are counted
+once, in the new function, instead of once per copy.
 
 **Not covered by:** Recipe SC, whose copies differ only in literals and enumeration
 constants, never in a member designator or a called function; Recipe SV and Recipe TW,
@@ -11048,7 +11094,14 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    of one lvalue `e.m`, the same base `e` in every copy, which the block reads or assigns
    and does not take the address of. A copy may name two such lvalues `e.m1` and `e.m2`
    of one base `e` (2026-11-12), two different members, each with its own declared type
-   `T1`, `T2` and its own pointer parameter. The lvalues of the
+   `T1`, `T2` and its own pointer parameter. Read-operand form (2026-11-28): a fourth
+   role, (d), is a read-only operand at any position in the block, not only role (b)'s
+   leading one: a parameter or local the block does not assign (`x` against `y`), or a
+   chain of member selections through one pointer variable the copies share, with no
+   call and no subscript in it (`windows->image.width` against
+   `windows->image.height`), naming an object the block does not write. All runs of one
+   role (d) have one declared type `U`. The block may read it more than once, or on some
+   paths only. The lvalues of the
    copies may also differ in a member of the chain before the last, when each is a chain
    of member selections through one pointer variable the copies share (`windows->popup.mapped`,
    `windows->widget.mapped`: `windows->M.mapped`), with no call and no subscript in it
@@ -11070,14 +11123,15 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
-   SC step 3), one per role (b) of the expression's type, and `T *value` for role (c)
+   SC step 3), one per role (b) of the expression's type, one `const U` per role (d),
+   and `T *value` for role (c)
    (`T1 *value1,T2 *value2` for two lvalues), at most four in all (roles (a) beyond that in
    Recipe SC's `const` struct).
-4. Its body is one copy's text with each role (a) and (b) run replaced by its
+4. Its body is one copy's text with each role (a), (b) and (d) run replaced by its
    parameter's name and every `e.m` of role (c) by `(*value)`, nothing else changed;
    bindings of an input struct stay as they were.
-5. Replace each copy with a call passing its constants, its role (b) expression and
-   `&e.m`. A step 1 helper's one call becomes the new call, with the helper's arguments
+5. Replace each copy with a call passing its constants, its role (b) expression, its role (d)
+   operands and `&e.m`. A step 1 helper's one call becomes the new call, with the helper's arguments
    substituted for its parameters, and the helper leaves the file (its text is the new
    function's).
 6. All copies move in one commit; the message lists each copy's runs. When a copy runs per
@@ -11085,7 +11139,9 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
 7. Check by script that substituting each copy's runs into the new function's body
    (`(*value)` by `e.m`) gives that copy's token sequence; check by reading that the
    caller guarantees `e` designates an object wherever a call stands (the copy evaluated
-   `e.m` only on some paths; the call computes its address always).
+   `e.m` only on some paths; the call computes its address always). For role (d), check
+   by reading that a member chain's pointer designates an object at each call, and that
+   no role (c) lvalue lies inside the object the operand names.
 
 **Before:**
 
@@ -11150,6 +11206,14 @@ static void EqualizeColormapValue(const EqualizeColors *colors,
   effect; evaluated as an argument directly before the call, after everything the
   previous statement did, it reads the same objects in the same state and yields the
   same value, which the block then tests where it tested the expression.
+- Role (d) (2026-11-28): the operand is read with no side effect from an object the
+  block never writes. The block writes only its role (c) lvalues and its own locals, and
+  step 7's reading excludes a role (c) lvalue inside the operand's object. So every read
+  in the copy yields the value the object held when the block began, which is the value
+  the argument reads directly before the call. The parameter has the operand's declared
+  type, so each cast or conversion the body applies to it converts the same value as
+  before. A member chain is now evaluated at the call even on paths where the copy never
+  reached it, so step 7's reading checks that its pointer designates an object there.
 - Role (c) with a chain (2026-11-11): `&windows->popup.mapped` is the address of the very
   object the copy's `windows->popup.mapped` named; the chain only selects members through
   a pointer variable already holding a valid object (the copy read `windows->popup.id` to
@@ -11198,7 +11262,14 @@ density, server_name, clip_mask) are each a decision: cc 22 to 11 in a probe, no
 on the new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
 2026-10-24. Widened the same day for `GetDrawInfo`'s option reads: three color options
 (QueryColorCompliance), four numeric (GetDrawValue) and two strings (CloneString), each keyed
-by its option name; cc 22 to 13 in a probe.
+by its option name; cc 22 to 13 in a probe. Step 2 (d), the read-operand form
+(2026-11-28, campaign A, W51 lane b), from `display-image-crop-private.h`'s
+`XFitSelectionRectangle` and `XClampLineEnd`. Each holds an x copy and a y copy. They
+also differ in a read of `windows->image.width` or `windows->image.height` away from the
+block's head, and the first also in the parameter `x` or `y` it compares with. Neither
+fits role (b). A probe of the chain after Recipe CF: 9.38, 9.38, 10.0, with no finding
+left. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19, for the
+owner's confirmation.
 
 ---
 
@@ -17150,15 +17221,46 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
    function or writes anything. Step 2 replaces the read by `p->m`, character for
    character, and deletes `v`'s declarator (a type line left with no name under it
    goes, with its blank line).
+   Dereferenced read (mandate (2026-11-19), added 2026-11-28, please confirm): the one
+   read may also be the whole operand of a unary `*` whose expression `*v` is itself a
+   whole argument of a call or a whole initialiser of a struct member
+   (`XCompositeImage(display,resource_info,windows,*image,exception)`, where `image` is
+   bound as `Image **const image = context->image;`). Step 2 then writes `*p->m`
+   (`*context->image`), with no parentheses added: postfix `->` binds tighter than
+   unary `*`, so the expression parses as `*(p->m)`. Every other condition of this step
+   holds. The pointer `v` held is `p->m`'s value, read with nothing called or written
+   between the binding and the read, so `*p->m` reads the same pointer and dereferences
+   it at the point where `*v` did, once.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+Oracle form (mandate (2026-11-19), added 2026-11-28, please confirm): when
+`obj_identical.sh` prints `DIFFERENT`, the step may still be made if oracle cases
+execute every function whose locals it inlines (`casemap.py`, the wide catalogue for
+X11 code). The oracle runs with `--function` on each of them, 0 diverged, and the
+message quotes each count and carries `Verified: oracle`. The message also names the
+functions whose code differs (`obj_modulo.sh`, or a comparison with the changed
+functions kept out of line on both sides). Steps 1 to 3 and 5 hold unchanged, checked
+by reading, and the warning checks of step 4 still print `OK`. Why the objects may
+differ: a binding loads its member at the top of the body, and the inlined read loads
+it where the argument stands. Nothing is called or written in between, so the value is
+the same, but the compiler may schedule the loads in another order and so pick other
+registers and stack slots (`XApplyCompositeCommand`, kept out of line: the loads of
+`windows` and `exception` swap, nothing else changes). At the oracle level this is no
+weaker than Recipe B's existing input struct form, which moves such bindings from one
+function to another on the oracle alone.
 
 **Provenance:** 2026-11-13, from `splay-tree.c`'s `CompareSplayTreeString` and
 `CompareSplayTreeStringInfo` (campaign B, M127 lane b round 5): after Recipe BF the
 file kept two *Code Duplication* pairs; this step on the comparison pair cleared both,
 9.38 to 10.0 in the probe. Added by Claude Code (Claude Opus 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 5's dereferenced read (2026-11-28, campaign A, W51 lane b), from
+`display-image-apply-effects-private.h`: after Recipe D and B share the failure notice
+of the five edit commands, `XApplyAnnotateCommand` and `XApplyCompositeCommand` read
+their `image` binding only as `*image`, a whole argument. A probe that keeps those two
+bindings stays at 9.09 with the duplication finding; inlining them too reaches 10.0 at
+the chain's end. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19,
+for the owner's confirmation.
 Lane: b
 
 ---
@@ -23856,6 +23958,22 @@ against the headers of `HEAD` and of the working tree (the carved and the new he
 ahead of every `-I` path), wide candidate's flags, `__LINE__` and `__FILE__` pinned:
 preprocessed unit and object both identical. Step 1's bar is the carved header's score
 before the step; both products must reach it and one must rise above it.
+Nested placement (mandate (2026-11-19), please confirm). When the `.c` file's `#include` of
+the new header would lower the `.c` file's score, the carved header names the new header
+instead, on the line directly after its include guard's `#define` and the blank line after
+it, where the run stood (blank and form-feed lines at that edge stay below the new line).
+CodeScene counts the lines of the last mid-file include group into the length of the
+function that follows it: `display-image.c`'s `XDisplayBackgroundImage` is under the bar
+with six carved-again headers of `display-image-tile-private.h` named above that header's
+`#include`, and a seventh makes it 70 lines, a *Large Method*, 9.68 -> 9.31; named by the tile
+header instead, the `.c` file stays 9.68 and the tile header measures 10.0 with the line.
+The carved header then has an include block of its own, and a later carve of it names its
+new header as the last line of that block (the rule above for a header with an include
+block). The `.c` file is unchanged; the new header has one includer, the carved header,
+which one `.c` file includes; the translation unit has the same tokens in the same order.
+Step 4's proof is the carved-again form's: the `.c` file compiled against the headers of
+`HEAD` and of the working tree, preprocessed unit and object both identical. Step 1's bar
+holds, scored with the new line in the carved header.
 Mid-file conditional form (mandate, 2026-11-19; campaign A round 36; owner 2026-11-20, "private
 headers may be ... included mid-file", read by the main session as covering mid-file includes
 in general, not only in X11 files, and flagged in the PR): Form A also applies to a `.c` file
@@ -27951,3 +28069,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | HN | Step 8: (a) an exit `{ S return(R); }` whose `S` only releases objects the block does not touch, when the caller's next test has the same body; (b) `v` also written by the block's first statement, the clone its last call transforms, kept in a helper local, the helper ending `return(Last(...));` (and `return(Call(...));` with no release after the last call); (c) `NULL` or `(T *) NULL` in a guard; (d) two copies in one caller in one commit | `compare-similarity-frequency-images-private.h`'s `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage` (campaign A, W51 round 38, lane a): their FFT heads as helpers, with two Recipe E steps, clear the header's Overall Code Complexity, 9.38 flat to 10.0 in a probe | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | B | Step 1, test-program caller: a changed call in a file under `tests/` that only a test program compiles may miss (d) only by constants clang folds from a contractable expression (`.text` and relocations identical with `__LINE__` pinned, the object identical with `-ffp-contract=off`) and, under `-fno-inline`, by callees no longer specialised for the caller's literal arguments and `.rodata` relocation addends; the subtest that runs the call passes | `colorspace-cie-to-rgb-private.h`'s `ConvertLuvToRGB` (campaign A, W51 round 38, lane a): `tests/validate.c`'s `ValidateLuvToRGB` passes literal Luv inputs; with them in a struct, two constants clang -O2 folds differ by 1 and 2 ulp and the objects are identical with `-ffp-contract=off`; the header goes 9.68 to 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | Step 1, upstream shared form: on a header this recipe produced and one header includes, the run may be the trailing one (after a top-level item, up to the closing `extern "C"` lines), moved verbatim into a new header with its own pair that the including header names on the line directly below the carved one; same proof and bar | `colorspace-jzazbz-oklab-private.h` (campaign A, W51 round 38, lane a): its trailing `ConvertRGBToOklab` and `ConvertRGBToOklch` sit in `colorspace-convert.c`'s `RGBToGenericMethods` table beside `MagickExport` entries, so their six arguments stay; with them carved out, Recipe B on the leading `ConvertOklabToRGB` and `ConvertOklchToRGB` takes the header 9.68 to 10.0 (stub probe; the new header 9.68) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | CF | Step 7, event form: when no copy runs per pixel or per channel, only once per user command or pointer event of the X11 programs, a new indirect call (`call *`) is allowed; the message gives the count in the gcc `-O2 -fopenmp` object before and after and names the function holding the new call. *Careful* gives the argument (the same callee with the same arguments; one indirect call per event) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XPreviewRectangle`, `XPreviewEllipse` and their `Erase` twins differ only in `XHighlightRectangle` against `XHighlightEllipse`; gcc keeps `XPreviewBox` out of line as `XPreviewBox.isra.0`, `call *` 11 to 12 in `display-image.c`'s object, the clang object identical. The owner accepted the same cost for Recipe DC's X11 dialog commands (2026-11-18 evening). Probed chain 8.28, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | MA | Step 2 (d), read-operand form: the copies may also differ in a read-only operand at any position, either a parameter or local the block does not assign, or a member chain through one shared pointer (no call, no subscript) naming an object the block does not write, all of one type `U`. It is passed by value as `const U` and named in the body wherever the copy read it. Step 7 adds two checks by reading: the chain's pointer designates an object at the call, and no role (c) lvalue lies in the object it names; *Use when*: also *Overall Code Complexity* (the copies' decisions counted once, in the new function) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XFitSelectionRectangle`'s x and y halves (`windows->image.width` against `height`, the parameters `x` against `y`) and `XClampLineEnd`'s x2 and y2 clamps (`width` against `height`). After Recipe CF the file's only finding is Overall Code Complexity. Probed chain 9.38, 9.38, 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | IC | Step 5, dereferenced read: the one read of a member binding `v` may be the whole operand of a unary `*` whose `*v` is a whole argument or a whole member initialiser; it becomes `*p->m` (`*context->image`), which parses as `*(p->m)`; every other condition of step 5 holds | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): after Recipe D and B share the five edit commands' failure notice, `XApplyAnnotateCommand` and `XApplyCompositeCommand` pass `*image`; a probe keeping those bindings stays at 9.09 with Code Duplication, the chain (D, B, IC, and E, D, B, IC on two more groups) ends at 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | IC | *Evidence level*, oracle form: when `obj_identical.sh` prints `DIFFERENT` and oracle cases execute every function whose locals the step inlines, the oracle `--function` on each (0 diverged, counts quoted) proves the step, `Verified: oracle`; the message names the functions whose code differs; steps 1 to 3 and 5 by reading, step 4's warning checks `OK` | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): inlining the bindings of the five edit commands leaves Draw, Color and Matte identical one by one, but Annotate and Composite change `XApplyFXCommands`'s stack frame (+16 bytes). Kept out of line, `XApplyCompositeCommand` differs only in the order of two member loads. The commands are reached by 22, 15, 23, 9 and 3 wide cases; the chain needs those two inlined (a probe keeping either binding: 9.09 or 9.38) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | W | Step 7, twin form with a buffer per copy: two `void` functions whose leading blocks are one text may share the new function in one commit when each block holds, in a compound statement of its own, a `static char` array that only the block names (moved unchanged to its function's opening declarations and passed by name as `char *`, so each function keeps its own buffer) and both bind the block's other inputs from one `const Name *name` parameter (the new function takes `name` and binds them, Recipe SM step 4); bindings only the block read go with it | `display-image-annotate-private.h` (campaign A, W51 round 38, lane b): `XSelectColorBorder` and `XSelectPenColor` share `XSelectEditPen`; Recipe F refuses the buffers (the colour dialog writes them) and one shared buffer would change each command's remembered reply. Probed chain 9.38, 9.38, 9.38, 9.38, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, nested placement: when the `.c` file's `#include` of the new header would lower the `.c` file, the carved header names the new header on the line after its guard's `#define` and blank line, where the run stood (an include block of its own; a later carve names its header last in that block); the `.c` file is unchanged; proof as for the carved-again form (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) | `display-image-tile-private.h` (campaign A, W51 round 38, lane b): its seventh carve (the translate command) probes the header at 10.0, but a seventh mid-file `#include` in `display-image.c` is counted into `XDisplayBackgroundImage` (70 lines, *Large Method*, 9.68 -> 9.31); nested in the tile header, `display-image.c` stays 9.68 and the tile header measures 10.0 | mandate (2026-11-19) |
