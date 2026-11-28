@@ -1491,6 +1491,45 @@ typedef struct _MagnifyWindowInput
     *exception;
 } MagnifyWindowInput;
 
+typedef struct _XImageCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} XImageCommandInput;
+
+typedef struct _XTileImageInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  XEvent
+    *event;
+
+  ExceptionInfo
+    *exception;
+} XTileImageInput;
+
 /*
   Forward declarations.
 */
@@ -1500,8 +1539,7 @@ static DisplayCommand
 static Image
   *XMagickCommand(const XImageCacheContext *,const DisplayCommand),
   *XOpenImage(Display *,XResourceInfo *,XWindows *,const MagickBooleanType),
-  *XTileImage(Display *,XResourceInfo *,XWindows *,Image *,XEvent *,
-    ExceptionInfo *),
+  *XTileImage(const XTileImageInput *),
   *XVisualDirectoryImage(Display *,XResourceInfo *,XWindows *,
     ExceptionInfo *);
 static MagickBooleanType
@@ -1512,8 +1550,7 @@ static MagickBooleanType
     ExceptionInfo *),
   XCropImage(Display *,XResourceInfo *,XWindows *,Image *,const ClipboardMode,
     ExceptionInfo *),
-  XColorEditImage(Display *,XResourceInfo *,XWindows *,Image **,
-    ExceptionInfo *),
+  XColorEditImage(const XImageCacheContext *),
   XCompositeImage(Display *,XResourceInfo *,XWindows *,Image *,
     ExceptionInfo *),
   XConfigureImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
@@ -1525,8 +1562,8 @@ static MagickBooleanType
   XRotateImage(Display *,XResourceInfo *,XWindows *,double,Image **,
     ExceptionInfo *),
   XROIImage(Display *,XResourceInfo *,XWindows *,Image **,ExceptionInfo *),
-  XSaveImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
-  XTrimImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
+  XSaveImage(const XImageCommandInput *),
+  XTrimImage(const XImageCommandInput *);
 static void
   XDrawPanRectangle(Display *,XWindows *),
   XImageCache(const XImageCacheContext *,const DisplayCommand),

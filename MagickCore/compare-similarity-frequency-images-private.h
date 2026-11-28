@@ -19,6 +19,22 @@
 #define MAGICKCORE_COMPARE_SIMILARITY_FREQUENCY_IMAGES_PRIVATE_H
 
 #if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
+static Image *SIMForwardFourierClone(const Image *image,
+  ExceptionInfo *exception)
+{
+  Image
+    *fourier_image = (Image *) NULL,
+    *temp_image = (Image *) NULL;
+
+  temp_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (temp_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageArtifact(temp_image,"fourier:normalize","inverse");
+  fourier_image=ForwardFourierTransformImage(temp_image,MagickFalse,exception);
+  temp_image=DestroyImageList(temp_image);
+  return(fourier_image);
+}
+
 static Image *SIMCrossCorrelationImage(const Image *alpha_image,
   const Image *beta_image,ExceptionInfo *exception)
 {
@@ -27,18 +43,12 @@ static Image *SIMCrossCorrelationImage(const Image *alpha_image,
     *beta_fft = (Image *) NULL,
     *complex_conjugate = (Image *) NULL,
     *complex_multiplication = (Image *) NULL,
-    *cross_correlation = (Image *) NULL,
-    *temp_image = (Image *) NULL;
+    *cross_correlation = (Image *) NULL;
 
   /*
     Take the FFT of beta (reconstruction) image.
   */
-  temp_image=CloneImage(beta_image,0,0,MagickTrue,exception);
-  if (temp_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageArtifact(temp_image,"fourier:normalize","inverse");
-  beta_fft=ForwardFourierTransformImage(temp_image,MagickFalse,exception);
-  temp_image=DestroyImageList(temp_image);
+  beta_fft=SIMForwardFourierClone(beta_image,exception);
   if (beta_fft == (Image *) NULL)
     return((Image *) NULL);
   /*
@@ -51,15 +61,7 @@ static Image *SIMCrossCorrelationImage(const Image *alpha_image,
   /*
     Take the FFT of the alpha (test) image.
   */
-  temp_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
-  if (temp_image == (Image *) NULL)
-    {
-      complex_conjugate=DestroyImageList(complex_conjugate);
-      return((Image *) NULL);
-    }
-  (void) SetImageArtifact(temp_image,"fourier:normalize","inverse");
-  alpha_fft=ForwardFourierTransformImage(temp_image,MagickFalse,exception);
-  temp_image=DestroyImageList(temp_image);
+  alpha_fft=SIMForwardFourierClone(alpha_image,exception);
   if (alpha_fft == (Image *) NULL)
     {
       complex_conjugate=DestroyImageList(complex_conjugate);
@@ -407,6 +409,23 @@ static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
   return(square_image);
 }
 
+static Image *SIMRootImage(Image *magnitude_image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if (status == MagickFalse)
+    {
+      magnitude_image=DestroyImage(magnitude_image);
+      return((Image *) NULL);
+    }
+  status=EvaluateImage(magnitude_image,PowEvaluateOperator,0.5,exception);
+  if (status == MagickFalse)
+    {
+      magnitude_image=DestroyImage(magnitude_image);
+      return (Image *) NULL;
+    }
+  return(magnitude_image);
+}
+
 static Image *SIMMagnitudeImage(Image *alpha_image,Image *beta_image,
   ExceptionInfo *exception)
 {
@@ -433,18 +452,7 @@ static Image *SIMMagnitudeImage(Image *alpha_image,Image *beta_image,
     exception);
   magnitude_image=xsq_image;
   ysq_image=DestroyImage(ysq_image);
-  if (status == MagickFalse)
-    {
-      magnitude_image=DestroyImage(magnitude_image);
-      return((Image *) NULL);
-    }
-  status=EvaluateImage(magnitude_image,PowEvaluateOperator,0.5,exception);
-  if (status == MagickFalse)
-    {
-      magnitude_image=DestroyImage(magnitude_image);
-      return (Image *) NULL;
-    }
-  return(magnitude_image);
+  return(SIMRootImage(magnitude_image,status,exception));
 }
 
 typedef struct
@@ -769,6 +777,36 @@ static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
   return(SIMImageRows(image,&rows,exception));
 }
 
+static Image *SIMCloneForwardFourier(const Image *image,
+  ExceptionInfo *exception)
+{
+  Image
+    *clone_image = (Image *) NULL;
+
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageArtifact(clone_image,"fourier:normalize","inverse");
+  return(ForwardFourierTransformImage(clone_image,MagickFalse,exception));
+}
+
+static void SIMNormalizeCrossPowerSpectrum(Image *complex_multiplication,
+  const Image *magnitude_image,ExceptionInfo *exception)
+{
+  if (complex_multiplication->next != (Image *) NULL)
+    {
+      /*
+        Normalize the cross-power spectrum by the product magnitude.
+      */
+      DisableCompositeClampUnlessSpecified(complex_multiplication);
+      DisableCompositeClampUnlessSpecified(complex_multiplication->next);
+      (void) CompositeImage(complex_multiplication,magnitude_image,
+        DivideSrcCompositeOp,MagickTrue,0,0,exception);
+      (void) CompositeImage(complex_multiplication->next,magnitude_image,
+        DivideSrcCompositeOp,MagickTrue,0,0,exception);
+    }
+}
+
 static Image *SIMPhaseCorrelationImage(const Image *target_image,
   const Image *reconstruct_image,const Image *magnitude_image,
   ExceptionInfo *exception)
@@ -782,25 +820,13 @@ static Image *SIMPhaseCorrelationImage(const Image *target_image,
   /*
     Take the FFT of the reconstruction image.
   */
-  reconstruct_fft=CloneImage(reconstruct_image,0,0,MagickTrue,exception);
-  if (reconstruct_fft == NULL)
-    return((Image *) NULL);
-  (void) SetImageArtifact(reconstruct_fft,"fourier:normalize","inverse");
-  reconstruct_fft=ForwardFourierTransformImage(reconstruct_fft,MagickFalse,
-    exception);
+  reconstruct_fft=SIMCloneForwardFourier(reconstruct_image,exception);
   if (reconstruct_fft == NULL)
     return((Image *) NULL);
   /*
     Take the FFT of the target image.
   */
-  target_fft=CloneImage(target_image,0,0,MagickTrue,exception);
-  if (target_fft == (Image *) NULL)
-    {
-      reconstruct_fft=DestroyImageList(reconstruct_fft);
-      return((Image *) NULL);
-    }
-  (void) SetImageArtifact(target_fft,"fourier:normalize","inverse");
-  target_fft=ForwardFourierTransformImage(target_fft,MagickFalse,exception);
+  target_fft=SIMCloneForwardFourier(target_image,exception);
   if (target_fft == (Image *) NULL)
     {
       reconstruct_fft=DestroyImageList(reconstruct_fft);
@@ -827,18 +853,8 @@ static Image *SIMPhaseCorrelationImage(const Image *target_image,
   reconstruct_fft=DestroyImageList(reconstruct_fft);
   if (complex_multiplication == (Image *) NULL)
     return((Image *) NULL);
-  if (complex_multiplication->next != (Image *) NULL)
-    {
-      /*
-        Normalize the cross-power spectrum by the product magnitude.
-      */
-      DisableCompositeClampUnlessSpecified(complex_multiplication);
-      DisableCompositeClampUnlessSpecified(complex_multiplication->next);
-      (void) CompositeImage(complex_multiplication,magnitude_image,
-        DivideSrcCompositeOp,MagickTrue,0,0,exception);
-      (void) CompositeImage(complex_multiplication->next,magnitude_image,
-        DivideSrcCompositeOp,MagickTrue,0,0,exception);
-    }
+  SIMNormalizeCrossPowerSpectrum(complex_multiplication,magnitude_image,
+    exception);
   /*
     Do the IFT and return the phase-correlation result.
   */

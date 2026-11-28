@@ -20,13 +20,11 @@
 #ifndef MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 
-static void XApplyAnnotateCommand(const XMagickCommandContext *context)
+static void XNoticeEditFailure(const XMagickCommandContext *context,
+  const MagickStatusType status,const char *reason)
 {
   Display
     *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
 
   XWindows
     *const windows = context->windows;
@@ -34,124 +32,96 @@ static void XApplyAnnotateCommand(const XMagickCommandContext *context)
   Image
     **const image = context->image;
 
-  ExceptionInfo
-    *const exception = context->exception;
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,reason,
+        (*image)->filename);
+      return;
+    }
+}
 
+static void XApplyAnnotateCommand(const XMagickCommandContext *context)
+{
   MagickStatusType
     status;
 
   /*
     Annotate the image with text.
   */
-  status=XAnnotateEditImage(display,resource_info,windows,*image,exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to annotate X image",
-        (*image)->filename);
-      return;
-    }
+  status=XAnnotateEditImage(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
+  XNoticeEditFailure(context,status,"Unable to annotate X image");
 }
 
-static void XApplyDrawCommand(const XMagickCommandContext *context)
+typedef MagickBooleanType
+  (*XImageCacheEditMethod)(const XImageCacheContext *);
+
+static inline MagickStatusType XRunImageCacheEdit(
+  const XMagickCommandContext *context,const XImageCacheEditMethod method)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   const XImageCacheContext
-    edit_context = { display, resource_info, windows, image, exception };
+    edit_context = { context->display, context->resource_info,
+      context->windows, context->image, context->exception };
+
+  status=method(&edit_context);
+  return(status);
+}
+
+static void XApplyDrawCommand(const XMagickCommandContext *context)
+{
+  MagickStatusType
+    status;
 
   /*
     Draw image.
   */
-  status=XDrawEditImage(&edit_context);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to draw on the X image",
-        (*image)->filename);
-      return;
-    }
+  status=XRunImageCacheEdit(context,XDrawEditImage);
+  XNoticeEditFailure(context,status,"Unable to draw on the X image");
 }
 
 static void XApplyColorCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   /*
     Color edit.
   */
-  status=XColorEditImage(display,resource_info,windows,image,exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to pixel edit X image",
-        (*image)->filename);
-      return;
-    }
+  status=XRunImageCacheEdit(context,XColorEditImage);
+  XNoticeEditFailure(context,status,"Unable to pixel edit X image");
 }
 
 static void XApplyMatteCommand(const XMagickCommandContext *context)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
   /*
     Matte edit.
   */
-  status=XMatteEditImage(display,resource_info,windows,image,exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to matte edit X image",
-        (*image)->filename);
-      return;
-    }
+  status=XMatteEditImage(context->display,context->resource_info,
+    context->windows,context->image,context->exception);
+  XNoticeEditFailure(context,status,"Unable to matte edit X image");
 }
 
 static void XApplyCompositeCommand(const XMagickCommandContext *context)
+{
+  MagickStatusType
+    status;
+
+  /*
+    Composite image.
+  */
+  status=XCompositeImage(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
+  XNoticeEditFailure(context,status,"Unable to composite X image");
+}
+
+static void XReplaceBorderedImage(const XMagickCommandContext *context,
+  Image *border_image)
 {
   Display
     *const display = context->display;
@@ -168,20 +138,22 @@ static void XApplyCompositeCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  MagickStatusType
-    status;
+  const XImageColormapTarget
+    cmap_target = { display, resource_info, windows };
 
-  /*
-    Composite image.
-  */
-  status=XCompositeImage(display,resource_info,windows,*image,
-    exception);
-  if (status == MagickFalse)
+  if (border_image != (Image *) NULL)
     {
-      XNoticeWidget(display,windows,"Unable to composite X image",
-        (*image)->filename);
-      return;
+      *image=DestroyImage(*image);
+      *image=border_image;
     }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  XConfigureImageColormap(&cmap_target,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
 static void XApplyAddBorderCommand(const XMagickCommandContext *context,
@@ -214,9 +186,6 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   const XImageCacheContext
     command_context = { display, resource_info, windows, image, exception };
 
-  const XImageColormapTarget
-    cmap_target = { display, resource_info, windows };
-
   /*
     Query user for border color and geometry.
   */
@@ -243,19 +212,7 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
     exception);
   border_image=BorderImage(*image,&page_geometry,(*image)->compose,
     exception);
-  if (border_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=border_image;
-    }
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->image.orphan != MagickFalse)
-    return;
-  windows->image.window_changes.width=(int) (*image)->columns;
-  windows->image.window_changes.height=(int) (*image)->rows;
-  XConfigureImageColormap(&cmap_target,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XReplaceBorderedImage(context,border_image);
 }
 
 static void XApplyAddFrameCommand(const XMagickCommandContext *context,
@@ -721,6 +678,34 @@ static void XApplyShowMatteCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static Image *XCloneNextImage(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    *nexus;
+
+  nexus=CloneImage(*image,0,0,MagickTrue,exception);
+  if (nexus != (Image *) NULL)
+    {
+      const XClientReason
+        reason = { windows->im_next_image, CurrentTime };
+
+      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
+    }
+  return(nexus);
+}
+
 static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
   Image *nexus)
 {
@@ -751,15 +736,7 @@ static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
   status=XBackgroundImage(&window_input);
   if (status == MagickFalse)
     return(nexus);
-  nexus=CloneImage(*image,0,0,MagickTrue,exception);
-  if (nexus != (Image *) NULL)
-    {
-      const XClientReason
-        reason = { windows->im_next_image, CurrentTime };
-
-      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
-    }
-  return(nexus);
+  return(XCloneNextImage(context));
 }
 
 static void XApplySlideShowCommand(const XMagickCommandContext *context)
@@ -809,12 +786,6 @@ static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
   XWindows
     *const windows = context->windows;
 
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
 
@@ -824,15 +795,7 @@ static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
   status=XPreferencesWidget(display,resource_info,windows);
   if (status == MagickFalse)
     return(nexus);
-  nexus=CloneImage(*image,0,0,MagickTrue,exception);
-  if (nexus != (Image *) NULL)
-    {
-      const XClientReason
-        reason = { windows->im_next_image, CurrentTime };
-
-      XClientMessage(display,windows->image.id,windows->im_protocols,&reason);
-    }
-  return(nexus);
+  return(XCloneNextImage(context));
 }
 
 static void XApplyBrowseDocumentationCommand(

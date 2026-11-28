@@ -10,7 +10,8 @@
 # Format: path, blob hash, then '#' and the reason (no static or inline function, no ')'
 # followed by '{' outside a macro body). Seeded 2026-11-20 (campaign A round 36, lane c) from
 # a scan of all 172 gated *-private.h files on campaign/W49-c: these 41 gave no score.
-MagickCore/accelerate-private.h 055e84a4fac46dd165215db911f2c0a9b663fa54  # MagickPrivate declarations only
+MagickCore/accelerate-private.h 082c46b9c6a94d67b10c4bb83011a711acd490e9  # MagickPrivate declarations and request typedefs (AccelerateResizeRequest, AccelerateUnsharpRequest)
+MagickCore/accelerate-private.h 0624b4a82d1514a724fdd67c3797bf81c5cbb770  # MagickPrivate declarations and request typedefs (the content this list's earlier hash no longer matched, at 81e38bca7)
 MagickCore/accelerate-recreate-buffer-private.h 921d03af784c52f96a5e3914e5613316c5d18cca  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
 MagickCore/accelerate-recreate-release-private.h 9fd2fd49dac2444619c8c6efdd66ac9301c24a88  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
 MagickCore/animate-private.h 320dab7ba985d8f6fe8adc159b57428f228a42ce  # declarations only
@@ -44,6 +45,7 @@ MagickCore/property-set-iptc-private.h 5fba6243527b87602fb74ab97cb660d2391446e5 
 MagickCore/property-set-pixel-private.h b91619f983e7f0a2eec65d7662744b608dc69bf2  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
 MagickCore/property-set-xmp-private.h ed747d1e61829595c43d3ad6baa4799ef7fd6449  # Recipe UB fragment: an #if 0 block of SetImageProperty's switch, no function
 MagickCore/registry-private.h 02378c83f0c1ee59cf033d651c83e31a293e5554  # declarations only
+MagickCore/resample-filter-private.h 86e181d9a472b361f5609e1daa4378ae07317da8  # macros and a struct (resample.c's EWA option defines and struct _ResampleFilter)
 MagickCore/resize-private.h 638b891ee4631624c433973f49f1f7c3b30a1308  # an enum and declarations
 MagickCore/resource-private.h 0965d639613e7b32a63e0c65aefe8f23234bfa15  # declarations only
 MagickCore/semaphore-private.h 5ede08477f418a9663eaa301e19207ec29b6d714  # declarations only

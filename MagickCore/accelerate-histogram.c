@@ -232,15 +232,15 @@ static void IntegrateEqualizeHistogram(const Image *image,
 static MagickBooleanType EqualizesRedChannel(const Image *image,
   const cl_float4 white,const cl_float4 black)
 {
-  return((((image->channel_mask & RedChannel) != 0) &&
-    (white.x != black.x)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (((image->channel_mask & RedChannel) != 0) &&
+    (white.x != black.x)));
 }
 
 static MagickBooleanType EqualizesGreenChannel(const Image *image,
   const cl_float4 white,const cl_float4 black)
 {
-  return((((image->channel_mask & GreenChannel) != 0) &&
-    (white.y != black.y)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (((image->channel_mask & GreenChannel) != 0) &&
+    (white.y != black.y)));
 }
 
 static MagickBooleanType EqualizesBlueChannel(const Image *image,

@@ -149,26 +149,29 @@ static void ConvertYDbDrThroughYUVToRGB(const GenericToRGBInput *input)
     *const G = input->G,
     *const B = input->B;
 
+  const ConversionsRGBTarget
+    target = { R, G, B };
+
   switch (colorspace)
   {
     case YDbDrColorspace:
     {
-      ConvertYDbDrToRGB(X,Y,Z,R,G,B);
+      ConvertYDbDrToRGB(X,Y,Z,&target);
       break;
     }
     case YIQColorspace:
     {
-      ConvertYIQToRGB(X,Y,Z,R,G,B);
+      ConvertYIQToRGB(X,Y,Z,&target);
       break;
     }
     case YPbPrColorspace:
     {
-      ConvertYPbPrToRGB(X,Y,Z,R,G,B);
+      ConvertYPbPrToRGB(X,Y,Z,&target);
       break;
     }
     case YUVColorspace:
     {
-      ConvertYUVToRGB(X,Y,Z,R,G,B);
+      ConvertYUVToRGB(X,Y,Z,&target);
       break;
     }
     default:
@@ -196,36 +199,51 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
     *const G = input->G,
     *const B = input->B;
 
+  const ConversionsRGBTarget
+    target = { R, G, B };
+
   switch (colorspace)
   {
     case OklabColorspace:
     {
-      ConvertOklabToRGB(X,Y,Z,R,G,B);
+      const OklabRGBTarget
+        rgb = { R, G, B };
+
+      ConvertOklabToRGB(X,Y,Z,&rgb);
       break;
     }
     case OklchColorspace:
     {
-      ConvertOklchToRGB(X,Y,Z,R,G,B);
+      const OklabRGBTarget
+        rgb = { R, G, B };
+
+      ConvertOklchToRGB(X,Y,Z,&rgb);
       break;
     }
     case ProPhotoColorspace:
     {
-      ConvertProPhotoToRGB(X,Y,Z,R,G,B);
+      const CIEToRGBTarget
+        rgb = { R, G, B };
+
+      ConvertProPhotoToRGB(X,Y,Z,&rgb);
       break;
     }
     case xyYColorspace:
     {
-      ConvertxyYToRGB(X,Y,Z,R,G,B);
+      ConvertxyYToRGB(X,Y,Z,&target);
       break;
     }
     case XYZColorspace:
     {
-      ConvertXYZToRGB(X,Y,Z,R,G,B);
+      const IlluminantRGBTarget
+        rgb = { R, G, B };
+
+      ConvertXYZToRGB(X,Y,Z,&rgb);
       break;
     }
     case YCbCrColorspace:
     {
-      ConvertYCbCrToRGB(X,Y,Z,R,G,B);
+      ConvertYCbCrToRGB(X,Y,Z,&target);
       break;
     }
     default:
@@ -258,7 +276,10 @@ static void ConvertLabThroughLuvToRGB(const GenericToRGBInput *input)
   {
     case LabColorspace:
     {
-      ConvertLabToRGB(X,Y,Z,illuminant,R,G,B);
+      const LabRGBTarget
+        target = { illuminant, R, G, B };
+
+      ConvertLabToRGB(X,Y,Z,&target);
       break;
     }
     case LCHColorspace:
@@ -279,7 +300,13 @@ static void ConvertLabThroughLuvToRGB(const GenericToRGBInput *input)
     }
     case LuvColorspace:
     {
-      ConvertLuvToRGB(X,Y,Z,illuminant,R,G,B);
+      const CIELuvInput
+        luv = { X, Y, Z };
+
+      const CIEToRGBTarget
+        rgb = { R, G, B };
+
+      ConvertLuvToRGB(&luv,illuminant,&rgb);
       break;
     }
     default:
@@ -335,7 +362,10 @@ static void ConvertHSBThroughJzazbzToRGB(const GenericToRGBInput *input)
     }
     case JzazbzColorspace:
     {
-      ConvertJzazbzToRGB(X,Y,Z,white_luminance,R,G,B);
+      const JzazbzToRGBInput
+        jzazbz = { X, Y, Z, white_luminance, R, G, B };
+
+      ConvertJzazbzToRGB(&jzazbz);
       break;
     }
     default:
@@ -366,7 +396,10 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   {
     case Adobe98Colorspace:
     {
-      ConvertAdobe98ToRGB(X,Y,Z,R,G,B);
+      const XYZToRGBTarget
+        target = { R, G, B };
+
+      ConvertAdobe98ToRGB(X,Y,Z,&target);
       break;
     }
     case CAT02LMSColorspace:
@@ -376,18 +409,30 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
         M,
         S;
 
-      ConvertXYZToCAT02LMS(X,Y,Z,&L,&M,&S);
-      ConvertCAT02LMSToRGB(L,M,S,R,G,B);
+      const CAT02LMSRGBTarget
+        target = { R, G, B };
+
+      const CAT02LMSTarget
+        lms = { (&L), (&M), (&S) };
+
+      ConvertXYZToCAT02LMS(X,Y,Z,&lms);
+      ConvertCAT02LMSToRGB(L,M,S,&target);
       break;
     }
     case CMYColorspace:
     {
-      ConvertCMYToRGB(X,Y,Z,R,G,B);
+      const XYZToRGBTarget
+        target = { R, G, B };
+
+      ConvertCMYToRGB(X,Y,Z,&target);
       break;
     }
     case DisplayP3Colorspace:
     {
-      ConvertDisplayP3ToRGB(X,Y,Z,R,G,B);
+      const CIEToRGBTarget
+        rgb = { R, G, B };
+
+      ConvertDisplayP3ToRGB(X,Y,Z,&rgb);
       break;
     }
     case HCLColorspace:

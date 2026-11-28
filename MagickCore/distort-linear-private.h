@@ -36,8 +36,24 @@ static inline void AffineArgsToCoefficients(double *affine)
   affine[3]=tmp[0]; affine[1]=tmp[1]; affine[4]=tmp[2]; affine[2]=tmp[3];
 }
 
-static inline void InvertAffineCoefficients(const double *coeff,double *inverse)
+typedef struct _CoefficientInversion
 {
+  const double
+    *coeff;
+
+  double
+    *inverse;
+} CoefficientInversion;
+
+static inline void InvertAffineCoefficients(
+  const CoefficientInversion *inversion)
+{
+  const double
+    *const coeff = inversion->coeff;
+
+  double
+    *const inverse = inversion->inverse;
+
   /* From "Digital Image Warping" by George Wolberg, page 50 */
   double determinant;
 
@@ -50,9 +66,15 @@ static inline void InvertAffineCoefficients(const double *coeff,double *inverse)
   inverse[5]=determinant*(coeff[2]*coeff[3]-coeff[0]*coeff[5]);
 }
 
-static inline void InvertPerspectiveCoefficients(const double *coeff,
-  double *inverse)
+static inline void InvertPerspectiveCoefficients(
+  const CoefficientInversion *inversion)
 {
+  const double
+    *const coeff = inversion->coeff;
+
+  double
+    *const inverse = inversion->inverse;
+
   /* From "Digital Image Warping" by George Wolberg, page 53 */
   double determinant;
 
@@ -175,9 +197,26 @@ static inline MagickBooleanType IsAffineFallback(const size_t number_arguments,
        ) ) ? MagickTrue : MagickFalse);
 }
 
-static inline MagickBooleanType IsMatrixMemoryMissing(double **matrix,
-  double **vectors,const double *terms)
+typedef struct _PolynomialMemory
 {
+  double
+    **matrix,
+    **vectors;
+
+  const double
+    *terms;
+} PolynomialMemory;
+
+static inline MagickBooleanType IsMatrixMemoryMissing(
+  const PolynomialMemory *memory)
+{
+  double
+    **const matrix = memory->matrix,
+    **const vectors = memory->vectors;
+
+  const double
+    *const terms = memory->terms;
+
   return(((matrix  == (double **) NULL) || (vectors == (double **) NULL) ||
     (terms   == (double *) NULL)) ? MagickTrue : MagickFalse);
 }
@@ -190,8 +229,43 @@ static inline MagickBooleanType IsInvalidPolarArgumentCount(
           || number_arguments > 8 ) ? MagickTrue : MagickFalse);
 }
 
-static inline MagickBooleanType IsInvalidPolarRadius(const double *coeff)
+typedef struct _CoefficientContext
 {
+  const Image
+    *image;
+
+  const double
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    number_arguments,
+    number_values,
+    cp_size,
+    cp_x,
+    cp_y,
+    cp_values;
+} CoefficientContext;
+
+typedef struct _CoefficientCall
+{
+  double
+    *coeff;
+
+  DistortMethod
+    *method;
+
+  const CoefficientContext
+    *context;
+} CoefficientCall;
+
+static inline MagickBooleanType IsInvalidPolarRadius(const CoefficientCall *call)
+{
+  const double
+    *const coeff = call->coeff;
+
   return(( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
            || (coeff[0]-coeff[1]) < MagickEpsilon ) ? MagickTrue : MagickFalse);
 }
@@ -204,9 +278,21 @@ static inline MagickBooleanType IsInvalidBarrelArgumentCount(
     MagickTrue : MagickFalse);
 }
 
-static inline void SetAffineSingleCoefficients(double *coeff,const double *arguments,
-  const size_t cp_values,const size_t number_values)
+static inline void SetAffineSingleCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    cp_values = context->cp_values,
+    number_values = context->number_values;
+
   size_t
     i;
 
@@ -224,8 +310,17 @@ static inline void SetAffineSingleCoefficients(double *coeff,const double *argum
   }
 }
 
-static inline void SetPolarFurthestRadius(const Image *image,double *coeff)
+static inline void SetPolarFurthestRadius(const CoefficientCall *call)
 {
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  double
+    *const coeff = call->coeff;
+
   /* furthest diagonal if radius == -1 */
   if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
     double rx,ry;
@@ -242,8 +337,17 @@ static inline void SetPolarFurthestRadius(const Image *image,double *coeff)
   }
 }
 
-static inline void SetPolarSpecialRadius(const Image *image,double *coeff)
+static inline void SetPolarSpecialRadius(const CoefficientCall *call)
 {
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  double
+    *const coeff = call->coeff;
+
   /* Use closest edge  if radius == 0 */
   if ( fabs(coeff[0]) < MagickEpsilon ) {
     coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
@@ -253,12 +357,32 @@ static inline void SetPolarSpecialRadius(const Image *image,double *coeff)
     coeff[0]=MagickMin(coeff[0],
                  fabs(coeff[3]-image->page.y-image->rows));
   }
-  SetPolarFurthestRadius(image,coeff);
+  SetPolarFurthestRadius(call);
 }
 
-static inline void SetArcOuterRadius(double *coeff,const size_t number_arguments,
-  const double *arguments)
+typedef struct _ArcOuterRadius
 {
+  double
+    *coeff;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+} ArcOuterRadius;
+
+static inline void SetArcOuterRadius(const ArcOuterRadius *radius)
+{
+  double
+    *const coeff = radius->coeff;
+
+  const size_t
+    number_arguments = radius->number_arguments;
+
+  const double
+    *const arguments = radius->arguments;
+
   if ( number_arguments >= 4 )
     coeff[3] = arguments[2] - arguments[3];
   else
@@ -266,9 +390,20 @@ static inline void SetArcOuterRadius(double *coeff,const size_t number_arguments
   coeff[2] = arguments[2];
 }
 
-static inline double *SetShepardsPower(const Image *image,double *coeff,
-  ExceptionInfo *exception)
+static inline double *SetShepardsPower(const CoefficientCall *call)
 {
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  double
+    *coeff = call->coeff;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   { const char *artifact=GetImageArtifact(image,"shepards:power");
     if ( artifact != (const char *) NULL ) {
       coeff[0]=StringToDouble(artifact,(char **) NULL) / 2.0;
@@ -361,41 +496,26 @@ static inline void SetAffineVectors(double **vectors,double *coeff,
     vectors[i] = &(coeff[i*3]);
 }
 
-typedef struct _CoefficientContext
-{
-  const Image
-    *image;
-
-  const double
-    *arguments;
-
-  ExceptionInfo
-    *exception;
-
-  size_t
-    number_arguments,
-    number_values,
-    cp_size,
-    cp_x,
-    cp_y,
-    cp_values;
-} CoefficientContext;
-
-typedef struct _CoefficientCall
+typedef struct _LeastSquaresArrays
 {
   double
-    *coeff;
+    **matrix,
+    **vectors;
+} LeastSquaresArrays;
 
-  DistortMethod
-    *method;
+static inline void AddAffineTerms(const CoefficientCall *call,
+  const LeastSquaresArrays *arrays)
+{
+  double
+    *const coeff = call->coeff;
+
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
 
   const CoefficientContext
-    *context;
-} CoefficientCall;
+    *const context = call->context;
 
-static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors,
-  const CoefficientContext *context)
-{
   const double
     *const arguments = context->arguments;
 
@@ -440,11 +560,16 @@ static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors
   }
 }
 
-static inline double *AffineCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *AffineCoefficients(const CoefficientCall *call)
 {
-  const double
-    *const arguments = context->arguments;
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
 
   ExceptionInfo
     *const exception = context->exception;
@@ -452,8 +577,7 @@ static inline double *AffineCoefficients(double *coeff,const DistortMethod *meth
   const size_t
     number_arguments = context->number_arguments,
     number_values = context->number_values,
-    cp_size = context->cp_size,
-    cp_values = context->cp_values;
+    cp_size = context->cp_size;
 
   /* Affine Distortion
        v =  c0*x + c1*y + c2
@@ -481,7 +605,7 @@ static inline double *AffineCoefficients(double *coeff,const DistortMethod *meth
   /* handle special cases of not enough arguments */
   if ( number_arguments == cp_size ) {
     /* Only 1 CP Set Given */
-    SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
+    SetAffineSingleCoefficients(call);
     return(coeff);
   }
   /* 2 or more points (usually 3) given.
@@ -501,7 +625,12 @@ static inline double *AffineCoefficients(double *coeff,const DistortMethod *meth
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  AddAffineTerms(coeff,matrix,vectors,context);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    AddAffineTerms(call,&arrays);
+  }
   /* Solve for LeastSquares Coefficients */
   status=GaussJordanElimination(matrix,vectors,3UL,number_values);
   matrix = RelinquishMagickMatrix(matrix, 3UL);
@@ -516,9 +645,19 @@ static inline double *AffineCoefficients(double *coeff,const DistortMethod *meth
   return(coeff);
 }
 
-static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
-  const double *arguments,const size_t number_arguments)
+static inline void AddRigidAffineTerms(const LeastSquaresArrays *arrays,
+  const CoefficientContext *context)
 {
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   const LeastSquaresSystem
     least_squares = { matrix, vectors, 4UL, 1UL };
 
@@ -543,8 +682,11 @@ static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
   }
 }
 
-static inline void ConvertRigidAffineCoefficients(double *coeff)
+static inline void ConvertRigidAffineCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
   double
     inverse[6];
 
@@ -558,14 +700,24 @@ static inline void ConvertRigidAffineCoefficients(double *coeff)
   inverse[4]=coeff[2];
   inverse[5]=coeff[3];
   AffineArgsToCoefficients(inverse);
-  InvertAffineCoefficients(inverse,coeff);
+  {
+    const CoefficientInversion
+      inversion = { inverse, coeff };
+
+    InvertAffineCoefficients(&inversion);
+  }
 }
 
-static inline double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *RigidAffineCoefficients(const CoefficientCall *call)
 {
-  const double
-    *const arguments = context->arguments;
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
 
   ExceptionInfo
     *const exception = context->exception;
@@ -610,7 +762,12 @@ static inline double *RigidAffineCoefficients(double *coeff,DistortMethod *metho
     Add control points for least squares solving.
   */
   vectors[0]=(&(coeff[0]));
-  AddRigidAffineTerms(matrix,vectors,arguments,number_arguments);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    AddRigidAffineTerms(&arrays,context);
+  }
   /*
     Solve for least-squares coefficients.
   */
@@ -624,14 +781,22 @@ static inline double *RigidAffineCoefficients(double *coeff,DistortMethod *metho
         CommandOptionToMnemonic(MagickDistortOptions,*method));
       return((double *) NULL);
     }
-  ConvertRigidAffineCoefficients(coeff);
+  ConvertRigidAffineCoefficients(call);
   *method=AffineDistortion;
   return(coeff);
 }
 
-static inline void SetAffineProjectionCoefficients(double *coeff,
-  const double *arguments)
+static inline void SetAffineProjectionCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
   size_t
     i;
 
@@ -639,14 +804,24 @@ static inline void SetAffineProjectionCoefficients(double *coeff,
   for(i=0; i<6UL; i++ )
     inverse[i] = arguments[i];
   AffineArgsToCoefficients(inverse); /* map into coefficients */
-  InvertAffineCoefficients(inverse, coeff); /* invert */
+  {
+    const CoefficientInversion
+      inversion = { inverse, coeff };
+
+    InvertAffineCoefficients(&inversion); /* invert */
+  }
 }
 
-static inline double *AffineProjectionCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *AffineProjectionCoefficients(const CoefficientCall *call)
 {
-  const double
-    *const arguments = context->arguments;
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
 
   ExceptionInfo
     *const exception = context->exception;
@@ -675,7 +850,7 @@ static inline double *AffineProjectionCoefficients(double *coeff,
     return((double *) NULL);
   }
   /* FUTURE: trap test for sx*sy-rx*ry == 0 (determinant = 0, no inverse) */
-  SetAffineProjectionCoefficients(coeff,arguments);
+  SetAffineProjectionCoefficients(call);
   *method = AffineDistortion;
 
   return(coeff);
@@ -691,10 +866,18 @@ typedef struct _ScaleRotateTranslateTargets
     *ny;
 } ScaleRotateTranslateTargets;
 
-static inline MagickBooleanType ParseScaleRotateTranslateArguments(double *coeff,
-  const DistortMethod *method,const CoefficientContext *context,
-  const ScaleRotateTranslateTargets *targets)
+static inline MagickBooleanType ParseScaleRotateTranslateArguments(
+  const CoefficientCall *call,const ScaleRotateTranslateTargets *targets)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
@@ -747,9 +930,17 @@ static inline MagickBooleanType ParseScaleRotateTranslateArguments(double *coeff
   return(MagickTrue);
 }
 
-static inline double *ScaleRotateTranslateCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *ScaleRotateTranslateCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -812,7 +1003,7 @@ static inline double *ScaleRotateTranslateCoefficients(double *coeff,
   default:
     x = nx = arguments[0];
     y = ny = arguments[1];
-    if (ParseScaleRotateTranslateArguments(coeff,method,context,&targets) ==
+    if (ParseScaleRotateTranslateArguments(call,&targets) ==
         MagickFalse)
       return((double *) NULL);
     break;
@@ -838,9 +1029,13 @@ static inline double *ScaleRotateTranslateCoefficients(double *coeff,
   return(coeff);
 }
 
-static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
+static inline void AddPerspectiveTerms(const LeastSquaresArrays *arrays,
   const CoefficientContext *context)
 {
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
+
   const double
     *const arguments = context->arguments;
 
@@ -887,9 +1082,21 @@ static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
   }
 }
 
-static inline void SetPerspectiveGroundSign(double *coeff,const double *arguments,
-  const size_t cp_x,const size_t cp_y)
+static inline void SetPerspectiveGroundSign(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    cp_x = context->cp_x,
+    cp_y = context->cp_y;
+
   /*
     Calculate 9'th coefficient! The ground-sky determination.
     What is sign of the 'ground' in r() denominator affine function?
@@ -901,20 +1108,23 @@ static inline void SetPerspectiveGroundSign(double *coeff,const double *argument
   coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
 }
 
-static inline double *PerspectiveCoefficients(double *coeff,
-  const DistortMethod *method,const CoefficientContext *context)
+static inline double *PerspectiveCoefficients(const CoefficientCall *call)
 {
-  const double
-    *const arguments = context->arguments;
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
 
   ExceptionInfo
     *const exception = context->exception;
 
   const size_t
     number_arguments = context->number_arguments,
-    cp_size = context->cp_size,
-    cp_x = context->cp_x,
-    cp_y = context->cp_y;
+    cp_size = context->cp_size;
 
   /*
      Perspective Distortion (a ratio of affine distortions)
@@ -972,7 +1182,12 @@ static inline double *PerspectiveCoefficients(double *coeff,
               "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  AddPerspectiveTerms(matrix,vectors,context);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    AddPerspectiveTerms(&arrays,context);
+  }
   /* Solve for LeastSquares Coefficients */
   status=GaussJordanElimination(matrix,vectors,8UL,1UL);
   matrix = RelinquishMagickMatrix(matrix, 8UL);
@@ -983,14 +1198,23 @@ static inline double *PerspectiveCoefficients(double *coeff,
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
     return((double *) NULL);
   }
-  SetPerspectiveGroundSign(coeff,arguments,cp_x,cp_y);
+  SetPerspectiveGroundSign(call);
 
   return(coeff);
 }
 
-static inline double *PerspectiveProjectionCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *PerspectiveProjectionCoefficients(
+  const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
@@ -1011,7 +1235,12 @@ static inline double *PerspectiveProjectionCoefficients(double *coeff,
     return((double *) NULL);
   }
   /* FUTURE: trap test  c0*c4-c3*c1 == 0  (determinate = 0, no inverse) */
-  InvertPerspectiveCoefficients(arguments, coeff);
+  {
+    const CoefficientInversion
+      inversion = { arguments, coeff };
+
+    InvertPerspectiveCoefficients(&inversion);
+  }
   /*
     Calculate 9'th coefficient! The ground-sky determination.
     What is sign of the 'ground' in r() denominator affine function?
@@ -1038,9 +1267,19 @@ static inline void SetBilinearVectors(double **vectors,double *coeff,
     vectors[i] = &(coeff[i*4]);
 }
 
-static inline MagickBooleanType SolveBilinearCoefficients(double *coeff,
-  double **matrix,double **vectors,const CoefficientContext *context)
+static inline MagickBooleanType SolveBilinearCoefficients(
+  const CoefficientCall *call,const LeastSquaresArrays *arrays)
 {
+  double
+    *const coeff = call->coeff;
+
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
@@ -1078,9 +1317,14 @@ static inline MagickBooleanType SolveBilinearCoefficients(double *coeff,
   return(status);
 }
 
-static inline void SetBilinearForwardCoefficients(double *coeff,
-  const DistortMethod *method)
+static inline void SetBilinearForwardCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
   if ( *method == BilinearForwardDistortion ) {
      /* Bilinear Forward Mapped Distortion
 
@@ -1126,9 +1370,17 @@ static inline void SetBilinearForwardCoefficients(double *coeff,
   }
 }
 
-static inline double *BilinearCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *BilinearCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   ExceptionInfo
     *const exception = context->exception;
 
@@ -1179,7 +1431,12 @@ static inline double *BilinearCoefficients(double *coeff,const DistortMethod *me
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  status=SolveBilinearCoefficients(coeff,matrix,vectors,context);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    status=SolveBilinearCoefficients(call,&arrays);
+  }
   matrix  = RelinquishMagickMatrix(matrix, 4UL);
   vectors = (double **) RelinquishMagickMemory(vectors);
   if ( status == MagickFalse ) {
@@ -1189,7 +1446,7 @@ static inline double *BilinearCoefficients(double *coeff,const DistortMethod *me
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
     return((double *) NULL);
   }
-  SetBilinearForwardCoefficients(coeff,method);
+  SetBilinearForwardCoefficients(call);
   return(coeff);
 }
 

@@ -13,8 +13,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private colorspace conversions to XYZ and RGB: Luv, LCHuv
-  and LMS; included by colorspace-private.h only.
+  MagickCore private colorspace conversions to XYZ: Luv and LCHuv;
+  included by colorspace-private.h only.
 */
 #ifndef MAGICKCORE_COLORSPACE_LUV_LMS_TO_RGB_PRIVATE_H
 #define MAGICKCORE_COLORSPACE_LUV_LMS_TO_RGB_PRIVATE_H
@@ -23,9 +23,28 @@
 extern "C" {
 #endif
 
-static inline void ConvertLuvToXYZ(const double L,const double u,const double v,
-  const IlluminantType illuminant,double *X,double *Y,double *Z)
+typedef struct _LuvXYZTarget
 {
+  IlluminantType
+    illuminant;
+
+  double
+    *X,
+    *Y,
+    *Z;
+} LuvXYZTarget;
+
+static inline void ConvertLuvToXYZ(const double L,const double u,const double v,
+  const LuvXYZTarget *target)
+{
+  const IlluminantType
+    illuminant = target->illuminant;
+
+  double
+    *const X = target->X,
+    *const Y = target->Y,
+    *const Z = target->Z;
+
   double
     gamma;
 
@@ -51,51 +70,10 @@ static inline void ConvertLuvToXYZ(const double L,const double u,const double v,
 }
 
 static inline void ConvertLCHuvToXYZ(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *X,double *Y,
-  double *Z)
+  const double hue,const LuvXYZTarget *target)
 {
   ConvertLuvToXYZ(luma,chroma*cos(DegreesToRadians(hue)),chroma*
-    sin(DegreesToRadians(hue)),illuminant,X,Y,Z);
-}
-
-static inline void ConvertLCHuvToRGB(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *red,double *green,
-  double *blue)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  /*
-    Convert LCHuv to RGB colorspace.
-  */
-  assert(red != (double *) NULL);
-  assert(green != (double *) NULL);
-  assert(blue != (double *) NULL);
-  ConvertLCHuvToXYZ(100.0*luma,255.0*(chroma-0.5),360.0*hue,illuminant,
-    &X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
-}
-
-static inline void ConvertLMSToXYZ(const double L,const double M,const double S,
-  double *X,double *Y,double *Z)
-{
-  *X=1.096123820835514*L-0.278869000218287*M+0.182745179382773*S;
-  *Y=0.454369041975359*L+0.473533154307412*M+0.072097803717229*S;
-  *Z=(-0.009627608738429)*L-0.005698031216113*M+1.015325639954543*S;
-}
-
-static inline void ConvertLMSToRGB(const double L,const double M,
-  const double S,double *red,double *green,double *blue)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  ConvertLMSToXYZ(L,M,S,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+    sin(DegreesToRadians(hue)),target);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

@@ -628,6 +628,21 @@ typedef struct _XStandardColormapRequest
     *pixel;
 } XStandardColormapRequest;
 
+typedef struct _XWindowInfoSource
+{
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XFontStruct
+    *font_info;
+} XWindowInfoSource;
+
 extern MagickPrivate void
   XBestIconSize(Display *,XWindowInfo *,Image *),
   XBestPixel(const XBestPixelTarget *,XColor *,unsigned int,XColor *),
@@ -652,8 +667,8 @@ extern MagickPrivate void
   XGetAnnotateInfo(XAnnotateInfo *),
   XGetPixelInfo(Display *,const XPixelInfoSource *,Image *,XPixelInfo *),
   XGetMapInfo(const XVisualInfo *,const Colormap,XStandardColormap *),
-  XGetWindowInfo(Display *,XVisualInfo *,XStandardColormap *,XPixelInfo *,
-    XFontStruct *,XResourceInfo *,XWindowInfo *),
+  XGetWindowInfo(Display *,const XWindowInfoSource *,XResourceInfo *,
+    XWindowInfo *),
   XMakeMagnifyImage(Display *,XWindows *,ExceptionInfo *),
   XMakeStandardColormap(Display *,const XStandardColormapRequest *,
     ExceptionInfo *),

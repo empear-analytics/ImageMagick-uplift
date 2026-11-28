@@ -14,9 +14,9 @@
   limitations under the License.
 
   MagickCore private methods of display-image.c: the save, new, shear, crop-
-  and-scale and region-of-interest appliers, the command dispatch, the magick
-  command and the magnify handlers, from XApplySaveCommand to
-  XMoveMagnifyRightDown; included by that file only.
+  and-scale and region-of-interest appliers, the command table and the magick
+  command, from XApplySaveCommand to XMagickCommand; included by that file
+  only.
 */
 #ifndef MAGICKCORE_DISPLAY_IMAGE_APPLY_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_APPLY_PRIVATE_H
@@ -44,7 +44,12 @@ static void XApplySaveCommand(const XMagickCommandContext *context)
   /*
     Save image.
   */
-  status=XSaveImage(display,resource_info,windows,*image,exception);
+  {
+    const XImageCommandInput
+      command_input = { display, resource_info, windows, *image, exception };
+
+    status=XSaveImage(&command_input);
+  }
   if (status == MagickFalse)
     {
       char
@@ -279,7 +284,7 @@ static void XApplyRegionOfInterestCommand(const XMagickCommandContext *context)
 }
 
 static void XApplySessionCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,Image **nexus)
+  const DisplayCommand command)
 {
   Display
     *const display = context->display;
@@ -292,11 +297,8 @@ static void XApplySessionCommands(const XMagickCommandContext *context,
 
   switch (command)
   {
-    case SlideShowCommand:
-      XApplySlideShowCommand(context);
-      break;
-    case PreferencesCommand:
-      (*nexus)=XApplyPreferencesCommand(context,(*nexus));
+    case InfoCommand:
+    case SaveToUndoBufferCommand:
       break;
     case HelpCommand:
     {
@@ -310,17 +312,12 @@ static void XApplySessionCommands(const XMagickCommandContext *context,
       }
       break;
     }
-    case BrowseDocumentationCommand:
-      XApplyBrowseDocumentationCommand(context);
-      break;
     case VersionCommand:
     {
       XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
         GetMagickCopyright());
       break;
     }
-    case SaveToUndoBufferCommand:
-      break;
     default:
     {
       (void) XBell(display,0);
@@ -329,438 +326,163 @@ static void XApplySessionCommands(const XMagickCommandContext *context,
   }
 }
 
-static void XApplyMiscellanyCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,Image **nexus)
+typedef struct _XCommandMethod
 {
-  switch (command)
+  DisplayCommand
+    command;
+
+  void
+    (*run)(const XMagickCommandContext *);
+
+  void
+    (*run_color)(const XMagickCommandContext *,char *);
+
+  void
+    (*run_flags)(const XMagickCommandContext *,MagickStatusType *);
+
+  void
+    (*run_quantize)(const XMagickCommandContext *,QuantizeInfo);
+
+  Image
+    *(*next_image)(const XMagickCommandContext *,Image *);
+
+  Image
+    *(*new_image)(const XMagickCommandContext *);
+} XCommandMethod;
+
+static const XCommandMethod
+  XCommandMethods[] =
   {
-    case InfoCommand:
-      break;
-    case ZoomCommand:
-      XApplyZoomCommand(context);
-      break;
-    case ShowPreviewCommand:
-      XApplyShowPreviewCommand(context);
-      break;
-    case ShowHistogramCommand:
-      XApplyShowHistogramCommand(context);
-      break;
-    case ShowMatteCommand:
-      XApplyShowMatteCommand(context);
-      break;
-    case BackgroundCommand:
-      (*nexus)=XApplyBackgroundCommand(context,(*nexus));
-      break;
-    default:
-    {
-      XApplySessionCommands(context,command,&(*nexus));
-      break;
-    }
-  }
+    { OpenCommand, NULL, NULL, NULL, NULL, NULL, XApplyOpenCommand },
+    { NextCommand, XApplyNextCommand, NULL, NULL, NULL, NULL, NULL },
+    { FormerCommand, XApplyFormerCommand, NULL, NULL, NULL, NULL, NULL },
+    { SelectCommand, NULL, NULL, NULL, NULL, NULL, XApplySelectCommand },
+    { SaveCommand, XApplySaveCommand, NULL, NULL, NULL, NULL, NULL },
+    { PrintCommand, XApplyPrintCommand, NULL, NULL, NULL, NULL, NULL },
+    { DeleteCommand, XApplyDeleteCommand, NULL, NULL, NULL, NULL, NULL },
+    { NewCommand, NULL, NULL, NULL, NULL, XApplyNewCommand, NULL },
+    { VisualDirectoryCommand, NULL, NULL, NULL, NULL, NULL,
+      XApplyVisualDirectoryCommand },
+    { QuitCommand, XApplyQuitCommand, NULL, NULL, NULL, NULL, NULL },
+    { CutCommand, XApplyCutCommand, NULL, NULL, NULL, NULL, NULL },
+    { CopyCommand, XApplyCopyCommand, NULL, NULL, NULL, NULL, NULL },
+    { PasteCommand, XApplyPasteCommand, NULL, NULL, NULL, NULL, NULL },
+    { HalfSizeCommand, XApplyHalfSizeCommand, NULL, NULL, NULL, NULL, NULL },
+    { OriginalSizeCommand, XApplyOriginalSizeCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { DoubleSizeCommand, XApplyDoubleSizeCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { ResizeCommand, XApplyResizeCommand, NULL, NULL, NULL, NULL, NULL },
+    { ApplyCommand, XApplyApplyCommand, NULL, NULL, NULL, NULL, NULL },
+    { RefreshCommand, XApplyRefreshCommand, NULL, NULL, NULL, NULL, NULL },
+    { RestoreCommand, XApplyRestoreCommand, NULL, NULL, NULL, NULL, NULL },
+    { CropCommand, XApplyCropCommand, NULL, NULL, NULL, NULL, NULL },
+    { ChopCommand, XApplyChopCommand, NULL, NULL, NULL, NULL, NULL },
+    { FlopCommand, XApplyFlopCommand, NULL, NULL, NULL, NULL, NULL },
+    { FlipCommand, XApplyFlipCommand, NULL, NULL, NULL, NULL, NULL },
+    { RotateRightCommand, XApplyRotateRightCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { RotateLeftCommand, XApplyRotateLeftCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { RotateCommand, XApplyRotateCommand, NULL, NULL, NULL, NULL, NULL },
+    { ShearCommand, NULL, XApplyShearCommand, NULL, NULL, NULL, NULL },
+    { RollCommand, XApplyRollCommand, NULL, NULL, NULL, NULL, NULL },
+    { TrimCommand, XApplyTrimCommand, NULL, NULL, NULL, NULL, NULL },
+    { HueCommand, XApplyHueCommand, NULL, NULL, NULL, NULL, NULL },
+    { SaturationCommand, XApplySaturationCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { BrightnessCommand, XApplyBrightnessCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { GammaCommand, XApplyGammaCommand, NULL, NULL, NULL, NULL, NULL },
+    { SpiffCommand, XApplySpiffCommand, NULL, NULL, NULL, NULL, NULL },
+    { DullCommand, XApplyDullCommand, NULL, NULL, NULL, NULL, NULL },
+    { ContrastStretchCommand, XApplyContrastStretchCommand, NULL, NULL, NULL,
+      NULL, NULL },
+    { SigmoidalContrastCommand, XApplySigmoidalContrastCommand, NULL, NULL,
+      NULL, NULL, NULL },
+    { NormalizeCommand, XApplyNormalizeCommand, NULL, NULL, NULL, NULL, NULL },
+    { EqualizeCommand, XApplyEqualizeCommand, NULL, NULL, NULL, NULL, NULL },
+    { NegateCommand, XApplyNegateCommand, NULL, NULL, NULL, NULL, NULL },
+    { GrayscaleCommand, XApplyGrayscaleCommand, NULL, NULL, NULL, NULL, NULL },
+    { MapCommand, NULL, NULL, NULL, XApplyMapCommand, NULL, NULL },
+    { QuantizeCommand, NULL, NULL, NULL, XApplyQuantizeCommand, NULL, NULL },
+    { DespeckleCommand, XApplyDespeckleCommand, NULL, NULL, NULL, NULL, NULL },
+    { EmbossCommand, XApplyEmbossCommand, NULL, NULL, NULL, NULL, NULL },
+    { ReduceNoiseCommand, NULL, NULL, XApplyReduceNoiseCommand, NULL, NULL,
+      NULL },
+    { AddNoiseCommand, XApplyAddNoiseCommand, NULL, NULL, NULL, NULL, NULL },
+    { SharpenCommand, NULL, NULL, XApplySharpenCommand, NULL, NULL, NULL },
+    { BlurCommand, NULL, NULL, XApplyBlurCommand, NULL, NULL, NULL },
+    { ThresholdCommand, XApplyThresholdCommand, NULL, NULL, NULL, NULL, NULL },
+    { EdgeDetectCommand, NULL, NULL, XApplyEdgeDetectCommand, NULL, NULL,
+      NULL },
+    { SpreadCommand, NULL, NULL, XApplySpreadCommand, NULL, NULL, NULL },
+    { ShadeCommand, XApplyShadeCommand, NULL, NULL, NULL, NULL, NULL },
+    { RaiseCommand, XApplyRaiseCommand, NULL, NULL, NULL, NULL, NULL },
+    { SegmentCommand, XApplySegmentCommand, NULL, NULL, NULL, NULL, NULL },
+    { SepiaToneCommand, XApplySepiaToneCommand, NULL, NULL, NULL, NULL, NULL },
+    { SolarizeCommand, XApplySolarizeCommand, NULL, NULL, NULL, NULL, NULL },
+    { SwirlCommand, NULL, NULL, XApplySwirlCommand, NULL, NULL, NULL },
+    { ImplodeCommand, NULL, NULL, XApplyImplodeCommand, NULL, NULL, NULL },
+    { VignetteCommand, XApplyVignetteCommand, NULL, NULL, NULL, NULL, NULL },
+    { WaveCommand, XApplyWaveCommand, NULL, NULL, NULL, NULL, NULL },
+    { OilPaintCommand, NULL, NULL, XApplyOilPaintCommand, NULL, NULL, NULL },
+    { CharcoalDrawCommand, XApplyCharcoalDrawCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { AnnotateCommand, XApplyAnnotateCommand, NULL, NULL, NULL, NULL, NULL },
+    { DrawCommand, XApplyDrawCommand, NULL, NULL, NULL, NULL, NULL },
+    { ColorCommand, XApplyColorCommand, NULL, NULL, NULL, NULL, NULL },
+    { MatteCommand, XApplyMatteCommand, NULL, NULL, NULL, NULL, NULL },
+    { CompositeCommand, XApplyCompositeCommand, NULL, NULL, NULL, NULL, NULL },
+    { AddBorderCommand, NULL, XApplyAddBorderCommand, NULL, NULL, NULL, NULL },
+    { AddFrameCommand, NULL, XApplyAddFrameCommand, NULL, NULL, NULL, NULL },
+    { CommentCommand, XApplyCommentCommand, NULL, NULL, NULL, NULL, NULL },
+    { LaunchCommand, NULL, NULL, NULL, NULL, XApplyLaunchCommand, NULL },
+    { RegionOfInterestCommand, XApplyRegionOfInterestCommand, NULL, NULL, NULL,
+      NULL, NULL },
+    { ZoomCommand, XApplyZoomCommand, NULL, NULL, NULL, NULL, NULL },
+    { ShowPreviewCommand, XApplyShowPreviewCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { ShowHistogramCommand, XApplyShowHistogramCommand, NULL, NULL, NULL, NULL,
+      NULL },
+    { ShowMatteCommand, XApplyShowMatteCommand, NULL, NULL, NULL, NULL, NULL },
+    { BackgroundCommand, NULL, NULL, NULL, NULL, XApplyBackgroundCommand,
+      NULL },
+    { SlideShowCommand, XApplySlideShowCommand, NULL, NULL, NULL, NULL, NULL },
+    { PreferencesCommand, NULL, NULL, NULL, NULL, XApplyPreferencesCommand,
+      NULL },
+    { BrowseDocumentationCommand, XApplyBrowseDocumentationCommand, NULL, NULL,
+      NULL, NULL, NULL }
+  };
+
+static const XCommandMethod *GetXCommandMethod(const DisplayCommand command)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(XCommandMethods)/sizeof(*XCommandMethods)); i++)
+    if (XCommandMethods[i].command == command)
+      return(XCommandMethods+i);
+  return((const XCommandMethod *) NULL);
 }
 
-static void XApplyImageEditCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,Image **nexus)
+static void XRunCommandMethod(const XCommandMethod *method,
+  const XMagickCommandContext *context,MagickStatusType *flags,Image **nexus)
 {
-  char
-    *const color = context->color;
-
-  switch (command)
-  {
-    case CompositeCommand:
-      XApplyCompositeCommand(context);
-      break;
-    case AddBorderCommand:
-      XApplyAddBorderCommand(context,color);
-      break;
-    case AddFrameCommand:
-      XApplyAddFrameCommand(context,color);
-      break;
-    case CommentCommand:
-      XApplyCommentCommand(context);
-      break;
-    case LaunchCommand:
-      (*nexus)=XApplyLaunchCommand(context,(*nexus));
-      break;
-    case RegionOfInterestCommand:
-      XApplyRegionOfInterestCommand(context);
-      break;
-    default:
-    {
-      XApplyMiscellanyCommands(context,command,&(*nexus));
-      break;
-    }
-  }
+  if (method->run != NULL)
+    method->run(context);
+  else if (method->run_color != NULL)
+    method->run_color(context,context->color);
+  else if (method->run_flags != NULL)
+    method->run_flags(context,flags);
+  else if (method->run_quantize != NULL)
+    method->run_quantize(context,*context->quantize_info);
+  else if (method->next_image != NULL)
+    *nexus=method->next_image(context,*nexus);
+  else
+    *nexus=method->new_image(context);
 }
 
-static void XApplyPaintCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case OilPaintCommand:
-      XApplyOilPaintCommand(context,&(*flags));
-      break;
-    case CharcoalDrawCommand:
-      XApplyCharcoalDrawCommand(context);
-      break;
-    case AnnotateCommand:
-      XApplyAnnotateCommand(context);
-      break;
-    case DrawCommand:
-      XApplyDrawCommand(context);
-      break;
-    case ColorCommand:
-      XApplyColorCommand(context);
-      break;
-    case MatteCommand:
-      XApplyMatteCommand(context);
-      break;
-    default:
-    {
-      XApplyImageEditCommands(context,command,&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyFXCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case SepiaToneCommand:
-      XApplySepiaToneCommand(context);
-      break;
-    case SolarizeCommand:
-      XApplySolarizeCommand(context);
-      break;
-    case SwirlCommand:
-      XApplySwirlCommand(context,&(*flags));
-      break;
-    case ImplodeCommand:
-      XApplyImplodeCommand(context,&(*flags));
-      break;
-    case VignetteCommand:
-      XApplyVignetteCommand(context);
-      break;
-    case WaveCommand:
-      XApplyWaveCommand(context);
-      break;
-    default:
-    {
-      XApplyPaintCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyEffectsCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case ThresholdCommand:
-      XApplyThresholdCommand(context);
-      break;
-    case EdgeDetectCommand:
-      XApplyEdgeDetectCommand(context,&(*flags));
-      break;
-    case SpreadCommand:
-      XApplySpreadCommand(context,&(*flags));
-      break;
-    case ShadeCommand:
-      XApplyShadeCommand(context);
-      break;
-    case RaiseCommand:
-      XApplyRaiseCommand(context);
-      break;
-    case SegmentCommand:
-      XApplySegmentCommand(context);
-      break;
-    default:
-    {
-      XApplyFXCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyFilterCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case DespeckleCommand:
-      XApplyDespeckleCommand(context);
-      break;
-    case EmbossCommand:
-      XApplyEmbossCommand(context);
-      break;
-    case ReduceNoiseCommand:
-      XApplyReduceNoiseCommand(context,&(*flags));
-      break;
-    case AddNoiseCommand:
-      XApplyAddNoiseCommand(context);
-      break;
-    case SharpenCommand:
-      XApplySharpenCommand(context,&(*flags));
-      break;
-    case BlurCommand:
-      XApplyBlurCommand(context,&(*flags));
-      break;
-    default:
-    {
-      XApplyEffectsCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyColorMapCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  QuantizeInfo
-    *const quantize_info = context->quantize_info;
-
-  switch (command)
-  {
-    case NegateCommand:
-      XApplyNegateCommand(context);
-      break;
-    case GrayscaleCommand:
-      XApplyGrayscaleCommand(context);
-      break;
-    case MapCommand:
-      XApplyMapCommand(context,(*quantize_info));
-      break;
-    case QuantizeCommand:
-      XApplyQuantizeCommand(context,(*quantize_info));
-      break;
-    default:
-    {
-      XApplyFilterCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyContrastCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case SpiffCommand:
-      XApplySpiffCommand(context);
-      break;
-    case DullCommand:
-      XApplyDullCommand(context);
-      break;
-    case ContrastStretchCommand:
-      XApplyContrastStretchCommand(context);
-      break;
-    case SigmoidalContrastCommand:
-      XApplySigmoidalContrastCommand(context);
-      break;
-    case NormalizeCommand:
-      XApplyNormalizeCommand(context);
-      break;
-    case EqualizeCommand:
-      XApplyEqualizeCommand(context);
-      break;
-    default:
-    {
-      XApplyColorMapCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyToneCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case HueCommand:
-      XApplyHueCommand(context);
-      break;
-    case SaturationCommand:
-      XApplySaturationCommand(context);
-      break;
-    case BrightnessCommand:
-      XApplyBrightnessCommand(context);
-      break;
-    case GammaCommand:
-      XApplyGammaCommand(context);
-      break;
-    default:
-    {
-      XApplyContrastCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyTransformCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  char
-    *const color = context->color;
-
-  switch (command)
-  {
-    case RotateRightCommand:
-      XApplyRotateRightCommand(context);
-      break;
-    case RotateLeftCommand:
-      XApplyRotateLeftCommand(context);
-      break;
-    case RotateCommand:
-      XApplyRotateCommand(context);
-      break;
-    case ShearCommand:
-      XApplyShearCommand(context,color);
-      break;
-    case RollCommand:
-      XApplyRollCommand(context);
-      break;
-    case TrimCommand:
-      XApplyTrimCommand(context);
-      break;
-    default:
-    {
-      XApplyToneCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyCropFlipCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case CropCommand:
-      XApplyCropCommand(context);
-      break;
-    case ChopCommand:
-      XApplyChopCommand(context);
-      break;
-    case FlopCommand:
-      XApplyFlopCommand(context);
-      break;
-    case FlipCommand:
-      XApplyFlipCommand(context);
-      break;
-    default:
-    {
-      XApplyTransformCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyViewCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case ApplyCommand:
-      XApplyApplyCommand(context);
-      break;
-    case RefreshCommand:
-      XApplyRefreshCommand(context);
-      break;
-    case RestoreCommand:
-      XApplyRestoreCommand(context);
-      break;
-    default:
-    {
-      XApplyCropFlipCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyResizeCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case HalfSizeCommand:
-      XApplyHalfSizeCommand(context);
-      break;
-    case OriginalSizeCommand:
-      XApplyOriginalSizeCommand(context);
-      break;
-    case DoubleSizeCommand:
-      XApplyDoubleSizeCommand(context);
-      break;
-    case ResizeCommand:
-      XApplyResizeCommand(context);
-      break;
-    default:
-    {
-      XApplyViewCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyEditCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
-{
-  switch (command)
-  {
-    case CutCommand:
-      XApplyCutCommand(context);
-      break;
-    case CopyCommand:
-      XApplyCopyCommand(context);
-      break;
-    case PasteCommand:
-      XApplyPasteCommand(context);
-      break;
-    default:
-    {
-      XApplyResizeCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-static void XApplyFileCommands(const XMagickCommandContext *context,
-  const DisplayCommand command,Image **nexus,MagickStatusType *flags)
-{
-  switch (command)
-  {
-    case SaveCommand:
-      XApplySaveCommand(context);
-      break;
-    case PrintCommand:
-      XApplyPrintCommand(context);
-      break;
-    case DeleteCommand:
-      XApplyDeleteCommand(context);
-      break;
-    case NewCommand:
-      (*nexus)=XApplyNewCommand(context,(*nexus));
-      break;
-    case VisualDirectoryCommand:
-      (*nexus)=XApplyVisualDirectoryCommand(context);
-      break;
-    case QuitCommand:
-      XApplyQuitCommand(context);
-      break;
-    default:
-    {
-      XApplyEditCommands(context,command,&(*flags),&(*nexus));
-      break;
-    }
-  }
-}
-
-
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -816,6 +538,9 @@ static Image *XMagickCommand(const XImageCacheContext *target,
   ExceptionInfo
     *const exception = target->exception;
 
+  const XCommandMethod
+    *method;
+
   GeometryInfo
     geometry_info;
 
@@ -859,246 +584,13 @@ static Image *XMagickCommand(const XImageCacheContext *target,
   context.exception=exception;
   context.color=color;
   context.quantize_info=&quantize_info;
-  switch (command)
-  {
-    case OpenCommand:
-      nexus=XApplyOpenCommand(&context);
-      break;
-    case NextCommand:
-      XApplyNextCommand(&context);
-      break;
-    case FormerCommand:
-      XApplyFormerCommand(&context);
-      break;
-    case SelectCommand:
-      nexus=XApplySelectCommand(&context);
-      break;
-    default:
-    {
-      XApplyFileCommands(&context,command,&nexus,&flags);
-      break;
-    }
-  }
+  method=GetXCommandMethod(command);
+  if (method != (const XCommandMethod *) NULL)
+    XRunCommandMethod(method,&context,&flags,&nexus);
+  else
+    XApplySessionCommands(&context,command);
   image_info=DestroyImageInfo(image_info);
   return(nexus);
-}
-
-static void XUpdateMagnifyInfo(Display *display,XWindows *windows,const int x,
-  const int y)
-{
-  char
-    text[MagickPathExtent];
-
-  if (windows->info.mapped != MagickFalse)
-    {
-      if ((x < (windows->info.x+(int) windows->info.width)) &&
-          (y < (windows->info.y+(int) windows->info.height)))
-        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-    }
-  else
-    if ((x > (windows->info.x+(int) windows->info.width)) ||
-        (y > (windows->info.y+(int) windows->info.height)))
-      (void) XMapWindow(display,windows->info.id);
-  if (windows->info.mapped != MagickFalse)
-    {
-      /*
-        Display pointer position.
-      */
-      (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-        windows->magnify.x,windows->magnify.y);
-      XInfoWidget(display,windows,text);
-    }
-}
-
-static void XClampMagnifyPosition(XWindows *windows,int *x,int *y)
-{
-  if ((*x) < 0)
-    (*x)=0;
-  else
-    if ((*x) >= (int) windows->image.width)
-      (*x)=(int) windows->image.width-1;
-  if ((*y) < 0)
-    (*y)=0;
-  else
-   if ((*y) >= (int) windows->image.height)
-     (*y)=(int) windows->image.height-1;
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-+   X M a g n i f y I m a g e                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XMagnifyImage() magnifies portions of the image as indicated by the pointer.
-%  The magnified portion is displayed in a separate window.
-%
-%  The format of the XMagnifyImage method is:
-%
-%      void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
-%
-%    o windows: Specifies a pointer to a XWindows structure.
-%
-%    o event: Specifies a pointer to a XEvent structure.  If it is NULL,
-%      the entire image is refreshed.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static void XTrackMagnifyButton(Display *display,XWindows *windows,
-  XEvent *event,ExceptionInfo *exception)
-{
-  int
-    x,
-    y;
-
-  size_t
-    state;
-
-  (void) XCheckDefineCursor(display,windows->image.id,windows->magnify.cursor);
-  state=DefaultState;
-  x=event->xbutton.x;
-  y=event->xbutton.y;
-  windows->magnify.x=(int) windows->image.x+x;
-  windows->magnify.y=(int) windows->image.y+y;
-  do
-  {
-    /*
-      Map and unmap Info widget as text cursor crosses its boundaries.
-    */
-    XUpdateMagnifyInfo(display,windows,x,y);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,event,exception);
-    switch (event->type)
-    {
-      case ButtonPress:
-        break;
-      case ButtonRelease:
-      {
-        /*
-          User has finished magnifying image.
-        */
-        x=event->xbutton.x;
-        y=event->xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case Expose:
-        break;
-      case MotionNotify:
-      {
-        x=event->xmotion.x;
-        y=event->xmotion.y;
-        break;
-      }
-      default:
-        break;
-    }
-    /*
-      Check boundary conditions.
-    */
-    XClampMagnifyPosition(windows,&x,&y);
-  } while ((state & ExitState) == 0);
-}
-
-static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
-{
-  /*
-    Update magnified image until the mouse button is released.
-  */
-  XTrackMagnifyButton(display,windows,event,exception);
-  /*
-    Display magnified image.
-  */
-  XSetCursorState(display,windows,MagickFalse);
-}
-typedef struct _MagnifyDigitKey
-{
-  int
-    key,
-    base;
-} MagnifyDigitKey;
-
-static const MagnifyDigitKey
-  MagnifyDigitKeys[] =
-  {
-    { XK_0, XK_0 },
-    { XK_1, XK_0 },
-    { XK_2, XK_0 },
-    { XK_3, XK_0 },
-    { XK_4, XK_0 },
-    { XK_5, XK_0 },
-    { XK_6, XK_0 },
-    { XK_7, XK_0 },
-    { XK_8, XK_0 },
-    { XK_9, XK_0 },
-    { XK_KP_0, XK_KP_0 },
-    { XK_KP_1, XK_KP_0 },
-    { XK_KP_2, XK_KP_0 },
-    { XK_KP_3, XK_KP_0 },
-    { XK_KP_4, XK_KP_0 },
-    { XK_KP_5, XK_KP_0 },
-    { XK_KP_6, XK_KP_0 },
-    { XK_KP_7, XK_KP_0 },
-    { XK_KP_8, XK_KP_0 },
-    { XK_KP_9, XK_KP_0 }
-  };
-
-static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
-{
-  const int
-    key = (int) key_symbol;
-
-  size_t
-    i;
-
-  for (i=0; i < (sizeof(MagnifyDigitKeys)/sizeof(*MagnifyDigitKeys)); i++)
-    if (MagnifyDigitKeys[i].key == key)
-      {
-        windows->magnify.data=(key_symbol-MagnifyDigitKeys[i].base);
-        break;
-      }
-}
-
-static void XMoveMagnifyRightDown(XWindows *windows,const unsigned int quantum,
-  const KeySym key_symbol)
-{
-  switch ((int) key_symbol)
-  {
-    case XK_Right:
-    case XK_KP_Right:
-    {
-      if (windows->magnify.x < (int) (windows->image.ximage->width-1))
-        windows->magnify.x+=(int) quantum;
-      break;
-    }
-    case XK_Down:
-    case XK_KP_Down:
-    {
-      if (windows->magnify.y < (int) (windows->image.ximage->height-1))
-        windows->magnify.y+=(int) quantum;
-      break;
-    }
-    default:
-    {
-      XSelectMagnifyDigit(windows,key_symbol);
-      break;
-    }
-  }
 }
 
 #endif

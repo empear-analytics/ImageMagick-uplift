@@ -23,17 +23,30 @@
 extern "C" {
 #endif
 
-static inline void ConvertRGBToJzazbz(const double red,const double green,
-  const double blue,const double white_luminance,double *Jz,double *az,
-  double *bz)
+typedef struct _RGBToJzazbzInput
+{
+  const double
+    red,
+    green,
+    blue,
+    white_luminance;
+} RGBToJzazbzInput;
+
+static inline void ConvertRGBToJzazbz(const RGBToJzazbzInput *rgb,double *Jz,
+  double *az,double *bz)
 {
   double
     X,
     Y,
     Z;
 
-  ConvertRGBToXYZ(red,blue,green,&X,&Y,&Z);
-  ConvertXYZToJzazbz(X,Y,Z,white_luminance,Jz,az,bz);
+  ConvertRGBToXYZ(rgb->red,rgb->blue,rgb->green,&X,&Y,&Z);
+  {
+    const XYZToJzazbzInput
+      xyz = { X, Y, Z, rgb->white_luminance };
+
+    ConvertXYZToJzazbz(&xyz,Jz,az,bz);
+  }
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

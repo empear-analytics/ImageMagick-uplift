@@ -88,6 +88,23 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-kernels-blur-private.h \
+  MagickCore/accelerate-kernels-contraststretch-private.h \
+  MagickCore/accelerate-kernels-despeckle-private.h \
+  MagickCore/accelerate-kernels-equalize-private.h \
+  MagickCore/accelerate-kernels-function-private.h \
+  MagickCore/accelerate-kernels-localcontrast-private.h \
+  MagickCore/accelerate-kernels-modulate-private.h \
+  MagickCore/accelerate-kernels-motionblur-private.h \
+  MagickCore/accelerate-kernels-noise-private.h \
+  MagickCore/accelerate-kernels-pixel-private.h \
+  MagickCore/accelerate-kernels-quantum-private.h \
+  MagickCore/accelerate-kernels-resizefilter-private.h \
+  MagickCore/accelerate-kernels-resizehorizontal-private.h \
+  MagickCore/accelerate-kernels-resizevertical-private.h \
+  MagickCore/accelerate-kernels-rotationalblur-private.h \
+  MagickCore/accelerate-kernels-unsharpmask-private.h \
+  MagickCore/accelerate-kernels-wavelet-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-recreate-buffer-private.h \
@@ -179,20 +196,28 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-hsb-hsi-to-rgb-private.h \
   MagickCore/colorspace-to-rgb-private.h \
   MagickCore/colorspace-lab-to-rgb-private.h \
+  MagickCore/colorspace-lchab-to-rgb-private.h \
   MagickCore/colorspace-luv-lms-to-rgb-private.h \
+  MagickCore/colorspace-lchuv-lms-to-rgb-private.h \
   MagickCore/colorspace-cie-to-rgb-private.h \
+  MagickCore/colorspace-rgb-xyz-cat02-private.h \
   MagickCore/colorspace-rgb-to-xyz-cmy-private.h \
+  MagickCore/colorspace-rgb-to-cmy-private.h \
   MagickCore/colorspace-rgb-to-hcl-hsb-private.h \
   MagickCore/colorspace-rgb-to-xyz-private.h \
   MagickCore/colorspace-rgb-to-hue-private.h \
+  MagickCore/colorspace-rgb-to-hsv-private.h \
   MagickCore/colorspace-rgb-to-lab-private.h \
+  MagickCore/colorspace-rgb-to-lchab-private.h \
   MagickCore/colorspace-rgb-to-lchuv-private.h \
   MagickCore/colorspace-rgb-to-cie-private.h \
+  MagickCore/colorspace-rgb-to-cie-entries-private.h \
   MagickCore/colorspace-xyz-to-jzazbz-private.h \
   MagickCore/colorspace-rgb-to-jzazbz-private.h \
   MagickCore/colorspace-jzazbz-to-xyz-private.h \
   MagickCore/colorspace-jzazbz-private.h \
   MagickCore/colorspace-jzazbz-oklab-private.h \
+  MagickCore/colorspace-rgb-to-oklab-private.h \
   MagickCore/colorspace-rgb-to-ycc-private.h \
   MagickCore/colorspace-rgb-to-luma-private.h \
   MagickCore/colorspace-conversions-private.h \
@@ -261,12 +286,22 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-apply-private.h \
   MagickCore/display-image-apply-effects-private.h \
   MagickCore/display-image-apply-filters-private.h \
+  MagickCore/display-image-magnify-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-save-private.h \
+  MagickCore/display-image-screen-button-private.h \
+  MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
+  MagickCore/display-image-tile-command-private.h \
+  MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -323,9 +358,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance-tone.c \
   MagickCore/enhance-equalize.c \
   MagickCore/enhance-level.c \
+  MagickCore/enhance-level-image.c \
+  MagickCore/enhance-levelize.c \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
   MagickCore/enhance-color-private.h \
+  MagickCore/enhance-level-private.h \
   MagickCore/enhance-private.h \
   MagickCore/exception.c \
   MagickCore/exception-throw.c \
@@ -368,6 +406,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/property-set-pixel-private.h \
   MagickCore/property-set-xmp-private.h \
   MagickCore/histogram.c \
+  MagickCore/histogram-stretch.c \
   MagickCore/histogram.h \
   MagickCore/identify.c \
   MagickCore/identify.h \
@@ -446,6 +485,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/morphology-builtin-base-private.h \
   MagickCore/morphology-primitive-walk-private.h \
   MagickCore/morphology-primitive-direct-private.h \
+  MagickCore/morphology-primitive-direct-row-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-base-private.h \
@@ -459,6 +499,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
   MagickCore/opencl-initialize-benchmark-private.h \
+  MagickCore/opencl-initialize-doctype-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -527,10 +568,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/registry.c \
   MagickCore/registry.h \
   MagickCore/resample.c \
+  MagickCore/resample-ewa.c \
   MagickCore/resample.h \
   MagickCore/resample-private.h \
+  MagickCore/resample-filter-private.h \
   MagickCore/resize.c \
   MagickCore/resize-rescale.c \
+  MagickCore/resize-liquid.c \
   MagickCore/resize-sample.c \
   MagickCore/resize-scale.c \
   MagickCore/resize-image.c \
@@ -584,6 +628,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/string-si.c \
   MagickCore/string_.h \
   MagickCore/string-private.h \
+  MagickCore/string-interpret-private.h \
   MagickCore/studio.h \
   MagickCore/thread.c \
   MagickCore/thread_.h \
@@ -597,6 +642,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/token-glob.c \
   MagickCore/token.h \
   MagickCore/token-private.h \
+  MagickCore/token-utf8-private.h \
   MagickCore/transform.c \
   MagickCore/transform-region.c \
   MagickCore/transform-crop.c \
@@ -606,9 +652,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/threshold.c \
   MagickCore/threshold-image.c \
   MagickCore/threshold-level.c \
+  MagickCore/threshold-range.c \
   MagickCore/threshold-adaptive.c \
   MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
+  MagickCore/threshold-level-private.h \
   MagickCore/threshold-private.h \
   MagickCore/type.c \
   MagickCore/type-list.c \
@@ -617,6 +665,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/utility-unique.c \
   MagickCore/utility.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-file-private.h \
   MagickCore/utility-path-private.h \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
@@ -638,6 +687,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
+  MagickCore/visual-effects-stereo.c \
   MagickCore/visual-effects.h \
   MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/vision.c \
@@ -677,6 +727,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-image.c \
   MagickCore/xwindow-annotate.c \
   MagickCore/xwindow-info.c \
+  MagickCore/xwindow-free.c \
   MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-pixel.c \
   MagickCore/xwindow-text.c \
@@ -806,6 +857,23 @@ MAGICKCORE_INCLUDE_HDRS = \
 MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-kernels-blur-private.h \
+  MagickCore/accelerate-kernels-contraststretch-private.h \
+  MagickCore/accelerate-kernels-despeckle-private.h \
+  MagickCore/accelerate-kernels-equalize-private.h \
+  MagickCore/accelerate-kernels-function-private.h \
+  MagickCore/accelerate-kernels-localcontrast-private.h \
+  MagickCore/accelerate-kernels-modulate-private.h \
+  MagickCore/accelerate-kernels-motionblur-private.h \
+  MagickCore/accelerate-kernels-noise-private.h \
+  MagickCore/accelerate-kernels-pixel-private.h \
+  MagickCore/accelerate-kernels-quantum-private.h \
+  MagickCore/accelerate-kernels-resizefilter-private.h \
+  MagickCore/accelerate-kernels-resizehorizontal-private.h \
+  MagickCore/accelerate-kernels-resizevertical-private.h \
+  MagickCore/accelerate-kernels-rotationalblur-private.h \
+  MagickCore/accelerate-kernels-unsharpmask-private.h \
+  MagickCore/accelerate-kernels-wavelet-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-recreate-buffer-private.h \
@@ -851,20 +919,28 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colorspace-hsb-hsi-to-rgb-private.h \
   MagickCore/colorspace-to-rgb-private.h \
   MagickCore/colorspace-lab-to-rgb-private.h \
+  MagickCore/colorspace-lchab-to-rgb-private.h \
   MagickCore/colorspace-luv-lms-to-rgb-private.h \
+  MagickCore/colorspace-lchuv-lms-to-rgb-private.h \
   MagickCore/colorspace-cie-to-rgb-private.h \
+  MagickCore/colorspace-rgb-xyz-cat02-private.h \
   MagickCore/colorspace-rgb-to-xyz-cmy-private.h \
+  MagickCore/colorspace-rgb-to-cmy-private.h \
   MagickCore/colorspace-rgb-to-hcl-hsb-private.h \
   MagickCore/colorspace-rgb-to-xyz-private.h \
   MagickCore/colorspace-rgb-to-hue-private.h \
+  MagickCore/colorspace-rgb-to-hsv-private.h \
   MagickCore/colorspace-rgb-to-lab-private.h \
+  MagickCore/colorspace-rgb-to-lchab-private.h \
   MagickCore/colorspace-rgb-to-lchuv-private.h \
   MagickCore/colorspace-rgb-to-cie-private.h \
+  MagickCore/colorspace-rgb-to-cie-entries-private.h \
   MagickCore/colorspace-xyz-to-jzazbz-private.h \
   MagickCore/colorspace-rgb-to-jzazbz-private.h \
   MagickCore/colorspace-jzazbz-to-xyz-private.h \
   MagickCore/colorspace-jzazbz-private.h \
   MagickCore/colorspace-jzazbz-oklab-private.h \
+  MagickCore/colorspace-rgb-to-oklab-private.h \
   MagickCore/colorspace-rgb-to-ycc-private.h \
   MagickCore/colorspace-rgb-to-luma-private.h \
   MagickCore/colorspace-conversions-private.h \
@@ -906,12 +982,22 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-apply-private.h \
   MagickCore/display-image-apply-effects-private.h \
   MagickCore/display-image-apply-filters-private.h \
+  MagickCore/display-image-magnify-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
+  MagickCore/display-image-save-private.h \
+  MagickCore/display-image-screen-button-private.h \
+  MagickCore/display-image-screen-configure-private.h \
+  MagickCore/display-image-screen-event-private.h \
+  MagickCore/display-image-tile-command-private.h \
+  MagickCore/display-image-tile-load-private.h \
   MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-translate-private.h \
   MagickCore/display-image-window-private.h \
   MagickCore/display-image-window-setup-private.h \
+  MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
@@ -935,6 +1021,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
   MagickCore/effect-common-private.h \
+  MagickCore/enhance-level-private.h \
   MagickCore/enhance-private.h \
   MagickCore/enhance-color-private.h \
   MagickCore/exception-private.h \
@@ -994,12 +1081,14 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/morphology-builtin-base-private.h \
   MagickCore/morphology-primitive-walk-private.h \
   MagickCore/morphology-primitive-direct-private.h \
+  MagickCore/morphology-primitive-direct-row-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
   MagickCore/opencl-initialize-benchmark-private.h \
+  MagickCore/opencl-initialize-doctype-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
@@ -1020,6 +1109,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/random-private.h \
   MagickCore/registry-private.h \
   MagickCore/resample-private.h \
+  MagickCore/resample-filter-private.h \
   MagickCore/resize-private.h \
   MagickCore/resource-private.h \
   MagickCore/resource-private.h \
@@ -1037,15 +1127,19 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/stream-map-private.h \
   MagickCore/stream-pixels-private.h \
   MagickCore/string-private.h \
+  MagickCore/string-interpret-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
+  MagickCore/threshold-level-private.h \
   MagickCore/threshold-private.h \
   MagickCore/timer-private.h \
   MagickCore/token-private.h \
+  MagickCore/token-utf8-private.h \
   MagickCore/transform-private.h \
   MagickCore/transform-region-private.h \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-file-private.h \
   MagickCore/utility-path-private.h \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \

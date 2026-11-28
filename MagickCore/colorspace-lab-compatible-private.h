@@ -26,10 +26,17 @@ extern "C" {
 static inline MagickBooleanType IsLabCompatibleColorspace(
   const ColorspaceType colorspace)
 {
-  if ((colorspace == LabColorspace) || (colorspace == LCHColorspace) ||
-      (colorspace == LCHabColorspace) || (colorspace == LCHuvColorspace) ||
-      (colorspace == OklabColorspace))
-    return(MagickTrue);
+  switch (colorspace)
+  {
+    case LabColorspace:
+    case LCHColorspace:
+    case LCHabColorspace:
+    case LCHuvColorspace:
+    case OklabColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
   return(MagickFalse);
 }
 

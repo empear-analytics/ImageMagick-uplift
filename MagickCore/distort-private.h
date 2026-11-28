@@ -126,16 +126,21 @@ static inline double *PolynomialCoefficients(double *coeff,
   vectors=(double **) AcquireQuantumMemory(number_values,
     sizeof(*vectors));
   terms=(double *) AcquireQuantumMemory(nterms,sizeof(*terms));
-  if (IsMatrixMemoryMissing(matrix,vectors,terms) != MagickFalse)
   {
-    matrix  = RelinquishMagickMatrix(matrix, nterms);
-    vectors = (double **) RelinquishMagickMemory(vectors);
-    terms   = (double *) RelinquishMagickMemory(terms);
-    coeff   = (double *) RelinquishMagickMemory(coeff);
-    (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed",
-            "%s", "DistortCoefficients");
-    return((double *) NULL);
+    const PolynomialMemory
+      memory = { matrix, vectors, terms };
+
+    if (IsMatrixMemoryMissing(&memory) != MagickFalse)
+    {
+      matrix  = RelinquishMagickMatrix(matrix, nterms);
+      vectors = (double **) RelinquishMagickMemory(vectors);
+      terms   = (double *) RelinquishMagickMemory(terms);
+      coeff   = (double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed",
+              "%s", "DistortCoefficients");
+      return((double *) NULL);
+    }
   }
   SetPolynomialVectors(vectors,coeff,number_values,nterms);
   /* Add given control point pairs for least squares solving */
@@ -185,7 +190,12 @@ static inline void SetArcCoefficients(double *coeff,const Image *image,
   coeff[3] = (double)image->rows-1;
   coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
   if ( number_arguments >= 3 )
-    SetArcOuterRadius(coeff,number_arguments,arguments);
+    {
+      const ArcOuterRadius
+        radius = { coeff, number_arguments, arguments };
+
+      SetArcOuterRadius(&radius);
+    }
   coeff[4] = ((double)image->columns-1.0)/2.0;
 }
 
@@ -373,9 +383,9 @@ static inline double *PolarCoefficients(const CoefficientCall *call)
   SetPolarCoefficients(coeff,image,arguments,number_arguments);
   /* if radius 0 or negative,  its a special value... */
   if ( coeff[0] < MagickEpsilon )
-    SetPolarSpecialRadius(image,coeff);
+    SetPolarSpecialRadius(call);
   /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
-  if (IsInvalidPolarRadius(coeff) != MagickFalse) {
+  if (IsInvalidPolarRadius(call) != MagickFalse) {
     (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
         "InvalidArgument", "%s : Invalid Radius",
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
@@ -642,9 +652,6 @@ static inline double *ShepardsCoefficients(const CoefficientCall *call)
   const CoefficientContext
     *const context = call->context;
 
-  const Image
-    *const image = context->image;
-
   ExceptionInfo
     *const exception = context->exception;
 
@@ -666,7 +673,7 @@ static inline double *ShepardsCoefficients(const CoefficientCall *call)
     return((double *) NULL);
   }
   /* User defined weighting power for Shepard's Method */
-  return(SetShepardsPower(image,coeff,exception));
+  return(SetShepardsPower(call));
 }
 
 static inline MagickBooleanType GetPolynomialCoefficientCount(const CoefficientContext *context,
@@ -874,7 +881,7 @@ static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
   {
     case BilinearForwardDistortion:
     case BilinearReverseDistortion:
-      return(BilinearCoefficients(coeff,method,context));
+      return(BilinearCoefficients(call));
 #if 0
     case QuadrilateralDistortion:
     {
@@ -907,29 +914,23 @@ static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
 static inline double *GenerateAffineFamilyCoefficients(
   const CoefficientCall *call)
 {
-  double
-    *const coeff = call->coeff;
-
   DistortMethod
     *const method = call->method;
-
-  const CoefficientContext
-    *const context = call->context;
 
   switch (*method)
   {
     case AffineDistortion:
-      return(AffineCoefficients(coeff,method,context));
+      return(AffineCoefficients(call));
     case RigidAffineDistortion:
-      return(RigidAffineCoefficients(coeff,method,context));
+      return(RigidAffineCoefficients(call));
     case AffineProjectionDistortion:
-      return(AffineProjectionCoefficients(coeff,method,context));
+      return(AffineProjectionCoefficients(call));
     case ScaleRotateTranslateDistortion:
-      return(ScaleRotateTranslateCoefficients(coeff,method,context));
+      return(ScaleRotateTranslateCoefficients(call));
     case PerspectiveDistortion:
-      return(PerspectiveCoefficients(coeff,method,context));
+      return(PerspectiveCoefficients(call));
     case PerspectiveProjectionDistortion:
-      return(PerspectiveProjectionCoefficients(coeff,method,context));
+      return(PerspectiveProjectionCoefficients(call));
     default:
       break;
   }

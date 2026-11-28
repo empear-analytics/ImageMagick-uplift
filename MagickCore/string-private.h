@@ -20,116 +20,11 @@
 
 #include <string.h>
 #include "MagickCore/locale_.h"
+#include "MagickCore/string-interpret-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
-
-static inline int MagickSscanf(const char *buffer,const char *format,...)
-{
-  int
-    ret;
-
-  va_list
-    args;
-
-  /*
-    Custom implementation so we can use sscanf without defining
-    _CRT_SECURE_NO_WARNINGS.
-  */
-  va_start(args,format);
-#if defined(_MSC_VER)
-  #pragma warning(push)
-  #pragma warning(disable:4996)
-#endif
-  ret=vsscanf(buffer,format,args);
-#if defined(_MSC_VER)
-  #pragma warning(pop)
-#endif
-  va_end(args);
-  return(ret);
-}
-
-static inline double SiPrefixToDoubleInterval(const char *string,
-  const double interval)
-{
-  char
-    *q;
-
-  double
-    value;
-
-  value=InterpretSiPrefixValue(string,&q);
-  if (*q == '%')
-    value*=interval/100.0;
-  return(value);
-}
-
-static inline double StringToDouble(const char *magick_restrict string,
-  char *magick_restrict *sentinel)
-{
-  return(InterpretLocaleValue(string,sentinel));
-}
-
-static inline float StringToFloat(const char *magick_restrict string,
-  char *magick_restrict *sentinel)
-{
-  return((float) InterpretLocaleValue(string,sentinel));
-}
-
-static inline const char *StringLocateSubstring(const char *haystack,
-  const char *needle)
-{
-#if defined(MAGICKCORE_HAVE_STRCASESTR)
-  return(strcasestr(haystack,needle));
-#else
-  {
-    size_t
-      length_needle,
-      length_haystack;
-
-    size_t
-      i;
-
-    if (!haystack || !needle)
-      return(NULL);
-    length_needle=strlen(needle);
-    length_haystack=strlen(haystack)-length_needle+1;
-    for (i=0; i < length_haystack; i++)
-    {
-      size_t
-        j;
-
-      for (j=0; j < length_needle; j++)
-      {
-        unsigned char c1 = (unsigned char) haystack[i+j];
-        unsigned char c2 = (unsigned char) needle[j];
-        if (toupper((int) c1) != toupper((int) c2))
-          goto next;
-      }
-      return((char *) haystack+i);
-      next:
-       ;
-    }
-    return((char *) NULL);
-  }
-#endif
-}
-
-static inline double StringToDoubleInterval(const char *string,
-  const double interval)
-{
-  char
-    *q;
-
-  double
-    value;
-
-  value=InterpretLocaleValue(string,&q);
-  if (*q == '%')
-    value*=interval/100.0;
-  return(value);
-}
 
 static inline int StringToInteger(const char *magick_restrict value)
 {

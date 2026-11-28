@@ -121,6 +121,8 @@ $call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make enhance-equalize.c
 $call Make enhance-level.c
+$call Make enhance-level-image.c
+$call Make enhance-levelize.c
 $call Make enhance-level-colors.c
 $call Make exception.c
 $call Make exception-throw.c
@@ -137,6 +139,7 @@ $call Make geometry-meta.c
 $call Make geometry-parse.c
 $call Make hashmap.c
 $call Make histogram.c
+$call Make histogram-stretch.c
 $call Make identify.c
 $call Make image.c
 $call Make image-mask.c
@@ -207,8 +210,10 @@ $call Make quantum-import.c
 $call Make random.c
 $call Make registry.c
 $call Make resample.c
+$call Make resample-ewa.c
 $call Make resize.c
 $call Make resize-rescale.c
+$call Make resize-liquid.c
 $call Make resize-sample.c
 $call Make resize-scale.c
 $call Make resize-image.c
@@ -249,6 +254,7 @@ $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-image.c
 $call Make threshold-level.c
+$call Make threshold-range.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c
@@ -276,6 +282,7 @@ $call Make xwindow.c
 $call Make xwindow-image.c
 $call Make xwindow-annotate.c
 $call Make xwindow-info.c
+$call Make xwindow-free.c
 $call Make xwindow-pixel.c
 $call Make xwindow-text.c
 $call Make xwindow-visual.c
