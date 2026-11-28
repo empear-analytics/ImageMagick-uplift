@@ -586,9 +586,13 @@ static inline double *AffineCoefficients(const CoefficientCall *call)
   return(coeff);
 }
 
-static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
+static inline void AddRigidAffineTerms(const LeastSquaresArrays *arrays,
   const CoefficientContext *context)
 {
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
+
   const double
     *const arguments = context->arguments;
 
@@ -694,7 +698,12 @@ static inline double *RigidAffineCoefficients(const CoefficientCall *call)
     Add control points for least squares solving.
   */
   vectors[0]=(&(coeff[0]));
-  AddRigidAffineTerms(matrix,vectors,context);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    AddRigidAffineTerms(&arrays,context);
+  }
   /*
     Solve for least-squares coefficients.
   */
