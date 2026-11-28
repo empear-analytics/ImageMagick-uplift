@@ -575,9 +575,17 @@ static inline void ConvertRigidAffineCoefficients(double *coeff)
   InvertAffineCoefficients(inverse,coeff);
 }
 
-static inline double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *RigidAffineCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   ExceptionInfo
     *const exception = context->exception;
 
