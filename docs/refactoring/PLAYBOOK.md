@@ -11192,6 +11192,26 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    `e.m` only on some paths; the call computes its address always). For role (d), check
    by reading that a member chain's pointer designates an object at each call, and that
    no role (c) lvalue lies inside the object the operand names.
+8. *Precomputed levels form* (mandate (2026-11-19), added 2026-11-28; please confirm). The
+   copies stand in one loop body and each is a chain `if ((C) && (A1)) x=v1; else if ((C)
+   && (A2)) x=v2; ...` with nothing between its links but `else`, every test opening with
+   the same conjunct `C` of that copy; `C` holds the copy's role (a) constant, calls
+   nothing, and reads only objects that nothing in the loop writes (`(image->channel_mask
+   & RedChannel) != 0`); the role (d) operands are members of a parameter or local struct
+   the function never assigns (`black.x` of `const cl_float4 black`). Then write a
+   `typedef struct` with one `MagickBooleanType` member for `C` and one member per role (d)
+   operand of its declared type, and a `static` function returning it, its parameters the
+   object `C` reads (pointer to `const`), the role (a) constant and the role (d) operands,
+   which sets the flag to `(C) ? MagickTrue : MagickFalse` and the members from the
+   operands. The caller declares, before the loop, one `const` local of the struct per
+   copy, initialised by a call of that function with the copy's constant and operands. The
+   new function of step 3 takes `const Name *levels` in place of the role (a) and (d)
+   parameters, declares a `const` local per role (d) member, of the operand's type and
+   with step 4's parameter name, initialised from `levels->`member, opens with `if
+   (levels->flag == MagickFalse) return;` and then holds the chain with `(C) && `
+   dropped from each test, otherwise as step 4 says; step 5's calls pass the copy's local
+   by address. When the loop runs per pixel or on a reached path, time it as Recipe CF
+   step 7 says.
 
 **Before:**
 
@@ -11286,6 +11306,14 @@ static void EqualizeColormapValue(const EqualizeColors *colors,
   nothing the body reads through `s` lies in them, so `&e1.m` and `&e2.m` never alias each
   other or the inputs; the copy wrote `e1.m` and `e2.m` where `(*value1)` and `(*value2)`
   now do, in the same order, with the same conversions.
+- Precomputed levels form (2026-11-28): `C` has no side effect and reads only objects the
+  loop does not write (checked by reading the loop and every function it calls), so it
+  has the same value before the loop as at every test; evaluating it once removes only
+  reads. When it is false, each `(C) && (Ai)` is false without evaluating `Ai`, so the
+  copy assigned nothing and evaluated nothing else, as the guard return does. When it is
+  true, `(C) && (Ai)` has the value of `Ai`, evaluated where it was. The role (d) members
+  hold copies, of the same type, of values nothing writes, so each test and assignment
+  reads the values it read before.
 - The removed helper of step 1 had one caller in the file, which now calls the function
   holding its text: nothing outside the file could call it.
 - `refactor_guard.py` reports the copies' literals and callees once (`WARN`,
@@ -11335,6 +11363,13 @@ black/white level blocks read `image`, `histogram` and the two `const` bindings 
 `FindStretchLevels(&search,RedChannel,&black.x,&white.x)` and its siblings: 7.61 to 7.69
 (`tools/ch.py`, cs-mcp), the first step of a chain that ends at 10.0. Added by Claude Code
 (Claude Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
+Step 8, the precomputed levels form (2026-11-28, campaign A, W51 round 38, lane b), from
+`accelerate-contrast-stretch.c`'s `BuildStretchMap`: each of its four channel chains tests
+`(image->channel_mask & C) != 0` in all three links, which neither role (a) nor Recipe GC
+(a conjunction returning constants) folds. `SetStretchMapValue` with
+`GetStretchChannelLevels`: 7.67 to 8.24 (`tools/ch.py`, cs-mcp), `BuildStretchMap` leaving
+*Complex Method*, a step of a chain that ends at 10.0. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
@@ -28118,3 +28153,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | rule | *Two levels of evidence*, new paragraph *Unreached functions: the worker of a wrapper no code calls*: in a `static` worker whose only caller is a `MagickPrivate` wrapper no code calls (WP step 8's `git grep` test, `casemap.py` 0), and in the helpers its steps add, Recipes H, E, V, W, MA, LM, JN and D may be taken at guard level, `Verified: guard`, with the recipe's steps checked by reading and quoted, `refactor_guard.py` (and `--calls`, only new or reused helpers moving), `WIDE=1 NOINLINE=F obj_modulo.sh` `IDENTICAL` or `MODULO-IDENTICAL`, and the CI and NDEBUG warning checks; a block throwing or logging through `GetMagickModule()` may move (the location names the helper, as the 2026-11-12/13 rulings allow); throw macros that return stay in the worker; unbuilt UB fragments stay unedited | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`, 7.61, no caller of its wrapper; a stub probe of `ComputeEqualizeImage`'s decomposition scores 10.0, but V, W, MA, LM and JN have no guard-level form and the GPU stages throw through `GetMagickModule()` | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | LM | Step 8, *gather form*: locals a function's cleanup releases (or that later steps hand together to helpers) may be gathered into a new struct local `r` of a new typedef, one member per local of its exact type (plus at most one member copying a never-assigned parameter, set by `r.p=p;` before the first of the moved `v=c;` statements), every use written `r.m`; no copy into an existing struct needed; a local an unbuilt fragment names stays unchosen except under *Unreached functions: the worker of a wrapper no code calls* | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s fourteen cleanup and stage locals; the probed chain (E, D, V, W, JN, D) ends at 10.0 from 8.24, the gather itself flat | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 3, *new input struct, two bases*: the input struct may be a new `typedef` (one `const`-pointee pointer member per pointer the copies read through), its `const` local initialised by `{ ... }` in a compound statement holding only the calls; a `const` binding of `p->n` is read as `s->m->n` and leaves the caller; role (c)'s two lvalues may be `e1.m` and `e2.m` of two distinct struct locals, the member differing between copies (`T *value1,T *value2`) | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s four black/white level blocks (`FindStretchLevels`), seven parameters without the struct; 7.61 -> 7.69, first step of a chain ending at 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | MA | Step 8, *precomputed levels form*: copies in one loop body that are `if`-`else` chains whose every test opens with the same side-effect-free conjunct `C` (reading nothing the loop writes) may get a new levels struct (a flag for `C`, the role (d) operands) filled before the loop by a new `static` function, one `const` local per copy; the new function takes the struct, binds the operands to `const` locals, returns first when the flag is `MagickFalse` and runs the chain with `C` dropped | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `BuildStretchMap`'s four channel chains (`SetStretchMapValue`, `GetStretchChannelLevels`); 7.67 -> 8.24, a step of a chain ending at 10.0 | mandate (2026-11-19) |
