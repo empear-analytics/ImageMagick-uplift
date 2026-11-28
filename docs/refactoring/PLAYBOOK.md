@@ -11022,6 +11022,8 @@ that opens the block: `enhance-tone.c`'s `EqualizeColormap`, whose four colormap
 each test `GetPixel<X>Traits(image)`, look up `<X>PixelChannel` and rewrite
 `image->colormap[j].<x>` from itself. Moved one by one they would be helpers that clone
 each other.
+It also serves *Overall Code Complexity* (2026-11-28): the copies' decisions are counted
+once, in the new function, instead of once per copy.
 
 **Not covered by:** Recipe SC, whose copies differ only in literals and enumeration
 constants, never in a member designator or a called function; Recipe SV and Recipe TW,
@@ -11046,7 +11048,14 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    of one lvalue `e.m`, the same base `e` in every copy, which the block reads or assigns
    and does not take the address of. A copy may name two such lvalues `e.m1` and `e.m2`
    of one base `e` (2026-11-12), two different members, each with its own declared type
-   `T1`, `T2` and its own pointer parameter. The lvalues of the
+   `T1`, `T2` and its own pointer parameter. Read-operand form (2026-11-28): a fourth
+   role, (d), is a read-only operand at any position in the block, not only role (b)'s
+   leading one: a parameter or local the block does not assign (`x` against `y`), or a
+   chain of member selections through one pointer variable the copies share, with no
+   call and no subscript in it (`windows->image.width` against
+   `windows->image.height`), naming an object the block does not write. All runs of one
+   role (d) have one declared type `U`. The block may read it more than once, or on some
+   paths only. The lvalues of the
    copies may also differ in a member of the chain before the last, when each is a chain
    of member selections through one pointer variable the copies share (`windows->popup.mapped`,
    `windows->widget.mapped`: `windows->M.mapped`), with no call and no subscript in it
@@ -11068,14 +11077,15 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
-   SC step 3), one per role (b) of the expression's type, and `T *value` for role (c)
+   SC step 3), one per role (b) of the expression's type, one `const U` per role (d),
+   and `T *value` for role (c)
    (`T1 *value1,T2 *value2` for two lvalues), at most four in all (roles (a) beyond that in
    Recipe SC's `const` struct).
-4. Its body is one copy's text with each role (a) and (b) run replaced by its
+4. Its body is one copy's text with each role (a), (b) and (d) run replaced by its
    parameter's name and every `e.m` of role (c) by `(*value)`, nothing else changed;
    bindings of an input struct stay as they were.
-5. Replace each copy with a call passing its constants, its role (b) expression and
-   `&e.m`. A step 1 helper's one call becomes the new call, with the helper's arguments
+5. Replace each copy with a call passing its constants, its role (b) expression, its role (d)
+   operands and `&e.m`. A step 1 helper's one call becomes the new call, with the helper's arguments
    substituted for its parameters, and the helper leaves the file (its text is the new
    function's).
 6. All copies move in one commit; the message lists each copy's runs. When a copy runs per
@@ -11083,7 +11093,9 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
 7. Check by script that substituting each copy's runs into the new function's body
    (`(*value)` by `e.m`) gives that copy's token sequence; check by reading that the
    caller guarantees `e` designates an object wherever a call stands (the copy evaluated
-   `e.m` only on some paths; the call computes its address always).
+   `e.m` only on some paths; the call computes its address always). For role (d), check
+   by reading that a member chain's pointer designates an object at each call, and that
+   no role (c) lvalue lies inside the object the operand names.
 
 **Before:**
 
@@ -11148,6 +11160,14 @@ static void EqualizeColormapValue(const EqualizeColors *colors,
   effect; evaluated as an argument directly before the call, after everything the
   previous statement did, it reads the same objects in the same state and yields the
   same value, which the block then tests where it tested the expression.
+- Role (d) (2026-11-28): the operand is read with no side effect from an object the
+  block never writes. The block writes only its role (c) lvalues and its own locals, and
+  step 7's reading excludes a role (c) lvalue inside the operand's object. So every read
+  in the copy yields the value the object held when the block began, which is the value
+  the argument reads directly before the call. The parameter has the operand's declared
+  type, so each cast or conversion the body applies to it converts the same value as
+  before. A member chain is now evaluated at the call even on paths where the copy never
+  reached it, so step 7's reading checks that its pointer designates an object there.
 - Role (c) with a chain (2026-11-11): `&windows->popup.mapped` is the address of the very
   object the copy's `windows->popup.mapped` named; the chain only selects members through
   a pointer variable already holding a valid object (the copy read `windows->popup.id` to
@@ -11196,7 +11216,14 @@ density, server_name, clip_mask) are each a decision: cc 22 to 11 in a probe, no
 on the new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
 2026-10-24. Widened the same day for `GetDrawInfo`'s option reads: three color options
 (QueryColorCompliance), four numeric (GetDrawValue) and two strings (CloneString), each keyed
-by its option name; cc 22 to 13 in a probe.
+by its option name; cc 22 to 13 in a probe. Step 2 (d), the read-operand form
+(2026-11-28, campaign A, W51 lane b), from `display-image-crop-private.h`'s
+`XFitSelectionRectangle` and `XClampLineEnd`. Each holds an x copy and a y copy. They
+also differ in a read of `windows->image.width` or `windows->image.height` away from the
+block's head, and the first also in the parameter `x` or `y` it compares with. Neither
+fits role (b). A probe of the chain after Recipe CF: 9.38, 9.38, 10.0, with no finding
+left. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19, for the
+owner's confirmation.
 
 ---
 
@@ -27904,3 +27931,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
 | 2026-11-28 | AMEND | CF | Step 7, event form: when no copy runs per pixel or per channel, only once per user command or pointer event of the X11 programs, a new indirect call (`call *`) is allowed; the message gives the count in the gcc `-O2 -fopenmp` object before and after and names the function holding the new call. *Careful* gives the argument (the same callee with the same arguments; one indirect call per event) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XPreviewRectangle`, `XPreviewEllipse` and their `Erase` twins differ only in `XHighlightRectangle` against `XHighlightEllipse`; gcc keeps `XPreviewBox` out of line as `XPreviewBox.isra.0`, `call *` 11 to 12 in `display-image.c`'s object, the clang object identical. The owner accepted the same cost for Recipe DC's X11 dialog commands (2026-11-18 evening). Probed chain 8.28, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | MA | Step 2 (d), read-operand form: the copies may also differ in a read-only operand at any position, either a parameter or local the block does not assign, or a member chain through one shared pointer (no call, no subscript) naming an object the block does not write, all of one type `U`. It is passed by value as `const U` and named in the body wherever the copy read it. Step 7 adds two checks by reading: the chain's pointer designates an object at the call, and no role (c) lvalue lies in the object it names; *Use when*: also *Overall Code Complexity* (the copies' decisions counted once, in the new function) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XFitSelectionRectangle`'s x and y halves (`windows->image.width` against `height`, the parameters `x` against `y`) and `XClampLineEnd`'s x2 and y2 clamps (`width` against `height`). After Recipe CF the file's only finding is Overall Code Complexity. Probed chain 9.38, 9.38, 10.0 | mandate (2026-11-19) |
