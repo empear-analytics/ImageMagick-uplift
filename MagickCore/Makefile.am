@@ -550,6 +550,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/registry.c \
   MagickCore/registry.h \
   MagickCore/resample.c \
+  MagickCore/resample-ewa.c \
   MagickCore/resample.h \
   MagickCore/resample-private.h \
   MagickCore/resample-filter-private.h \

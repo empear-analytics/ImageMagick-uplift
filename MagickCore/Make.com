@@ -210,6 +210,7 @@ $call Make quantum-import.c
 $call Make random.c
 $call Make registry.c
 $call Make resample.c
+$call Make resample-ewa.c
 $call Make resize.c
 $call Make resize-rescale.c
 $call Make resize-liquid.c
