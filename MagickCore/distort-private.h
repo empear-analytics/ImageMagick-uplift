@@ -126,16 +126,21 @@ static inline double *PolynomialCoefficients(double *coeff,
   vectors=(double **) AcquireQuantumMemory(number_values,
     sizeof(*vectors));
   terms=(double *) AcquireQuantumMemory(nterms,sizeof(*terms));
-  if (IsMatrixMemoryMissing(matrix,vectors,terms) != MagickFalse)
   {
-    matrix  = RelinquishMagickMatrix(matrix, nterms);
-    vectors = (double **) RelinquishMagickMemory(vectors);
-    terms   = (double *) RelinquishMagickMemory(terms);
-    coeff   = (double *) RelinquishMagickMemory(coeff);
-    (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed",
-            "%s", "DistortCoefficients");
-    return((double *) NULL);
+    const PolynomialMemory
+      memory = { matrix, vectors, terms };
+
+    if (IsMatrixMemoryMissing(&memory) != MagickFalse)
+    {
+      matrix  = RelinquishMagickMatrix(matrix, nterms);
+      vectors = (double **) RelinquishMagickMemory(vectors);
+      terms   = (double *) RelinquishMagickMemory(terms);
+      coeff   = (double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed",
+              "%s", "DistortCoefficients");
+      return((double *) NULL);
+    }
   }
   SetPolynomialVectors(vectors,coeff,number_values,nterms);
   /* Add given control point pairs for least squares solving */

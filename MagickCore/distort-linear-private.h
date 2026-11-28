@@ -175,9 +175,26 @@ static inline MagickBooleanType IsAffineFallback(const size_t number_arguments,
        ) ) ? MagickTrue : MagickFalse);
 }
 
-static inline MagickBooleanType IsMatrixMemoryMissing(double **matrix,
-  double **vectors,const double *terms)
+typedef struct _PolynomialMemory
 {
+  double
+    **matrix,
+    **vectors;
+
+  const double
+    *terms;
+} PolynomialMemory;
+
+static inline MagickBooleanType IsMatrixMemoryMissing(
+  const PolynomialMemory *memory)
+{
+  double
+    **const matrix = memory->matrix,
+    **const vectors = memory->vectors;
+
+  const double
+    *const terms = memory->terms;
+
   return(((matrix  == (double **) NULL) || (vectors == (double **) NULL) ||
     (terms   == (double *) NULL)) ? MagickTrue : MagickFalse);
 }
