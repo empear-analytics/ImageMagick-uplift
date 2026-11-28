@@ -23781,6 +23781,25 @@ line markers and blank lines dropped; every including object of an OpenMP -O2 tr
 identical to a snapshot of the parent, debug sections stripped; the C++ check runs on the
 MagickCore includers. Step 1's probe applies: the carved header rises and the new header
 scores at least the carved header's score before.
+Trailing-run form (mandate (2026-11-19), added 2026-11-28 for
+`colorspace-jzazbz-oklab-private.h`, please confirm): on a header that this recipe produced
+and that one header includes (the colorspace converter headers, which only
+`colorspace-private.h` names), the run may instead be the header's last one. It begins
+directly after a top-level item and ends directly before the header's closing `extern "C"`
+lines (`#if defined(__cplusplus)` ... `}` ... `#endif`, empty in C), with every
+`#if`/`#endif` pair it holds inside it, and holds only `#define`s, `static const` tables and
+`static inline` functions. The new header holds the run verbatim in its order, wrapped in an
+`extern "C"` pair of its own, and the including header names it on the line directly below
+the carved header, so every translation unit has the same tokens in the same order (the
+pairs are empty in C; in C++ each item keeps its C linkage). Use it when the items that a
+later step can clear lead the header and the trailing ones cannot change (functions held
+in a function-pointer table that also holds `MagickExport` entries, whose type fixes their
+signatures). Step 4's proof is the upstream shared form's: every including source's
+preprocessed C unit identical, the including header, the carved header and the new header
+placed as at `HEAD` and as in the working tree, `__LINE__`/`__FILE__` pinned; every
+including object of an OpenMP -O2 tree identical to the parent's, debug sections stripped.
+Step 1's bar holds: the new header scores at least the carved header's score before, and
+the carved header rises or, flat, stands in a stub-probed chain whose last step raises it.
 X11 conditional form (mandate, 2026-11-19; campaign A round 35): Form A also applies to a
 `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)`,
 whose matching `#endif` is the file's last directive (the `widget-*.c` split products). The
@@ -27931,3 +27950,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
 | 2026-11-28 | AMEND | HN | Step 8: (a) an exit `{ S return(R); }` whose `S` only releases objects the block does not touch, when the caller's next test has the same body; (b) `v` also written by the block's first statement, the clone its last call transforms, kept in a helper local, the helper ending `return(Last(...));` (and `return(Call(...));` with no release after the last call); (c) `NULL` or `(T *) NULL` in a guard; (d) two copies in one caller in one commit | `compare-similarity-frequency-images-private.h`'s `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage` (campaign A, W51 round 38, lane a): their FFT heads as helpers, with two Recipe E steps, clear the header's Overall Code Complexity, 9.38 flat to 10.0 in a probe | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | B | Step 1, test-program caller: a changed call in a file under `tests/` that only a test program compiles may miss (d) only by constants clang folds from a contractable expression (`.text` and relocations identical with `__LINE__` pinned, the object identical with `-ffp-contract=off`) and, under `-fno-inline`, by callees no longer specialised for the caller's literal arguments and `.rodata` relocation addends; the subtest that runs the call passes | `colorspace-cie-to-rgb-private.h`'s `ConvertLuvToRGB` (campaign A, W51 round 38, lane a): `tests/validate.c`'s `ValidateLuvToRGB` passes literal Luv inputs; with them in a struct, two constants clang -O2 folds differ by 1 and 2 ulp and the objects are identical with `-ffp-contract=off`; the header goes 9.68 to 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | Step 1, upstream shared form: on a header this recipe produced and one header includes, the run may be the trailing one (after a top-level item, up to the closing `extern "C"` lines), moved verbatim into a new header with its own pair that the including header names on the line directly below the carved one; same proof and bar | `colorspace-jzazbz-oklab-private.h` (campaign A, W51 round 38, lane a): its trailing `ConvertRGBToOklab` and `ConvertRGBToOklch` sit in `colorspace-convert.c`'s `RGBToGenericMethods` table beside `MagickExport` entries, so their six arguments stay; with them carved out, Recipe B on the leading `ConvertOklabToRGB` and `ConvertOklchToRGB` takes the header 9.68 to 10.0 (stub probe; the new header 9.68) | mandate (2026-11-19) |
