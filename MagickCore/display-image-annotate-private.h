@@ -663,6 +663,17 @@ static void XColorEditCommand(const ColorEditContext *context,
     context->cursor);
 }
 
+static MagickBooleanType IsColorEditButton1(const ColorEditContext *context,
+  const XEvent *event)
+{
+  if ((*event).xbutton.button != Button1)
+    return(MagickFalse);
+  if (((*event).xbutton.window != context->windows->image.id) &&
+      ((*event).xbutton.window != context->windows->magnify.id))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void XColorEditPress(const ColorEditContext *context,
   const ColorEditTargets *targets)
 {
@@ -676,10 +687,7 @@ static void XColorEditPress(const ColorEditContext *context,
     *const x = targets->x,
     *const y = targets->y;
 
-  if ((*event).xbutton.button != Button1)
-    return;
-  if (((*event).xbutton.window != context->windows->image.id) &&
-      ((*event).xbutton.window != context->windows->magnify.id))
+  if (IsColorEditButton1(context,event) == MagickFalse)
     return;
   /*
     exit loop.
