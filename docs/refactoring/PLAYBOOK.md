@@ -5408,6 +5408,19 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    block's own `R`, and check every argument against its parameter by reading.
 7. Another copy of the block, identical but for the expression of step 5 and its own `R`,
    may call the same function the same way (Recipe D), one commit per caller.
+   Twin form with a buffer per copy (mandate (2026-11-19), please confirm). Two `void`
+   functions of one file whose leading blocks (step 8) are the same token sequence,
+   checked by script, may share the new function in one commit when (a) each block holds,
+   in a compound statement of its own, a `static char` array declaration with its
+   initialiser (the same text in both) that only the block names, and (b) each function
+   binds the block's other inputs as `const` locals from the members of one `const Name
+   *name` parameter of the same type in both. The array declaration moves, unchanged, to
+   its function's opening declarations, and the call passes the array's name; the new
+   function takes it as `char *` under the array's name, so the block's text is
+   unchanged. The new function takes `name` and binds the members the block reads as
+   `const` locals of their old names and types (Recipe SM step 4); a binding of a caller
+   that only the block read goes with it (`-Wunused-variable` shows one left behind).
+   Steps 1 to 5 hold for the rest, at most four parameters in all.
 8. In a `void` caller the block's exits are `return;` (2026-11-11): step 1 reads
    `return;` for `return(R);` (every `return` in the block is `return;`), step 2 has no
    `R` to check, and step 6 writes `if (Helper(...) == MagickFalse) return;`. Steps 3 to
@@ -5469,6 +5482,15 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 - The failure paths are mostly allocation failures that no case reaches: the oracle
   checks the success path; the failure path is checked by reading, each `return(R);`
   against its `return(MagickFalse);`, and `refactor_guard.py --calls`.
+- Step 7's twin form. A `static` array declared at block scope or among the function's
+  opening declarations has static storage duration, no linkage and its initialiser
+  applied once before the program starts, in either place; only the scope of its name
+  widens, to the rest of its own function. Each function keeps its own array, so the text
+  it holds from one command to the next is what it held before, and the new function
+  receives its address, as the callees in the block did: every store through it lands in
+  the same array, and a pointer the block stores (`pen_colors[...]=color_name;`) is the
+  same address. The bindings are the same members of the same struct, which nothing
+  writes, read once more in the new function.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 and 5
 checked by reading; or, for a function no case reaches, guard with `tools/obj_identical.sh`
@@ -5492,6 +5514,13 @@ Step 3's `return(v);` exception (2026-11-14, campaign B, M127 lane b round 13):
 leaves through `return(flags);` at its `default:`; a probe 7.90 to 8.04. Added by Claude
 Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 Lane: b
+Step 7's twin form with a buffer per copy (2026-11-28, campaign A, W51 round 38 lane b):
+`display-image-annotate-private.h`'s `XSelectColorBorder` and `XSelectPenColor`, whose
+pen-menu heads (menu, pop-up, `Browser...` dialog into a `static char color_name[]` of
+each function, two `return;` exits) are one text. Recipe F does not apply: the dialog
+writes the buffer, and one shared buffer would change the remembered reply of each
+command. Probed chain: 9.38, 9.38 (the twin merge), then four W leaf steps to 10.0.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19.
 
 ---
 
@@ -27965,3 +27994,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | MA | Step 2 (d), read-operand form: the copies may also differ in a read-only operand at any position, either a parameter or local the block does not assign, or a member chain through one shared pointer (no call, no subscript) naming an object the block does not write, all of one type `U`. It is passed by value as `const U` and named in the body wherever the copy read it. Step 7 adds two checks by reading: the chain's pointer designates an object at the call, and no role (c) lvalue lies in the object it names; *Use when*: also *Overall Code Complexity* (the copies' decisions counted once, in the new function) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XFitSelectionRectangle`'s x and y halves (`windows->image.width` against `height`, the parameters `x` against `y`) and `XClampLineEnd`'s x2 and y2 clamps (`width` against `height`). After Recipe CF the file's only finding is Overall Code Complexity. Probed chain 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | IC | Step 5, dereferenced read: the one read of a member binding `v` may be the whole operand of a unary `*` whose `*v` is a whole argument or a whole member initialiser; it becomes `*p->m` (`*context->image`), which parses as `*(p->m)`; every other condition of step 5 holds | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): after Recipe D and B share the five edit commands' failure notice, `XApplyAnnotateCommand` and `XApplyCompositeCommand` pass `*image`; a probe keeping those bindings stays at 9.09 with Code Duplication, the chain (D, B, IC, and E, D, B, IC on two more groups) ends at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | IC | *Evidence level*, oracle form: when `obj_identical.sh` prints `DIFFERENT` and oracle cases execute every function whose locals the step inlines, the oracle `--function` on each (0 diverged, counts quoted) proves the step, `Verified: oracle`; the message names the functions whose code differs; steps 1 to 3 and 5 by reading, step 4's warning checks `OK` | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): inlining the bindings of the five edit commands leaves Draw, Color and Matte identical one by one, but Annotate and Composite change `XApplyFXCommands`'s stack frame (+16 bytes). Kept out of line, `XApplyCompositeCommand` differs only in the order of two member loads. The commands are reached by 22, 15, 23, 9 and 3 wide cases; the chain needs those two inlined (a probe keeping either binding: 9.09 or 9.38) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | W | Step 7, twin form with a buffer per copy: two `void` functions whose leading blocks are one text may share the new function in one commit when each block holds, in a compound statement of its own, a `static char` array that only the block names (moved unchanged to its function's opening declarations and passed by name as `char *`, so each function keeps its own buffer) and both bind the block's other inputs from one `const Name *name` parameter (the new function takes `name` and binds them, Recipe SM step 4); bindings only the block read go with it | `display-image-annotate-private.h` (campaign A, W51 round 38, lane b): `XSelectColorBorder` and `XSelectPenColor` share `XSelectEditPen`; Recipe F refuses the buffers (the colour dialog writes them) and one shared buffer would change each command's remembered reply. Probed chain 9.38, 9.38, 9.38, 9.38, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
