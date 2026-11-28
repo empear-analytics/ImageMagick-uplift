@@ -14,8 +14,8 @@
   limitations under the License.
 
   MagickCore private colorspace predicates: IsRGBColorspace,
-  IssRGBColorspace and IssRGBCompatibleColorspace; included by
-  colorspace-private.h only.
+  IssRGBColorspace, IsRGBModelColorspace and IssRGBCompatibleColorspace;
+  included by colorspace-private.h only.
 */
 #ifndef MAGICKCORE_COLORSPACE_RGB_PREDICATES_PRIVATE_H
 #define MAGICKCORE_COLORSPACE_RGB_PREDICATES_PRIVATE_H
@@ -46,7 +46,7 @@ static inline MagickBooleanType IssRGBColorspace(
   return(MagickFalse);
 }
 
-static inline MagickBooleanType IssRGBCompatibleColorspace(
+static inline MagickBooleanType IsRGBModelColorspace(
   const ColorspaceType colorspace)
 {
   switch (colorspace)
@@ -57,6 +57,20 @@ static inline MagickBooleanType IssRGBCompatibleColorspace(
     case ProPhotoColorspace:
     case DisplayP3Colorspace:
     case scRGBColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static inline MagickBooleanType IssRGBCompatibleColorspace(
+  const ColorspaceType colorspace)
+{
+  if (IsRGBModelColorspace(colorspace) != MagickFalse)
+    return(MagickTrue);
+  switch (colorspace)
+  {
     case TransparentColorspace:
     case GRAYColorspace:
     case LinearGRAYColorspace:
