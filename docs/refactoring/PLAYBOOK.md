@@ -1057,6 +1057,25 @@ refuses a member through `->`, another member assigned, and another member passe
 member is an lvalue of the same type as a variable, read once at the call and assigned
 once at the return, so the caller's object ends with the value the block left in it.
 
+**A helper in an included private header** (mandate (2026-11-19), added 2026-11-28 for
+`accelerate-unsharp.c`'s `ComputeUnsharpMaskImageSingle`, please confirm; the tool under the
+owner's ruling of 2026-11-20 that `tools/reuse_check.py` may cover helpers in included
+private headers). In form (b), *Unreached functions* and *Object code that differs only in
+the caller*, the existing helper may be a `static inline` function of a private header
+(not installed) that the file includes directly, the header unchanged by the step: the
+block is its body under the renaming above (`DestroyUnfinishedImage` of
+`accelerate-core-private.h`, whose body is the cleanup's `if ((outputReady == MagickFalse)
+&& (filteredImage != (Image *) NULL)) filteredImage=DestroyImage(filteredImage);` and
+`return(filteredImage);`). `tools/reuse_check.py` reads the helper from that header when
+the file defines no `static` function of its name, refuses a header that differs from
+`HEAD`, and names it (`tools/test_reuse_check.py`'s `HelperInIncludedHeader`).
+`obj_modulo.sh` names the header's helper as `<Helper>`; when the caller is itself inlined
+into its own caller as built, `NOINLINE=<Caller>` keeps it out of line on both sides, and
+the run without it is quoted too. The helper is one definition included by every file
+that names it, so the call runs the text the block held, on the objects the call binds,
+as for a helper of the file; a `static inline` function of a header has internal linkage
+in each including unit, exactly as a `static` function of the file has.
+
 **A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
 *Unreached functions* and *Object code that differs only in the caller* may call a
 helper that the file defines below the caller, and one whose block reads its inputs
@@ -28181,3 +28200,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | UB | *Kernel-string form*: a run of whole top-level `STRINGIFY`/`OPENCL_*` calls in `accelerate-kernels-private.h`'s two kernel-source initialisers moves byte for byte into a guard-less fragment `accelerate-kernels-<theme>-private.h`, named by a column-0 `#include` where it stood; cuts only at parenthesis depth 0; nothing edited; the fragment scores at least the file's score before the step; proof both kernel strings byte-identical (`cmp`), `opencl-initialize.c`'s unit and object identical (`HDRS=1 WIDE=1`), wide oracle on `CompileOpenCLKernel` | `accelerate-kernels-private.h` (2.03; *Brain Method*, *Complex Method*, *Large Method*, *Excess Number of Function Arguments*, *Code Duplication*, all in OpenCL C): a stub probe of 17 fragments, one per kernel section, takes it to 10.0 with no findings, the fragments 6.61 to 10.0 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file conditional form, carved in its middle*: in a header of that form that one `.c` file includes, a run between two kept items, inside the same `#if` branches, moves verbatim into a new header named by an `#include` on the run's first line in the carved header; on such a header OH also takes *Primitive Obsession* and *String Heavy Function Arguments* when the probe leaves both headers at 10.0 (or at the bar with a stub-probed chain ending at 10.0 for both); proof: the `.c` file against `HEAD`'s and the working tree's headers, unit and object identical in every build that compiles it | `opencl-initialize-benchmark-private.h` (9.38; *Primitive Obsession* 45 %, *String Heavy Function Arguments* 40 %): after four Recipe IP steps the header stays at 9.68 (*Primitive Obsession* 36 %); moving the DOCTYPE run `EndDoctypeQuote` to `SkipOpenCLBenchmarkDoctype` into `opencl-initialize-doctype-private.h` gives 10.0 for both (stub probe, cs-mcp 1.5.16, `tools/ch.py`; campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | B, I, E | Recipe B step 1 (b): a function the owner released although its only call is commented out keeps that comment verbatim; *Unreached functions: Recipe I*: a guard-level E or I step may move an `OpenCLThrowMagickException(...,GetMagickModule(),...)` statement into its helper, the reported location then naming the helper | `accelerate-unsharp.c` (campaign A, W51 round 38): `AccelerateUnsharpMaskImage`'s only call is commented out in `effect-sharpen.c`, and its kernel acquisitions throw through `OpenCLThrowMagickException` | owner |
+| 2026-11-28 | AMEND | D | *A helper in an included private header*: in form (b), *Unreached functions* and *Object code that differs only in the caller*, the existing helper may be a `static inline` function of a non-installed private header the file includes directly, unchanged by the step; `tools/reuse_check.py` reads it there (babde966f) and `obj_modulo.sh` takes `NOINLINE=<Caller>` when the caller is inlined into its own caller | `accelerate-unsharp.c`'s `ComputeUnsharpMaskImageSingle` (campaign A, W51 round 38, lane d): its cleanup block is the body of `accelerate-core-private.h`'s `DestroyUnfinishedImage`, which `ComputeUnsharpMaskImage` already calls; the function is reached by no case. 8.83 to 8.84, the function's Complex Method (cc 9) no longer reported | mandate (2026-11-19) |
