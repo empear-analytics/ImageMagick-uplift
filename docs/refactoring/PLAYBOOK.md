@@ -17151,6 +17151,16 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
    function or writes anything. Step 2 replaces the read by `p->m`, character for
    character, and deletes `v`'s declarator (a type line left with no name under it
    goes, with its blank line).
+   Dereferenced read (mandate (2026-11-19), added 2026-11-28, please confirm): the one
+   read may also be the whole operand of a unary `*` whose expression `*v` is itself a
+   whole argument of a call or a whole initialiser of a struct member
+   (`XCompositeImage(display,resource_info,windows,*image,exception)`, where `image` is
+   bound as `Image **const image = context->image;`). Step 2 then writes `*p->m`
+   (`*context->image`), with no parentheses added: postfix `->` binds tighter than
+   unary `*`, so the expression parses as `*(p->m)`. Every other condition of this step
+   holds. The pointer `v` held is `p->m`'s value, read with nothing called or written
+   between the binding and the read, so `*p->m` reads the same pointer and dereferences
+   it at the point where `*v` did, once.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
@@ -17159,7 +17169,13 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
 `CompareSplayTreeStringInfo` (campaign B, M127 lane b round 5): after Recipe BF the
 file kept two *Code Duplication* pairs; this step on the comparison pair cleared both,
 9.38 to 10.0 in the probe. Added by Claude Code (Claude Opus 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 5's dereferenced read (2026-11-28, campaign A, W51 lane b), from
+`display-image-apply-effects-private.h`: after Recipe D and B share the failure notice
+of the five edit commands, `XApplyAnnotateCommand` and `XApplyCompositeCommand` read
+their `image` binding only as `*image`, a whole argument. A probe that keeps those two
+bindings stays at 9.09 with the duplication finding; inlining them too reaches 10.0 at
+the chain's end. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19,
+for the owner's confirmation.
 Lane: b
 
 ---
@@ -27932,3 +27948,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
 | 2026-11-28 | AMEND | CF | Step 7, event form: when no copy runs per pixel or per channel, only once per user command or pointer event of the X11 programs, a new indirect call (`call *`) is allowed; the message gives the count in the gcc `-O2 -fopenmp` object before and after and names the function holding the new call. *Careful* gives the argument (the same callee with the same arguments; one indirect call per event) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XPreviewRectangle`, `XPreviewEllipse` and their `Erase` twins differ only in `XHighlightRectangle` against `XHighlightEllipse`; gcc keeps `XPreviewBox` out of line as `XPreviewBox.isra.0`, `call *` 11 to 12 in `display-image.c`'s object, the clang object identical. The owner accepted the same cost for Recipe DC's X11 dialog commands (2026-11-18 evening). Probed chain 8.28, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 2 (d), read-operand form: the copies may also differ in a read-only operand at any position, either a parameter or local the block does not assign, or a member chain through one shared pointer (no call, no subscript) naming an object the block does not write, all of one type `U`. It is passed by value as `const U` and named in the body wherever the copy read it. Step 7 adds two checks by reading: the chain's pointer designates an object at the call, and no role (c) lvalue lies in the object it names; *Use when*: also *Overall Code Complexity* (the copies' decisions counted once, in the new function) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XFitSelectionRectangle`'s x and y halves (`windows->image.width` against `height`, the parameters `x` against `y`) and `XClampLineEnd`'s x2 and y2 clamps (`width` against `height`). After Recipe CF the file's only finding is Overall Code Complexity. Probed chain 9.38, 9.38, 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | IC | Step 5, dereferenced read: the one read of a member binding `v` may be the whole operand of a unary `*` whose `*v` is a whole argument or a whole member initialiser; it becomes `*p->m` (`*context->image`), which parses as `*(p->m)`; every other condition of step 5 holds | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): after Recipe D and B share the five edit commands' failure notice, `XApplyAnnotateCommand` and `XApplyCompositeCommand` pass `*image`; a probe keeping those bindings stays at 9.09 with Code Duplication, the chain (D, B, IC, and E, D, B, IC on two more groups) ends at 10.0 | mandate (2026-11-19) |
