@@ -261,6 +261,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-apply-private.h \
   MagickCore/display-image-apply-effects-private.h \
   MagickCore/display-image-apply-filters-private.h \
+  MagickCore/display-image-magnify-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
   MagickCore/display-image-save-private.h \
@@ -916,6 +917,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-apply-private.h \
   MagickCore/display-image-apply-effects-private.h \
   MagickCore/display-image-apply-filters-private.h \
+  MagickCore/display-image-magnify-private.h \
   MagickCore/display-image-matte-private.h \
   MagickCore/display-image-matte-roi-private.h \
   MagickCore/display-image-save-private.h \
