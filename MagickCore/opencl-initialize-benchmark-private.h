@@ -316,6 +316,19 @@ static int CloseDoctypeBracket(int bracket_depth)
   return(bracket_depth);
 }
 
+typedef struct _OpenCLBenchmarkTokens
+{
+  MagickCLEnv
+    clEnv;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent;
+} OpenCLBenchmarkTokens;
+
 static const char *SkipOpenCLBenchmarkComment(const char *q,
   const size_t extent,char *token)
 {
@@ -472,19 +485,6 @@ static const char *SkipOpenCLBenchmarkDoctype(const char *q)
   }
   return(q);
 }
-
-typedef struct _OpenCLBenchmarkTokens
-{
-  MagickCLEnv
-    clEnv;
-
-  char
-    *keyword,
-    *token;
-
-  size_t
-    extent;
-} OpenCLBenchmarkTokens;
 
 static void ReadOpenCLBenchmarkAttribute(const OpenCLBenchmarkTokens *tokens,
   MagickCLDeviceBenchmark **device_benchmark,const char **q)
