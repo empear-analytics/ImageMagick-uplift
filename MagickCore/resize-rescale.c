@@ -793,12 +793,18 @@ MagickExport Image *ResampleImage(const Image *image,const double x_resolution,
 %
 */
 
+static inline MagickBooleanType IsCharInRange(const char low,
+  const char *uri,const char high)
+{
+  return(((low <= *uri) && (*uri <= high)) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsURIUnreserved(const char *uri)
 {
-  return(((('a' <= *uri) && (*uri <= 'z')) ||
-    (('A' <= *uri) && (*uri <= 'Z')) ||
-    (('0' <= *uri) && (*uri <= '9')) || (strchr("/-_.~",*uri) != 0)) ?
-    MagickTrue : MagickFalse);
+  return(((IsCharInRange('a',uri,'z') != MagickFalse) ||
+    (IsCharInRange('A',uri,'Z') != MagickFalse) ||
+    (IsCharInRange('0',uri,'9') != MagickFalse) ||
+    (strchr("/-_.~",*uri) != 0)) ? MagickTrue : MagickFalse);
 }
 
 static void url_encode(const char *uri,char *encode_uri)
