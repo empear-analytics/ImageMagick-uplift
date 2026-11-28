@@ -19,6 +19,22 @@
 #define MAGICKCORE_COMPARE_SIMILARITY_FREQUENCY_IMAGES_PRIVATE_H
 
 #if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
+static Image *SIMForwardFourierClone(const Image *image,
+  ExceptionInfo *exception)
+{
+  Image
+    *fourier_image = (Image *) NULL,
+    *temp_image = (Image *) NULL;
+
+  temp_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (temp_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageArtifact(temp_image,"fourier:normalize","inverse");
+  fourier_image=ForwardFourierTransformImage(temp_image,MagickFalse,exception);
+  temp_image=DestroyImageList(temp_image);
+  return(fourier_image);
+}
+
 static Image *SIMCrossCorrelationImage(const Image *alpha_image,
   const Image *beta_image,ExceptionInfo *exception)
 {
@@ -27,18 +43,12 @@ static Image *SIMCrossCorrelationImage(const Image *alpha_image,
     *beta_fft = (Image *) NULL,
     *complex_conjugate = (Image *) NULL,
     *complex_multiplication = (Image *) NULL,
-    *cross_correlation = (Image *) NULL,
-    *temp_image = (Image *) NULL;
+    *cross_correlation = (Image *) NULL;
 
   /*
     Take the FFT of beta (reconstruction) image.
   */
-  temp_image=CloneImage(beta_image,0,0,MagickTrue,exception);
-  if (temp_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageArtifact(temp_image,"fourier:normalize","inverse");
-  beta_fft=ForwardFourierTransformImage(temp_image,MagickFalse,exception);
-  temp_image=DestroyImageList(temp_image);
+  beta_fft=SIMForwardFourierClone(beta_image,exception);
   if (beta_fft == (Image *) NULL)
     return((Image *) NULL);
   /*
@@ -51,15 +61,7 @@ static Image *SIMCrossCorrelationImage(const Image *alpha_image,
   /*
     Take the FFT of the alpha (test) image.
   */
-  temp_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
-  if (temp_image == (Image *) NULL)
-    {
-      complex_conjugate=DestroyImageList(complex_conjugate);
-      return((Image *) NULL);
-    }
-  (void) SetImageArtifact(temp_image,"fourier:normalize","inverse");
-  alpha_fft=ForwardFourierTransformImage(temp_image,MagickFalse,exception);
-  temp_image=DestroyImageList(temp_image);
+  alpha_fft=SIMForwardFourierClone(alpha_image,exception);
   if (alpha_fft == (Image *) NULL)
     {
       complex_conjugate=DestroyImageList(complex_conjugate);
