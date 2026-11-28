@@ -20,6 +20,17 @@
 #ifndef MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 #define MAGICKCORE_DISPLAY_IMAGE_APPLY_EFFECTS_PRIVATE_H
 
+static void XNoticeEditFailure(Display *display,XWindows *windows,
+  Image **image,const MagickStatusType status,const char *reason)
+{
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,reason,
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyAnnotateCommand(const XMagickCommandContext *context)
 {
   Display
@@ -44,12 +55,8 @@ static void XApplyAnnotateCommand(const XMagickCommandContext *context)
     Annotate the image with text.
   */
   status=XAnnotateEditImage(display,resource_info,windows,*image,exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to annotate X image",
-        (*image)->filename);
-      return;
-    }
+  XNoticeEditFailure(display,windows,image,status,
+    "Unable to annotate X image");
 }
 
 static void XApplyDrawCommand(const XMagickCommandContext *context)
@@ -79,12 +86,8 @@ static void XApplyDrawCommand(const XMagickCommandContext *context)
     Draw image.
   */
   status=XDrawEditImage(&edit_context);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to draw on the X image",
-        (*image)->filename);
-      return;
-    }
+  XNoticeEditFailure(display,windows,image,status,
+    "Unable to draw on the X image");
 }
 
 static void XApplyColorCommand(const XMagickCommandContext *context)
@@ -111,12 +114,8 @@ static void XApplyColorCommand(const XMagickCommandContext *context)
     Color edit.
   */
   status=XColorEditImage(display,resource_info,windows,image,exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to pixel edit X image",
-        (*image)->filename);
-      return;
-    }
+  XNoticeEditFailure(display,windows,image,status,
+    "Unable to pixel edit X image");
 }
 
 static void XApplyMatteCommand(const XMagickCommandContext *context)
@@ -143,12 +142,8 @@ static void XApplyMatteCommand(const XMagickCommandContext *context)
     Matte edit.
   */
   status=XMatteEditImage(display,resource_info,windows,image,exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to matte edit X image",
-        (*image)->filename);
-      return;
-    }
+  XNoticeEditFailure(display,windows,image,status,
+    "Unable to matte edit X image");
 }
 
 static void XApplyCompositeCommand(const XMagickCommandContext *context)
@@ -176,12 +171,8 @@ static void XApplyCompositeCommand(const XMagickCommandContext *context)
   */
   status=XCompositeImage(display,resource_info,windows,*image,
     exception);
-  if (status == MagickFalse)
-    {
-      XNoticeWidget(display,windows,"Unable to composite X image",
-        (*image)->filename);
-      return;
-    }
+  XNoticeEditFailure(display,windows,image,status,
+    "Unable to composite X image");
 }
 
 static void XApplyAddBorderCommand(const XMagickCommandContext *context,
