@@ -39,6 +39,7 @@
 #include "MagickCore/colorspace-rgb-to-hue-private.h"
 #include "MagickCore/colorspace-rgb-to-hsv-private.h"
 #include "MagickCore/colorspace-rgb-to-lab-private.h"
+#include "MagickCore/colorspace-rgb-to-lchab-private.h"
 #include "MagickCore/colorspace-rgb-to-lchuv-private.h"
 #include "MagickCore/colorspace-rgb-to-cie-private.h"
 #include "MagickCore/colorspace-rgb-to-cie-entries-private.h"
