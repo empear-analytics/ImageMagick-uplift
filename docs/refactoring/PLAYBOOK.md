@@ -24354,6 +24354,27 @@ which moves zeroing writes and keeps the variable.
    text no build compiles names it (a Recipe UB fragment, which is never edited), or when
    step 2 does not hold for it. No statement names `s` between its declaration and the
    call except through the renamed uses.
+8. *Gather form* (mandate (2026-11-19), added 2026-11-28; please confirm). The locals need not
+   be copied into an existing struct: locals of the function that its cleanup releases, or
+   that the steps planned after this one hand together to helpers, may be gathered into one
+   new struct local `r` of a new `typedef struct` written directly above the function, one
+   member per chosen local, of the local's exact declared type, in any order, plus at most one
+   member holding a parameter `p` that the function never assigns and whose address it never
+   takes. `r` is declared without an initialiser among the function's declarations; each
+   chosen local's declarator goes, and every occurrence of it in the function's code is written
+   `r.m` (step 3), comments and string literals unchanged; a statement `v=c;` stays in its
+   place as `r.m=c;`, and `r.p=p;` stands directly before the first of them. Each chosen
+   local meets step 2's type and storage conditions; the function takes no address of a
+   chosen local other than as an argument of a call that keeps no copy of it, and passes
+   nothing of `r` whole. A local that text no build compiles names stays unchosen, except under
+   *Unreached functions: the worker of a wrapper no code calls* (item 4). Why the behaviour is
+   the same: each member is an object of the local's type with the local's lifetime (that of
+   `r`, declared in the same block), so every statement reads and writes the same values, in
+   the same order, in a different object; a member is indeterminate exactly where the local
+   was, and is set by the statements that set the local. `r.p` holds `p`'s value from its
+   assignment on, and nothing writes either. Proof: `refactor_guard.py` (`OK`; `--calls` no
+   change), the CI and NDEBUG warning checks, and the oracle on the function's cases or, for a
+   function no case reaches, *Unreached functions: the worker of a wrapper no code calls*.
 
 **Before:**
 
@@ -28063,3 +28084,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | W | Step 7, twin form with a buffer per copy: two `void` functions whose leading blocks are one text may share the new function in one commit when each block holds, in a compound statement of its own, a `static char` array that only the block names (moved unchanged to its function's opening declarations and passed by name as `char *`, so each function keeps its own buffer) and both bind the block's other inputs from one `const Name *name` parameter (the new function takes `name` and binds them, Recipe SM step 4); bindings only the block read go with it | `display-image-annotate-private.h` (campaign A, W51 round 38, lane b): `XSelectColorBorder` and `XSelectPenColor` share `XSelectEditPen`; Recipe F refuses the buffers (the colour dialog writes them) and one shared buffer would change each command's remembered reply. Probed chain 9.38, 9.38, 9.38, 9.38, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, nested placement: when the `.c` file's `#include` of the new header would lower the `.c` file, the carved header names the new header on the line after its guard's `#define` and blank line, where the run stood (an include block of its own; a later carve names its header last in that block); the `.c` file is unchanged; proof as for the carved-again form (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) | `display-image-tile-private.h` (campaign A, W51 round 38, lane b): its seventh carve (the translate command) probes the header at 10.0, but a seventh mid-file `#include` in `display-image.c` is counted into `XDisplayBackgroundImage` (70 lines, *Large Method*, 9.68 -> 9.31); nested in the tile header, `display-image.c` stays 9.68 and the tile header measures 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | rule | *Two levels of evidence*, new paragraph *Unreached functions: the worker of a wrapper no code calls*: in a `static` worker whose only caller is a `MagickPrivate` wrapper no code calls (WP step 8's `git grep` test, `casemap.py` 0), and in the helpers its steps add, Recipes H, E, V, W, MA, LM, JN and D may be taken at guard level, `Verified: guard`, with the recipe's steps checked by reading and quoted, `refactor_guard.py` (and `--calls`, only new or reused helpers moving), `WIDE=1 NOINLINE=F obj_modulo.sh` `IDENTICAL` or `MODULO-IDENTICAL`, and the CI and NDEBUG warning checks; a block throwing or logging through `GetMagickModule()` may move (the location names the helper, as the 2026-11-12/13 rulings allow); throw macros that return stay in the worker; unbuilt UB fragments stay unedited | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`, 7.61, no caller of its wrapper; a stub probe of `ComputeEqualizeImage`'s decomposition scores 10.0, but V, W, MA, LM and JN have no guard-level form and the GPU stages throw through `GetMagickModule()` | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | LM | Step 8, *gather form*: locals a function's cleanup releases (or that later steps hand together to helpers) may be gathered into a new struct local `r` of a new typedef, one member per local of its exact type (plus at most one member copying a never-assigned parameter, set by `r.p=p;` before the first of the moved `v=c;` statements), every use written `r.m`; no copy into an existing struct needed; a local an unbuilt fragment names stays unchosen except under *Unreached functions: the worker of a wrapper no code calls* | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s fourteen cleanup and stage locals; the probed chain (E, D, V, W, JN, D) ends at 10.0 from 8.24, the gather itself flat | mandate (2026-11-19) |
