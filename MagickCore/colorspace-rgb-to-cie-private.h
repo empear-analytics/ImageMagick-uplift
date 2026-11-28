@@ -13,8 +13,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private colorspace conversions from RGB and XYZ: ProPhoto, LMS,
-  Luv and xyY; included by colorspace-private.h only.
+  MagickCore private colorspace conversion from XYZ to ProPhoto; included by
+  colorspace-private.h only.
 */
 #ifndef MAGICKCORE_COLORSPACE_RGB_TO_CIE_PRIVATE_H
 #define MAGICKCORE_COLORSPACE_RGB_TO_CIE_PRIVATE_H
@@ -50,72 +50,6 @@ static inline void ConvertXYZToProPhoto(const ConvertXYZInput *xyz,
   *red=QuantumScale*EncodePixelGamma((double) QuantumRange*r);
   *green=QuantumScale*EncodePixelGamma((double) QuantumRange*g);
   *blue=QuantumScale*EncodePixelGamma((double) QuantumRange*b);
-}
-
-static inline void ConvertRGBToProPhoto(const double red,const double green,
-  const double blue,double *r,double *g,double *b)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  ConvertRGBToXYZ(red,green,blue,&X,&Y,&Z);
-  {
-    const ConvertXYZInput
-      xyz = { X, Y, Z };
-
-    ConvertXYZToProPhoto(&xyz,r,g,b);
-  }
-}
-
-static inline void ConvertXYZToLMS(const double x,const double y,
-  const double z,double *L,double *M,double *S)
-{
-  *L=0.7328*x+0.4296*y-0.1624*z;
-  *M=(-0.7036*x+1.6975*y+0.0061*z);
-  *S=0.0030*x+0.0136*y+0.9834*z;
-}
-
-static inline void ConvertRGBToLMS(const double red,const double green,
-  const double blue,double *L,double *M,double *S)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  ConvertRGBToXYZ(red,green,blue,&X,&Y,&Z);
-  ConvertXYZToLMS(X,Y,Z,L,M,S);
-}
-
-static inline void ConvertRGBToLuv(const double red,const double green,
-  const double blue,const IlluminantType illuminant,double *L,double *u,
-  double *v)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  ConvertRGBToXYZ(red,green,blue,&X,&Y,&Z);
-  ConvertXYZToLuv(X,Y,Z,illuminant,L,u,v);
-}
-
-static inline void ConvertRGBToxyY(const double red,const double green,
-  const double blue,double *low_x,double *low_y,double *cap_Y)
-{
-  double
-    gamma,
-    X,
-    Y,
-    Z;
-
-  ConvertRGBToXYZ(red,green,blue,&X,&Y,&Z);
-  gamma=MagickSafeReciprocal(X+Y+Z);
-  *low_x=gamma*X;
-  *low_y=gamma*Y;
-  *cap_Y=Y;
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
