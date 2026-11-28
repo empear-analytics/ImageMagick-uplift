@@ -23740,6 +23740,20 @@ line markers and blank lines dropped; every including object of an OpenMP -O2 tr
 identical to a snapshot of the parent, debug sections stripped; the C++ check runs on the
 MagickCore includers. Step 1's probe applies: the carved header rises and the new header
 scores at least the carved header's score before.
+Upstream shared mid-file form (mandate, 2026-11-19; campaign A round 38; the owner's
+2026-11-20 ruling that mid-file includes are allowed in any file): in an upstream shared
+header with no include block of its own (`token-private.h`, 31 including sources), the run
+may begin directly after a kept item, as in the mid-file form below (a non-`const`
+file-scope object such as `utf_info`, a `typedef` other items name, or a declaration with
+external linkage), and end directly before the next item that stays; the carved header
+names the new header on the run's first line, where the run stood, inside its own `extern
+"C"` pair, so the new header adds no pair of its own and the translation unit has the same
+tokens in the same order in C and in C++. The new header holds the items verbatim and in
+order inside its include guard and is included only by the carved header. Proof as for the
+upstream shared form: every including source's preprocessed unit and object identical with
+`HEAD`'s and the working tree's headers (`HDRS=1` `tools/obj_identical.sh` in every
+`ci_linux_warnings` configuration that compiles it), and the C++ check on the MagickCore
+includers. Step 1's probe applies.
 X11 conditional form (mandate, 2026-11-19; campaign A round 35): Form A also applies to a
 `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)`,
 whose matching `#endif` is the file's last directive (the `widget-*.c` split products). The
@@ -27888,3 +27902,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
+| 2026-11-28 | AMEND | OH | *Upstream shared mid-file form*: in an upstream shared header without an include block, Form A's run may begin after a kept item (a non-`const` file-scope object, a named `typedef`, an external declaration) and end before the next kept item; the header names the new header where the run stood, inside its own `extern "C"` pair (the new header adds none); proof every includer's unit and object identical (`HDRS=1`) in every `ci_linux_warnings` configuration, plus the C++ check | `token-private.h` (9.09; *Overall Code Complexity* and *Complex Method* on `ConvertMacRomanToUTF8`, cc 10): any function added in place costs *Primitive Obsession* (probes 8.28 to 9.09); a probe moving `ConvertLatin1ToUTF8`, `macroman_unicode` and `ConvertMacRomanToUTF8` out from after `utf_info` gives 10.0 and a new header at 9.68, then 10.0 after one Recipe E step (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
