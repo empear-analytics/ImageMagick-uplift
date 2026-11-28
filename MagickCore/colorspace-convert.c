@@ -297,7 +297,10 @@ MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
     }
     case JzazbzColorspace:
     {
-      ConvertRGBToJzazbz(R,G,B,white_luminance,X,Y,Z);
+      const RGBToJzazbzInput
+        rgb = { R, G, B, white_luminance };
+
+      ConvertRGBToJzazbz(&rgb,X,Y,Z);
       break;
     }
     default:
