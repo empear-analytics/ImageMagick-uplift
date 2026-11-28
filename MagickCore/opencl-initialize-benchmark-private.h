@@ -514,9 +514,18 @@ static void ReadOpenCLBenchmarkAttribute(const OpenCLBenchmarkTokens *tokens,
   SetOpenCLBenchmarkAttribute((*device_benchmark),keyword,token);
 }
 
-static MagickBooleanType SkipOpenCLBenchmarkMarkup(const char *keyword,
-  const size_t extent,char *token,const char **q)
+static MagickBooleanType SkipOpenCLBenchmarkMarkup(
+  const OpenCLBenchmarkTokens *tokens,const char **q)
 {
+  const char
+    *const keyword = tokens->keyword;
+
+  const size_t
+    extent = tokens->extent;
+
+  char
+    *const token = tokens->token;
+
   if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
     {
       (*q)=SkipOpenCLBenchmarkDoctype((*q));
@@ -538,14 +547,10 @@ static MagickBooleanType ReadOpenCLBenchmarkMarkup(
   MagickCLDeviceBenchmark **device_benchmark,MagickBooleanType *broke)
 {
   char
-    *const keyword = tokens->keyword,
-    *const token = tokens->token;
-
-  const size_t
-    extent = tokens->extent;
+    *const keyword = tokens->keyword;
 
   (*broke)=MagickFalse;
-  if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,q) != MagickFalse)
+  if (SkipOpenCLBenchmarkMarkup(tokens,q) != MagickFalse)
     return(MagickFalse);
   if (LocaleCompare(keyword,"<device") == 0)
     {
