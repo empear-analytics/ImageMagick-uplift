@@ -659,9 +659,17 @@ static inline double *RigidAffineCoefficients(const CoefficientCall *call)
   return(coeff);
 }
 
-static inline void SetAffineProjectionCoefficients(double *coeff,
-  const double *arguments)
+static inline void SetAffineProjectionCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
   size_t
     i;
 
@@ -682,9 +690,6 @@ static inline double *AffineProjectionCoefficients(const CoefficientCall *call)
 
   const CoefficientContext
     *const context = call->context;
-
-  const double
-    *const arguments = context->arguments;
 
   ExceptionInfo
     *const exception = context->exception;
@@ -713,7 +718,7 @@ static inline double *AffineProjectionCoefficients(const CoefficientCall *call)
     return((double *) NULL);
   }
   /* FUTURE: trap test for sx*sy-rx*ry == 0 (determinant = 0, no inverse) */
-  SetAffineProjectionCoefficients(coeff,arguments);
+  SetAffineProjectionCoefficients(call);
   *method = AffineDistortion;
 
   return(coeff);
