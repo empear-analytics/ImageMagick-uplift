@@ -290,8 +290,8 @@ typedef struct _ColorBorderTargets
     *border_color;
 } ColorBorderTargets;
 
-static void XSelectColorBorder(const EditMenuInput *menu,
-  XResourceInfo *resource_info,const ColorBorderTargets *targets)
+static MagickBooleanType XSelectEditPen(const EditMenuInput *menu,
+  XResourceInfo *resource_info,char *color_name,int *pen_number)
 {
   Display
     *const display = menu->display;
@@ -308,14 +308,8 @@ static void XSelectColorBorder(const EditMenuInput *menu,
   char
     *const command = menu->command;
 
-  XColor
-    *const border_color = targets->border_color;
-
   const char
     *ColorMenu[MaxNumberPens];
-
-  int
-    pen_number;
 
   ssize_t
     i;
@@ -334,23 +328,43 @@ static void XSelectColorBorder(const EditMenuInput *menu,
     const XMenuRequest
       menu_request = { ColorEditMenu[id], (const char **) ColorMenu, command };
 
-    pen_number=XMenuWidget(display,windows,&menu_request);
+    (*pen_number)=XMenuWidget(display,windows,&menu_request);
   }
-  if (pen_number < 0)
-    return;
-  if (pen_number == (MaxNumberPens-2))
+  if ((*pen_number) < 0)
+    return(MagickFalse);
+  if ((*pen_number) == (MaxNumberPens-2))
     {
-      static char
-        color_name[MagickPathExtent] = "gray";
-
       /*
         Select a pen color from a dialog.
       */
-      resource_info->pen_colors[pen_number]=color_name;
+      resource_info->pen_colors[(*pen_number)]=color_name;
       XColorBrowserWidget(display,windows,"Select",color_name);
       if (*color_name == '\0')
-        return;
+        return(MagickFalse);
     }
+  return(MagickTrue);
+}
+
+static void XSelectColorBorder(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const ColorBorderTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  static char
+    color_name[MagickPathExtent] = "gray";
+
+  int
+    pen_number;
+
+  if (XSelectEditPen(menu,resource_info,color_name,&pen_number) == MagickFalse)
+    return;
   /*
     Set border color.
   */
@@ -376,61 +390,20 @@ static void XSelectPenColor(const EditMenuInput *menu,
   XWindows
     *const windows = menu->windows;
 
-  const char
-    *const *const ColorEditMenu = menu->MatteEditMenu;
-
-  const int
-    id = menu->id;
-
-  char
-    *const command = menu->command;
-
   XColor
     *const color = targets->color;
 
   unsigned int
     *const pen_id = targets->pen_id;
 
-  const char
-    *ColorMenu[MaxNumberPens];
+  static char
+    color_name[MagickPathExtent] = "gray";
 
   int
     pen_number;
 
-  ssize_t
-    i;
-
-  /*
-    Initialize menu selections.
-  */
-  for (i=0; i < (int) (MaxNumberPens-2); i++)
-    ColorMenu[i]=resource_info->pen_colors[i];
-  ColorMenu[MaxNumberPens-2]="Browser...";
-  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-  /*
-    Select a pen color from the pop-up menu.
-  */
-  {
-    const XMenuRequest
-      menu_request = { ColorEditMenu[id], (const char **) ColorMenu, command };
-
-    pen_number=XMenuWidget(display,windows,&menu_request);
-  }
-  if (pen_number < 0)
+  if (XSelectEditPen(menu,resource_info,color_name,&pen_number) == MagickFalse)
     return;
-  if (pen_number == (MaxNumberPens-2))
-    {
-      static char
-        color_name[MagickPathExtent] = "gray";
-
-      /*
-        Select a pen color from a dialog.
-      */
-      resource_info->pen_colors[pen_number]=color_name;
-      XColorBrowserWidget(display,windows,"Select",color_name);
-      if (*color_name == '\0')
-        return;
-    }
   /*
     Set pen color.
   */
