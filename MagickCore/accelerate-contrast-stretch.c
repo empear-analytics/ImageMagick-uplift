@@ -591,6 +591,80 @@ static MagickBooleanType CreateStretchMapBuffer(StretchResources *r,
   return(MagickTrue);
 }
 
+static MagickBooleanType RunStretchPass(Image *image,StretchResources *r,
+  const cl_int channel_mask,ExceptionInfo *exception)
+{
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  cl_uint
+    i;
+
+  size_t
+    global_work_size[2],
+    length;
+
+  if (CreateStretchMapBuffer(r,exception) == MagickFalse)
+    return(MagickFalse);
+
+  /* get the OpenCL kernel */
+  r->stretchKernel = AcquireOpenCLKernel(r->device,"ContrastStretch");
+  if (r->stretchKernel == NULL)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* set the kernel arguments */
+  i=0;
+  clStatus=r->clEnv->library->clSetKernelArg(r->stretchKernel,i++,sizeof(cl_mem),(void *)&r->imageBuffer);
+  clStatus|=r->clEnv->library->clSetKernelArg(r->stretchKernel,i++,sizeof(cl_int),&channel_mask);
+  clStatus|=r->clEnv->library->clSetKernelArg(r->stretchKernel,i++,sizeof(cl_mem),(void *)&r->stretchMapBuffer);
+  clStatus|=r->clEnv->library->clSetKernelArg(r->stretchKernel,i++,sizeof(cl_float4),&r->white);
+  clStatus|=r->clEnv->library->clSetKernelArg(r->stretchKernel,i++,sizeof(cl_float4),&r->black);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* launch the kernel */
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+
+  clStatus = r->clEnv->library->clEnqueueNDRangeKernel(r->queue, r->stretchKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(r->device,r->stretchKernel,event);
+
+  /* read the data back */
+  if (ALIGNED(r->inputPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    r->clEnv->library->clEnqueueMapBuffer(r->queue, r->imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = r->clEnv->library->clEnqueueReadBuffer(r->queue, r->imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), r->inputPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+
+  r->outputReady=SyncCacheViewAuthenticPixels(r->image_view,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -599,18 +673,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     r;
 
   cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    clStatus;
-
-  cl_event
-    event;
-
-  cl_uint
-    i;
-
-  size_t
-    global_work_size[2],
-    length;
+    channel_mask=get32BitChannelValue(image->channel_mask);
 
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
@@ -699,61 +762,8 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
 #include "MagickCore/accelerate-recreate-buffer-private.h"
 
-  if (CreateStretchMapBuffer(&r,exception) == MagickFalse)
+  if (RunStretchPass(image,&r,channel_mask,exception) == MagickFalse)
     goto cleanup;
-
-  /* get the OpenCL kernel */
-  r.stretchKernel = AcquireOpenCLKernel(r.device,"ContrastStretch");
-  if (r.stretchKernel == NULL)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
-    goto cleanup;
-  }
-
-  /* set the kernel arguments */
-  i=0;
-  clStatus=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_mem),(void *)&r.imageBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_int),&channel_mask);
-  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_mem),(void *)&r.stretchMapBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_float4),&r.white);
-  clStatus|=clEnv->library->clSetKernelArg(r.stretchKernel,i++,sizeof(cl_float4),&r.black);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
-  }
-
-  /* launch the kernel */
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
-
-  clStatus = clEnv->library->clEnqueueNDRangeKernel(r.queue, r.stretchKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-    goto cleanup;
-  }
-  RecordProfileData(r.device,r.stretchKernel,event);
-
-  /* read the data back */
-  if (ALIGNED(r.inputPixels,CLPixelPacket))
-  {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(r.queue, r.imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(r.queue, r.imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), r.inputPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
-  }
-
-  r.outputReady=SyncCacheViewAuthenticPixels(r.image_view,exception);
 
 cleanup:
 
