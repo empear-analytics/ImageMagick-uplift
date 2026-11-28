@@ -215,8 +215,11 @@ static MagickBooleanType ValidateJPEGYCbCrToRGB()
     g,
     b;
 
+  const ConversionsRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  JPEGYCbCrToRGB");
-  ConvertYCbCrToRGB(0.783460,0.319581,0.330539,&r,&g,&b);
+  ConvertYCbCrToRGB(0.783460,0.319581,0.330539,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))
@@ -399,8 +402,11 @@ static MagickBooleanType ValidateYDbDrToRGB()
     g,
     b;
 
+  const ConversionsRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  YDbDrToRGB");
-  ConvertYDbDrToRGB(0.783460,-0.480932+0.5,0.451670+0.5,&r,&g,&b);
+  ConvertYDbDrToRGB(0.783460,-0.480932+0.5,0.451670+0.5,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))
@@ -449,8 +455,11 @@ static MagickBooleanType ValidateYIQToRGB()
     g,
     b;
 
+  const ConversionsRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  YIQToRGB");
-  ConvertYIQToRGB(0.783460,-0.089078+0.5,-0.245399+0.5,&r,&g,&b);
+  ConvertYIQToRGB(0.783460,-0.089078+0.5,-0.245399+0.5,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))
@@ -482,8 +491,11 @@ static MagickBooleanType ValidateYPbPrToRGB()
     g,
     b;
 
+  const ConversionsRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  YPbPrToRGB");
-  ConvertYPbPrToRGB(0.783460,-0.180419+0.5,-0.169461+0.5,&r,&g,&b);
+  ConvertYPbPrToRGB(0.783460,-0.180419+0.5,-0.169461+0.5,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))
@@ -515,8 +527,11 @@ static MagickBooleanType ValidateYUVToRGB()
     g,
     b;
 
+  const ConversionsRGBTarget
+    target = { (&r), (&g), (&b) };
+
   (void) FormatLocaleFile(stdout,"  YUVToRGB");
-  ConvertYUVToRGB(0.783460,-0.157383+0.5,-0.208443+0.5,&r,&g,&b);
+  ConvertYUVToRGB(0.783460,-0.157383+0.5,-0.208443+0.5,&target);
   if ((fabs((double) r-0.545877*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) g-0.966567*(double) QuantumRange) >= ReferenceEpsilon) ||
       (fabs((double) b-0.463759*(double) QuantumRange) >= ReferenceEpsilon))

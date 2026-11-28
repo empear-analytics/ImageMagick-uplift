@@ -149,26 +149,29 @@ static void ConvertYDbDrThroughYUVToRGB(const GenericToRGBInput *input)
     *const G = input->G,
     *const B = input->B;
 
+  const ConversionsRGBTarget
+    target = { R, G, B };
+
   switch (colorspace)
   {
     case YDbDrColorspace:
     {
-      ConvertYDbDrToRGB(X,Y,Z,R,G,B);
+      ConvertYDbDrToRGB(X,Y,Z,&target);
       break;
     }
     case YIQColorspace:
     {
-      ConvertYIQToRGB(X,Y,Z,R,G,B);
+      ConvertYIQToRGB(X,Y,Z,&target);
       break;
     }
     case YPbPrColorspace:
     {
-      ConvertYPbPrToRGB(X,Y,Z,R,G,B);
+      ConvertYPbPrToRGB(X,Y,Z,&target);
       break;
     }
     case YUVColorspace:
     {
-      ConvertYUVToRGB(X,Y,Z,R,G,B);
+      ConvertYUVToRGB(X,Y,Z,&target);
       break;
     }
     default:
@@ -196,6 +199,9 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
     *const G = input->G,
     *const B = input->B;
 
+  const ConversionsRGBTarget
+    target = { R, G, B };
+
   switch (colorspace)
   {
     case OklabColorspace:
@@ -215,7 +221,7 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
     }
     case xyYColorspace:
     {
-      ConvertxyYToRGB(X,Y,Z,R,G,B);
+      ConvertxyYToRGB(X,Y,Z,&target);
       break;
     }
     case XYZColorspace:
@@ -225,7 +231,7 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
     }
     case YCbCrColorspace:
     {
-      ConvertYCbCrToRGB(X,Y,Z,R,G,B);
+      ConvertYCbCrToRGB(X,Y,Z,&target);
       break;
     }
     default:
