@@ -774,9 +774,17 @@ static inline MagickBooleanType ParseScaleRotateTranslateArguments(double *coeff
   return(MagickTrue);
 }
 
-static inline double *ScaleRotateTranslateCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *ScaleRotateTranslateCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
