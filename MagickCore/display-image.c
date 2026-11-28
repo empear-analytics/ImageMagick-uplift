@@ -129,6 +129,7 @@
 #include "MagickCore/display-image-screen-configure-private.h"
 #include "MagickCore/display-image-screen-event-private.h"
 #include "MagickCore/display-image-tile-load-private.h"
+#include "MagickCore/display-image-tile-command-private.h"
 #include "MagickCore/display-image-tile-private.h"
 
 
