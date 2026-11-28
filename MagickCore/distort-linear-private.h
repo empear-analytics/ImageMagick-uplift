@@ -1176,10 +1176,14 @@ static inline void SetBilinearVectors(double **vectors,double *coeff,
 }
 
 static inline MagickBooleanType SolveBilinearCoefficients(
-  const CoefficientCall *call,double **matrix,double **vectors)
+  const CoefficientCall *call,const LeastSquaresArrays *arrays)
 {
   double
     *const coeff = call->coeff;
+
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
 
   const CoefficientContext
     *const context = call->context;
@@ -1335,7 +1339,12 @@ static inline double *BilinearCoefficients(const CoefficientCall *call)
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  status=SolveBilinearCoefficients(call,matrix,vectors);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    status=SolveBilinearCoefficients(call,&arrays);
+  }
   matrix  = RelinquishMagickMatrix(matrix, 4UL);
   vectors = (double **) RelinquishMagickMemory(vectors);
   if ( status == MagickFalse ) {
