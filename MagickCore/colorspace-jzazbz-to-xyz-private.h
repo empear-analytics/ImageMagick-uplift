@@ -52,6 +52,33 @@ typedef struct _JzazbzToXYZInput
     *Z;
 } JzazbzToXYZInput;
 
+static inline void StoreJzazbzLMSAsXYZ(const double L,const double M,
+  const double S,const JzazbzToXYZInput *jzazbz)
+{
+  double
+    Xp,
+    Zp,
+    Yp;
+
+  Zp=Jzazbz_ZL*L;
+  Xp=Jzazbz_XL*L;
+  Yp=Jzazbz_YL*L;
+  Zp+=Jzazbz_ZM*M;
+  Xp+=Jzazbz_XM*M;
+  Yp+=Jzazbz_YM*M;
+  Zp+=Jzazbz_ZS*S;
+  Xp+=Jzazbz_XS*S;
+  Yp+=Jzazbz_YS*S;
+  Zp=IsNaN(Zp) != 0 ? 0.0 : Zp;
+  Xp=Zp+(Xp-Zp)/Jzazbz_b;  /* If Xp and Zp are vectorized, better done */
+  Xp=IsNaN(Xp) != 0 ? 0.0 : Xp;  /* as rJzazbz_b = 1.0/Jzazbz_b; */
+  Yp=Xp+(Yp-Xp)/Jzazbz_g;  /* Xp=rJzazbz_b*Xp+(1.0-rJzazbz_b)*Zp; etc. */
+  Yp=IsNaN(Yp) != 0 ? 0.0 : Yp;
+  *jzazbz->Z=Zp;
+  *jzazbz->X=Xp;
+  *jzazbz->Y=Yp;
+}
+
 static inline void ConvertJzazbzToXYZ(const JzazbzToXYZInput *jzazbz)
 {
   double
@@ -75,10 +102,7 @@ static inline void ConvertJzazbzToXYZ(const JzazbzToXYZInput *jzazbz)
     Sp,
     nL,
     nM,
-    nS,
-    Xp,
-    Zp,
-    Yp;
+    nS;
 
   g=jzazbz->Jz+Jzazbz_d0;
   azz=jzazbz->az-0.5;
@@ -106,23 +130,7 @@ static inline void ConvertJzazbzToXYZ(const JzazbzToXYZInput *jzazbz)
   L*=jzazbz->white_luminance;
   M*=jzazbz->white_luminance;
   S*=jzazbz->white_luminance;
-  Zp=Jzazbz_ZL*L;
-  Xp=Jzazbz_XL*L;
-  Yp=Jzazbz_YL*L;
-  Zp+=Jzazbz_ZM*M;
-  Xp+=Jzazbz_XM*M;
-  Yp+=Jzazbz_YM*M;
-  Zp+=Jzazbz_ZS*S;
-  Xp+=Jzazbz_XS*S;
-  Yp+=Jzazbz_YS*S;
-  Zp=IsNaN(Zp) != 0 ? 0.0 : Zp;
-  Xp=Zp+(Xp-Zp)/Jzazbz_b;  /* If Xp and Zp are vectorized, better done */
-  Xp=IsNaN(Xp) != 0 ? 0.0 : Xp;  /* as rJzazbz_b = 1.0/Jzazbz_b; */
-  Yp=Xp+(Yp-Xp)/Jzazbz_g;  /* Xp=rJzazbz_b*Xp+(1.0-rJzazbz_b)*Zp; etc. */
-  Yp=IsNaN(Yp) != 0 ? 0.0 : Yp;
-  *jzazbz->Z=Zp;
-  *jzazbz->X=Xp;
-  *jzazbz->Y=Yp;
+  StoreJzazbzLMSAsXYZ(L,M,S,jzazbz);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
