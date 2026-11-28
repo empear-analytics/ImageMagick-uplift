@@ -1543,7 +1543,7 @@ static MagickBooleanType
     ExceptionInfo *),
   XROIImage(Display *,XResourceInfo *,XWindows *,Image **,ExceptionInfo *),
   XSaveImage(const XImageCommandInput *),
-  XTrimImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
+  XTrimImage(const XImageCommandInput *);
 static void
   XDrawPanRectangle(Display *,XWindows *),
   XImageCache(const XImageCacheContext *,const DisplayCommand),

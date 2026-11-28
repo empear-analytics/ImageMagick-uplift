@@ -1537,10 +1537,23 @@ static void XTrimTopEdge(const XWindows *windows,RectangleInfo *trim_info)
   (*trim_info).y=(ssize_t) y;
 }
 
-static MagickBooleanType XTrimImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+static MagickBooleanType XTrimImage(const XImageCommandInput *command_input)
 {
+  Display
+    *const display = command_input->display;
+
+  XResourceInfo
+    *const resource_info = command_input->resource_info;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  Image
+    *const image = command_input->image;
+
+  ExceptionInfo
+    *const exception = command_input->exception;
+
   RectangleInfo
     trim_info;
 
