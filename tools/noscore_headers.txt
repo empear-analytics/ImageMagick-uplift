@@ -10,7 +10,8 @@
 # Format: path, blob hash, then '#' and the reason (no static or inline function, no ')'
 # followed by '{' outside a macro body). Seeded 2026-11-20 (campaign A round 36, lane c) from
 # a scan of all 172 gated *-private.h files on campaign/W49-c: these 41 gave no score.
-MagickCore/accelerate-private.h 055e84a4fac46dd165215db911f2c0a9b663fa54  # MagickPrivate declarations only
+MagickCore/accelerate-private.h 082c46b9c6a94d67b10c4bb83011a711acd490e9  # MagickPrivate declarations and request typedefs (AccelerateResizeRequest, AccelerateUnsharpRequest)
+MagickCore/accelerate-private.h 0624b4a82d1514a724fdd67c3797bf81c5cbb770  # MagickPrivate declarations and request typedefs (the content this list's earlier hash no longer matched, at 81e38bca7)
 MagickCore/accelerate-recreate-buffer-private.h 921d03af784c52f96a5e3914e5613316c5d18cca  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
 MagickCore/accelerate-recreate-release-private.h 9fd2fd49dac2444619c8c6efdd66ac9301c24a88  # Recipe UB fragment: statements of an #ifdef RECREATEBUFFER block, no function
 MagickCore/animate-private.h 320dab7ba985d8f6fe8adc159b57428f228a42ce  # declarations only

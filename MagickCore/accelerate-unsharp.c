@@ -658,9 +658,14 @@ cleanup:
 }
 
 MagickPrivate Image *AccelerateUnsharpMaskImage(const Image *image,
-  const double radius,const double sigma,const double gain,
-  const double threshold,ExceptionInfo *exception)
+  const AccelerateUnsharpRequest *request,ExceptionInfo *exception)
 {
+  const double
+    radius = request->radius,
+    sigma = request->sigma,
+    gain = request->gain,
+    threshold = request->threshold;
+
   Image
     *filteredImage;
 
