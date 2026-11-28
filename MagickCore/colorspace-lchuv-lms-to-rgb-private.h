@@ -35,14 +35,16 @@ static inline void ConvertLCHuvToRGB(const double luma,const double chroma,
   const IlluminantRGBTarget
     rgb = { red, green, blue };
 
+  const LuvXYZTarget
+    xyz = { illuminant, (&X), (&Y), (&Z) };
+
   /*
     Convert LCHuv to RGB colorspace.
   */
   assert(red != (double *) NULL);
   assert(green != (double *) NULL);
   assert(blue != (double *) NULL);
-  ConvertLCHuvToXYZ(100.0*luma,255.0*(chroma-0.5),360.0*hue,illuminant,
-    &X,&Y,&Z);
+  ConvertLCHuvToXYZ(100.0*luma,255.0*(chroma-0.5),360.0*hue,&xyz);
   ConvertXYZToRGB(X,Y,Z,&rgb);
 }
 

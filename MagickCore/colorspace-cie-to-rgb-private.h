@@ -94,8 +94,10 @@ static inline void ConvertLuvToRGB(const CIELuvInput *luv,
     Y,
     Z;
 
-  ConvertLuvToXYZ(100.0*luv->L,354.0*luv->u-134.0,262.0*luv->v-140.0,
-    illuminant,&X,&Y,&Z);
+  const LuvXYZTarget
+    xyz = { illuminant, (&X), (&Y), (&Z) };
+
+  ConvertLuvToXYZ(100.0*luv->L,354.0*luv->u-134.0,262.0*luv->v-140.0,&xyz);
   {
     const IlluminantRGBTarget
       rgb = { target->red, target->green, target->blue };

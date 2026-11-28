@@ -23,9 +23,28 @@
 extern "C" {
 #endif
 
-static inline void ConvertLuvToXYZ(const double L,const double u,const double v,
-  const IlluminantType illuminant,double *X,double *Y,double *Z)
+typedef struct _LuvXYZTarget
 {
+  IlluminantType
+    illuminant;
+
+  double
+    *X,
+    *Y,
+    *Z;
+} LuvXYZTarget;
+
+static inline void ConvertLuvToXYZ(const double L,const double u,const double v,
+  const LuvXYZTarget *target)
+{
+  const IlluminantType
+    illuminant = target->illuminant;
+
+  double
+    *const X = target->X,
+    *const Y = target->Y,
+    *const Z = target->Z;
+
   double
     gamma;
 
@@ -51,11 +70,10 @@ static inline void ConvertLuvToXYZ(const double L,const double u,const double v,
 }
 
 static inline void ConvertLCHuvToXYZ(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *X,double *Y,
-  double *Z)
+  const double hue,const LuvXYZTarget *target)
 {
   ConvertLuvToXYZ(luma,chroma*cos(DegreesToRadians(hue)),chroma*
-    sin(DegreesToRadians(hue)),illuminant,X,Y,Z);
+    sin(DegreesToRadians(hue)),target);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
