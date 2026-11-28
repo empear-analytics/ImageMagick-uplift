@@ -23,9 +23,6 @@
 extern "C" {
 #endif
 
-static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
-  const double bz,const double white_luminance,double *X,double *Y,double *Z)
-{
 #define Jzazbz_Ca  (0.138605043271539)
 #define Jzazbz_Cb  (0.0580473161561189)
 #define Jzazbz_Sa  (-0.0960192420263189)
@@ -41,6 +38,9 @@ static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
 #define Jzazbz_ZS  (1.52276656130526)
 #define mJzazbz_c3  (-2392.0/128.0)
 
+static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
+  const double bz,const double white_luminance,double *X,double *Y,double *Z)
+{
   double
     azz,
     bzz,
