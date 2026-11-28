@@ -276,6 +276,7 @@ $call Make xwindow.c
 $call Make xwindow-image.c
 $call Make xwindow-annotate.c
 $call Make xwindow-info.c
+$call Make xwindow-free.c
 $call Make xwindow-pixel.c
 $call Make xwindow-text.c
 $call Make xwindow-visual.c

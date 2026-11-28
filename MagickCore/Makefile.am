@@ -686,6 +686,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-image.c \
   MagickCore/xwindow-annotate.c \
   MagickCore/xwindow-info.c \
+  MagickCore/xwindow-free.c \
   MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-pixel.c \
   MagickCore/xwindow-text.c \
