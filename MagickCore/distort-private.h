@@ -927,7 +927,7 @@ static inline double *GenerateAffineFamilyCoefficients(
     case ScaleRotateTranslateDistortion:
       return(ScaleRotateTranslateCoefficients(call));
     case PerspectiveDistortion:
-      return(PerspectiveCoefficients(coeff,method,context));
+      return(PerspectiveCoefficients(call));
     case PerspectiveProjectionDistortion:
       return(PerspectiveProjectionCoefficients(coeff,method,context));
     default:

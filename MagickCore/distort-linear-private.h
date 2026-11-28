@@ -936,9 +936,17 @@ static inline void SetPerspectiveGroundSign(double *coeff,const double *argument
   coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
 }
 
-static inline double *PerspectiveCoefficients(double *coeff,
-  const DistortMethod *method,const CoefficientContext *context)
+static inline double *PerspectiveCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
