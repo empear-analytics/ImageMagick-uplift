@@ -619,6 +619,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/utility-unique.c \
   MagickCore/utility.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-file-private.h \
   MagickCore/utility-path-private.h \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
@@ -1050,6 +1051,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/transform-region-private.h \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-file-private.h \
   MagickCore/utility-path-private.h \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
