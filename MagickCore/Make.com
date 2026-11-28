@@ -121,6 +121,8 @@ $call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make enhance-equalize.c
 $call Make enhance-level.c
+$call Make enhance-level-image.c
+$call Make enhance-levelize.c
 $call Make enhance-level-colors.c
 $call Make exception.c
 $call Make exception-throw.c
