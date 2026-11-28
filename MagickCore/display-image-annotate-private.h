@@ -836,6 +836,17 @@ static void XColorEditEvent(const ColorEditContext *context,
   }
 }
 
+static MagickBooleanType IsColorEditOffsetInside(
+  const ColorEditContext *context,int x_offset,int y_offset)
+{
+  if ((x_offset < 0) || (y_offset < 0))
+    return(MagickFalse);
+  if ((x_offset >= (int) (*context->image)->columns) ||
+      (y_offset >= (int) (*context->image)->rows))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
   const ColorEditTargets *targets,int x_offset,int y_offset)
 {
@@ -889,10 +900,7 @@ static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
         context->windows->image.ximage->width+x);
       y_offset=((int) height*(context->windows->image.y+y_offset)/(int)
         context->windows->image.ximage->height+y);
-      if ((x_offset < 0) || (y_offset < 0))
-        return(MagickTrue);
-      if ((x_offset >= (int) (*context->image)->columns) ||
-          (y_offset >= (int) (*context->image)->rows))
+      if (IsColorEditOffsetInside(context,x_offset,y_offset) == MagickFalse)
         return(MagickTrue);
       image_view=AcquireAuthenticCacheView(*context->image,context->exception);
       pixel_input.image=context->image;
