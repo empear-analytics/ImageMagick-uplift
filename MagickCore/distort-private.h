@@ -919,7 +919,7 @@ static inline double *GenerateAffineFamilyCoefficients(
   switch (*method)
   {
     case AffineDistortion:
-      return(AffineCoefficients(coeff,method,context));
+      return(AffineCoefficients(call));
     case RigidAffineDistortion:
       return(RigidAffineCoefficients(coeff,method,context));
     case AffineProjectionDistortion:

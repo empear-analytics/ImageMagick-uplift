@@ -440,9 +440,17 @@ static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors
   }
 }
 
-static inline double *AffineCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *AffineCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
