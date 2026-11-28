@@ -23,39 +23,79 @@
 extern "C" {
 #endif
 
+typedef struct _XYZToRGBTarget
+{
+  double
+    *red,
+    *green,
+    *blue;
+} XYZToRGBTarget;
+
+typedef struct _CAT02LMSXYZTarget
+{
+  double
+    *X,
+    *Y,
+    *Z;
+} CAT02LMSXYZTarget;
+
+typedef struct _CAT02LMSRGBTarget
+{
+  double
+    *R,
+    *G,
+    *B;
+} CAT02LMSRGBTarget;
+
 static inline void ConvertAdobe98ToRGB(const double r,const double g,
-  const double b,double *red,double *green,double *blue)
+  const double b,const XYZToRGBTarget *target)
 {
   double
     X,
     Y,
     Z;
 
-  ConvertAdobe98ToXYZ(r,g,b,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  const IlluminantXYZTarget
+    xyz = { (&X), (&Y), (&Z) };
+
+  ConvertAdobe98ToXYZ(r,g,b,&xyz);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertCAT02LMSToXYZ(const double L,const double M,
-  const double S,double *X,double *Y,double *Z)
+  const double S,const CAT02LMSXYZTarget *target)
 {
   /*
     Convert CAT02LMS to XYZ colorspace.
   */
-  *X=1.096123820835514*L-0.278869000218287*M+0.182745179382773*S;
-  *Y=0.454369041975359*L+0.473533154307412*M+0.072097803717229*S;
-  *Z=(-0.009627608738429)*L-0.005698031216113*M+1.015325639954543*S;
+  *target->X=1.096123820835514*L-0.278869000218287*M+0.182745179382773*S;
+  *target->Y=0.454369041975359*L+0.473533154307412*M+0.072097803717229*S;
+  *target->Z=(-0.009627608738429)*L-0.005698031216113*M+1.015325639954543*S;
 }
 
 static inline void ConvertCAT02LMSToRGB(const double L,const double M,
-  const double S,double *R,double *G,double *B)
+  const double S,const CAT02LMSRGBTarget *target)
 {
   double
     X,
     Y,
     Z;
 
-  ConvertCAT02LMSToXYZ(L,M,S,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,R,G,B);
+  const CAT02LMSXYZTarget
+    xyz = { (&X), (&Y), (&Z) };
+
+  ConvertCAT02LMSToXYZ(L,M,S,&xyz);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->R, target->G, target->B };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertCMYKToRGB(PixelInfo *pixel)
@@ -69,11 +109,11 @@ static inline void ConvertCMYKToRGB(PixelInfo *pixel)
 }
 
 static inline void ConvertCMYToRGB(const double cyan,const double magenta,
-  const double yellow,double *red,double *green,double *blue)
+  const double yellow,const XYZToRGBTarget *target)
 {
-	*red=(double) QuantumRange*(1.0-cyan);
-  *green=(double) QuantumRange*(1.0-magenta);
-  *blue=(double) QuantumRange*(1.0-yellow);
+	*target->red=(double) QuantumRange*(1.0-cyan);
+  *target->green=(double) QuantumRange*(1.0-magenta);
+  *target->blue=(double) QuantumRange*(1.0-yellow);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

@@ -23,9 +23,6 @@
 extern "C" {
 #endif
 
-static inline void ConvertXYZToJzazbz(const double X,const double Y,
-  const double Z,const double white_luminance,double *Jz,double *az,double *bz)
-{
 #define Jzazbz_b  (1.15)  /* https://observablehq.com/@jrus/jzazbz */
 #define Jzazbz_g  (0.66)  /* refactored by N. Robidoux */
 #define Jzazbz_c1  (3424.0/4096.0)
@@ -50,6 +47,24 @@ static inline void ConvertXYZToJzazbz(const double X,const double Y,
 #define Jzazbz_bL  (0.199076)
 #define Jzazbz_bM  (1.096799)
 #define Jzazbz_bS  (-1.295875)
+
+typedef struct _XYZToJzazbzInput
+{
+  const double
+    X,
+    Y,
+    Z,
+    white_luminance;
+} XYZToJzazbzInput;
+
+static inline void ConvertXYZToJzazbz(const XYZToJzazbzInput *xyz,double *Jz,
+  double *az,double *bz)
+{
+  const double
+    X = xyz->X,
+    Y = xyz->Y,
+    Z = xyz->Z,
+    white_luminance = xyz->white_luminance;
 
   double
     a,

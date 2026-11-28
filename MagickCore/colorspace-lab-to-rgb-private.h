@@ -13,8 +13,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private colorspace conversions to XYZ and RGB: Lab and LCHab;
-  included by colorspace-private.h only.
+  MagickCore private colorspace conversions to XYZ: Lab and LCHab, and from
+  Lab to RGB; included by colorspace-private.h only.
 */
 #ifndef MAGICKCORE_COLORSPACE_LAB_TO_RGB_PRIVATE_H
 #define MAGICKCORE_COLORSPACE_LAB_TO_RGB_PRIVATE_H
@@ -23,8 +23,30 @@
 extern "C" {
 #endif
 
+typedef struct _LabXYZTarget
+{
+  IlluminantType
+    illuminant;
+
+  double
+    *X,
+    *Y,
+    *Z;
+} LabXYZTarget;
+
+typedef struct _LabRGBTarget
+{
+  IlluminantType
+    illuminant;
+
+  double
+    *red,
+    *green,
+    *blue;
+} LabRGBTarget;
+
 static inline void ConvertLabToXYZ(const double L,const double a,const double b,
-  const IlluminantType illuminant,double *X,double *Y,double *Z)
+  const LabXYZTarget *target)
 {
   double
     x,
@@ -46,50 +68,42 @@ static inline void ConvertLabToXYZ(const double L,const double a,const double b,
     z=(z*z*z);
   else
     z=(116.0*z-16.0)/CIEK;
-  *X=illuminant_tristimulus[illuminant].x*x;
-  *Y=illuminant_tristimulus[illuminant].y*y;
-  *Z=illuminant_tristimulus[illuminant].z*z;
+  *target->X=illuminant_tristimulus[target->illuminant].x*x;
+  *target->Y=illuminant_tristimulus[target->illuminant].y*y;
+  *target->Z=illuminant_tristimulus[target->illuminant].z*z;
 }
 
 static inline void ConvertLabToRGB(const double L,const double a,
-  const double b,const IlluminantType illuminant,double *red,double *green,
-  double *blue)
+  const double b,const LabRGBTarget *target)
 {
+  const IlluminantType
+    illuminant = target->illuminant;
+
+  double
+    *const red = target->red,
+    *const green = target->green,
+    *const blue = target->blue;
+
   double
     X,
     Y,
     Z;
 
-  ConvertLabToXYZ(100.0*L,255.0*(a-0.5),255.0*(b-0.5),illuminant,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  const IlluminantRGBTarget
+    rgb = { red, green, blue };
+
+  const LabXYZTarget
+    xyz = { illuminant, (&X), (&Y), (&Z) };
+
+  ConvertLabToXYZ(100.0*L,255.0*(a-0.5),255.0*(b-0.5),&xyz);
+  ConvertXYZToRGB(X,Y,Z,&rgb);
 }
 
 static inline void ConvertLCHabToXYZ(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *X,double *Y,
-  double *Z)
+  const double hue,const LabXYZTarget *target)
 {
   ConvertLabToXYZ(luma,chroma*cos(DegreesToRadians(hue)),chroma*
-    sin(DegreesToRadians(hue)),illuminant,X,Y,Z);
-}
-
-static inline void ConvertLCHabToRGB(const double luma,const double chroma,
-  const double hue,const IlluminantType illuminant,double *red,double *green,
-  double *blue)
-{
-  double
-    X,
-    Y,
-    Z;
-
-  /*
-    Convert LCHab to RGB colorspace.
-  */
-  assert(red != (double *) NULL);
-  assert(green != (double *) NULL);
-  assert(blue != (double *) NULL);
-  ConvertLCHabToXYZ(100.0*luma,255.0*(chroma-0.5),360.0*hue,illuminant,
-    &X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+    sin(DegreesToRadians(hue)),target);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

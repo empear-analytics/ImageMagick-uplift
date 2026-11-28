@@ -23,8 +23,32 @@
 extern "C" {
 #endif
 
+typedef struct _CIEToXYZTarget
+{
+  double
+    *X,
+    *Y,
+    *Z;
+} CIEToXYZTarget;
+
+typedef struct _CIEToRGBTarget
+{
+  double
+    *red,
+    *green,
+    *blue;
+} CIEToRGBTarget;
+
+typedef struct _CIELuvInput
+{
+  double
+    L,
+    u,
+    v;
+} CIELuvInput;
+
 static inline void ConvertDisplayP3ToXYZ(const double red,const double green,
-  const double blue,double *X,double *Y,double *Z)
+  const double blue,const CIEToXYZTarget *target)
 {
   double
     b,
@@ -37,38 +61,53 @@ static inline void ConvertDisplayP3ToXYZ(const double red,const double green,
   r=QuantumScale*DecodePixelGamma((double) QuantumRange*red);
   g=QuantumScale*DecodePixelGamma((double) QuantumRange*green);
   b=QuantumScale*DecodePixelGamma((double) QuantumRange*blue);
-  *X=0.4865709486482162*r+0.26566769316909306*g+0.1982172852343625*b;
-  *Y=0.2289745640697488*r+0.69173852183650640*g+0.0792869140937450*b;
-  *Z=0.0000000000000000*r+0.04511338185890264*g+1.0439443689009760*b;
+  *target->X=0.4865709486482162*r+0.26566769316909306*g+0.1982172852343625*b;
+  *target->Y=0.2289745640697488*r+0.69173852183650640*g+0.0792869140937450*b;
+  *target->Z=0.0000000000000000*r+0.04511338185890264*g+1.0439443689009760*b;
 }
 
 static inline void ConvertDisplayP3ToRGB(const double r,const double g,
-  const double b,double *red,double *green,double *blue)
+  const double b,const CIEToRGBTarget *target)
 {
   double
     X,
     Y,
     Z;
 
-  ConvertDisplayP3ToXYZ(r,g,b,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  const CIEToXYZTarget
+    xyz = { (&X), (&Y), (&Z) };
+
+  ConvertDisplayP3ToXYZ(r,g,b,&xyz);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
-static inline void ConvertLuvToRGB(const double L,const double u,
-  const double v,const IlluminantType illuminant,double *red,double *green,
-  double *blue)
+static inline void ConvertLuvToRGB(const CIELuvInput *luv,
+  const IlluminantType illuminant,const CIEToRGBTarget *target)
 {
   double
     X,
     Y,
     Z;
 
-  ConvertLuvToXYZ(100.0*L,354.0*u-134.0,262.0*v-140.0,illuminant,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  const LuvXYZTarget
+    xyz = { illuminant, (&X), (&Y), (&Z) };
+
+  ConvertLuvToXYZ(100.0*luv->L,354.0*luv->u-134.0,262.0*luv->v-140.0,&xyz);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 static inline void ConvertProPhotoToXYZ(const double red,const double green,
-  const double blue,double *X,double *Y,double *Z)
+  const double blue,const CIEToXYZTarget *target)
 {
   double
     b,
@@ -81,22 +120,33 @@ static inline void ConvertProPhotoToXYZ(const double red,const double green,
   r=QuantumScale*DecodePixelGamma((double) QuantumRange*red);
   g=QuantumScale*DecodePixelGamma((double) QuantumRange*green);
   b=QuantumScale*DecodePixelGamma((double) QuantumRange*blue);
-  *X=0.4865709486482162*r+0.26566769316909306*g+0.1982172852343625*b;
-  *X=0.7977604896723027*r+0.13518583717574031*g+0.03134934958152480000*b;
-  *Y=0.2880711282292934*r+0.71184321781010140*g+0.00008565396060525902*b;
-  *Z=0.0000000000000000*r+0.00000000000000000*g+0.82510460251046010000*b;
+  *target->X=0.4865709486482162*r+0.26566769316909306*g+0.1982172852343625*b;
+  *target->X=0.7977604896723027*r+0.13518583717574031*g+
+    0.03134934958152480000*b;
+  *target->Y=0.2880711282292934*r+0.71184321781010140*g+
+    0.00008565396060525902*b;
+  *target->Z=0.0000000000000000*r+0.00000000000000000*g+
+    0.82510460251046010000*b;
 }
 
 static inline void ConvertProPhotoToRGB(const double r,const double g,
-  const double b,double *red,double *green,double *blue)
+  const double b,const CIEToRGBTarget *target)
 {
   double
     X,
     Y,
     Z;
 
-  ConvertProPhotoToXYZ(r,g,b,&X,&Y,&Z);
-  ConvertXYZToRGB(X,Y,Z,red,green,blue);
+  const CIEToXYZTarget
+    xyz = { (&X), (&Y), (&Z) };
+
+  ConvertProPhotoToXYZ(r,g,b,&xyz);
+  {
+    const IlluminantRGBTarget
+      rgb = { target->red, target->green, target->blue };
+
+    ConvertXYZToRGB(X,Y,Z,&rgb);
+  }
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

@@ -2092,6 +2092,23 @@ merges code, not parameters.
    by hand before and after. A `static` function that the bundled one calls with exactly
    the bound locals of its step 3 may then take the same `const Name *` under step 8's
    *Existing input struct* form, the bindings standing for Recipe N's.
+   *Test-program caller* (mandate (2026-11-19), added 2026-11-28 for
+   `colorspace-cie-to-rgb-private.h`'s `ConvertLuvToRGB`, please confirm). A changed call in
+   a file under `tests/` that only a test program compiles (`tests/validate.c`: no oracle
+   case runs it, no library object holds it) may miss (d) in two ways only, each measured
+   and quoted in the message. (i) At the build's own flags, with `__LINE__` pinned as
+   `obj_identical.sh` compiles, its `.text` and relocations are identical and the only
+   other bytes that differ are constants in `.rodata.cst*` that clang folded from a
+   contractable expression (`354.0*u-134.0`, `llvm.fmuladd`): with `-ffp-contract=off`
+   added to both sides the objects are identical. (ii) With `-fno-inline`, the functions
+   that differ besides the bundled one and the caller are callees of the bundled function
+   that clang had specialised for the caller's literal arguments (interprocedural constant
+   propagation, which the struct stops) and functions whose only difference is a `.rodata`
+   relocation addend; none is new or gone. The test program is rebuilt and the subtest
+   that runs the call passes (`tests/validate -validate <type>`). The defining file, every
+   library caller and every other includer keep (d) as written. The test program may then
+   compute a floating-point value that differs in its last bits, inside the subtest's
+   tolerance; the library's code does not change.
 2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
    top of the file, one member per parameter in the group, with the parameter's type and
    name.
@@ -15941,6 +15958,22 @@ block leaves through `goto`.
    the new function, which declares `v` and ends with `return(v);` (steps 1, 3 and 4 otherwise
    hold); in the caller `v=Helper(...);` is followed by a copy of the block's first guard,
    `if (v == (T *) NULL) return(v);`.
+8. Exits with releases, a transformed clone, twin heads (mandate (2026-11-19), added
+   2026-11-28 for `compare-similarity-frequency-images-private.h`'s
+   `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage`, please confirm). (a) An exit
+   of the block may be `{ S return(R); }`, `S` statements that only release objects the
+   block neither reads nor writes (`complex_conjugate=DestroyImageList(complex_conjugate);`),
+   when the caller's next statement is `if (v == (T *) NULL) { S return(R); }` with the
+   same `S` and `R`; the exit becomes `return((T *) NULL);`. (b) `v` may also be written
+   by the block's first statement, the object its last call transforms (`v=CloneImage(...);`,
+   its test, `v=Last(v,...);`, nothing else writing `v`): the helper holds that object in a
+   local of its own declared as `v` was (`clone_image`) and ends
+   `return(Last(clone_image,...));`. When no release follows step 2's last call, the helper
+   may likewise end `return(Call(...));` instead of declaring `v`. An object the block
+   overwrote without releasing it stays unreleased: no fix rides along. (c) A guard of the
+   block may spell the null pointer `NULL` or `(T *) NULL`; the helper writes `(T *) NULL`.
+   (d) Two copies in one caller that are the same text under Recipe D's renaming but for
+   their exits' `S` call the same helper in one commit, as Recipe W step 7 lets a copy do.
 
 **Before:**
 
@@ -15982,6 +16015,14 @@ block leaves through `goto`.
   which holds that `NULL`: the value the caller returned before, at the same point. On the
   path that passes every guard the helper returns `v` and the caller goes on with it as
   before; the guard reads `v` once more and has no side effect.
+- Step 8: (a) the helper returns `(T *) NULL` where the block ran `S` and returned `R`, after
+  the same statements, and the caller's next statement runs the same `S` and returns `R`;
+  `S` touches nothing the block wrote, so it releases the same objects. (b) The helper
+  returns the value the block's last statement left in `v`; the clone that `v` held before
+  was read only inside the block, now through the helper's own local. (c) `NULL` is a null
+  pointer constant, converted to the pointer's type when compared (C11 6.3.2.3p3, 6.5.9p5),
+  so `p == NULL` and `p == (T *) NULL` have the same value. (d) Each copy's call runs the
+  one helper on its own arguments, as each copy ran its own text.
 - The early returns are allocation failures that no case reaches: checked by reading, each
   `return(R);` against its `return((T *) NULL);`; the last path is checked by the oracle.
 
@@ -15992,7 +16033,7 @@ checked by reading.
 after Recipe RD it is a *Large Method* of 73 lines whose head builds `mean_image` from a crop and
 a difference sum; the head as a helper takes it out of the finding, 3.58 to 3.70 in a probe, no
 finding on the helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
-to evolve the recipes. Step 7 (the self-guarded head): 2026-11-19, from `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a), cc 10 to 9 and 8.87 to 8.89 in a probe; added by Claude Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are fine").
+to evolve the recipes. Step 7 (the self-guarded head): 2026-11-19, from `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a), cc 10 to 9 and 8.87 to 8.89 in a probe; added by Claude Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are fine"). Step 8 (exits with releases, a transformed clone, twin heads): 2026-11-28, from the same header's `SIMCrossCorrelationImage` (two FFT heads, the second releasing `complex_conjugate` at both exits) and `SIMPhaseCorrelationImage` (two FFT heads that overwrite their clones), campaign A, W51 round 38, lane a; with two Recipe E steps the header's Overall Code Complexity clears, 9.38 flat to 10.0 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19.
 
 ---
 
@@ -23740,6 +23781,25 @@ line markers and blank lines dropped; every including object of an OpenMP -O2 tr
 identical to a snapshot of the parent, debug sections stripped; the C++ check runs on the
 MagickCore includers. Step 1's probe applies: the carved header rises and the new header
 scores at least the carved header's score before.
+Trailing-run form (mandate (2026-11-19), added 2026-11-28 for
+`colorspace-jzazbz-oklab-private.h`, please confirm): on a header that this recipe produced
+and that one header includes (the colorspace converter headers, which only
+`colorspace-private.h` names), the run may instead be the header's last one. It begins
+directly after a top-level item and ends directly before the header's closing `extern "C"`
+lines (`#if defined(__cplusplus)` ... `}` ... `#endif`, empty in C), with every
+`#if`/`#endif` pair it holds inside it, and holds only `#define`s, `static const` tables and
+`static inline` functions. The new header holds the run verbatim in its order, wrapped in an
+`extern "C"` pair of its own, and the including header names it on the line directly below
+the carved header, so every translation unit has the same tokens in the same order (the
+pairs are empty in C; in C++ each item keeps its C linkage). Use it when the items that a
+later step can clear lead the header and the trailing ones cannot change (functions held
+in a function-pointer table that also holds `MagickExport` entries, whose type fixes their
+signatures). Step 4's proof is the upstream shared form's: every including source's
+preprocessed C unit identical, the including header, the carved header and the new header
+placed as at `HEAD` and as in the working tree, `__LINE__`/`__FILE__` pinned; every
+including object of an OpenMP -O2 tree identical to the parent's, debug sections stripped.
+Step 1's bar holds: the new header scores at least the carved header's score before, and
+the carved header rises or, flat, stands in a stub-probed chain whose last step raises it.
 X11 conditional form (mandate, 2026-11-19; campaign A round 35): Form A also applies to a
 `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)`,
 whose matching `#endif` is the file's last directive (the `widget-*.c` split products). The
@@ -27888,3 +27948,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | BP | Step 6, address form: a group whose members are all addresses of one caller's plain locals is filled once, as a `const` declaration at the top of the block declaring those locals, and every call of the group in that block passes it | `property-8bim-private.h` (campaign B, M143): the `(&info,&length)` cursor of `Get8BIMResources`, passed to four helpers in one loop; per-call blocks would add four fills of the same two addresses. A probe of the chain (BP, IP, BP on the resource names): 9.38 to 10.0 | mandate (2026-10-24) |
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
+| 2026-11-28 | AMEND | HN | Step 8: (a) an exit `{ S return(R); }` whose `S` only releases objects the block does not touch, when the caller's next test has the same body; (b) `v` also written by the block's first statement, the clone its last call transforms, kept in a helper local, the helper ending `return(Last(...));` (and `return(Call(...));` with no release after the last call); (c) `NULL` or `(T *) NULL` in a guard; (d) two copies in one caller in one commit | `compare-similarity-frequency-images-private.h`'s `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage` (campaign A, W51 round 38, lane a): their FFT heads as helpers, with two Recipe E steps, clear the header's Overall Code Complexity, 9.38 flat to 10.0 in a probe | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | B | Step 1, test-program caller: a changed call in a file under `tests/` that only a test program compiles may miss (d) only by constants clang folds from a contractable expression (`.text` and relocations identical with `__LINE__` pinned, the object identical with `-ffp-contract=off`) and, under `-fno-inline`, by callees no longer specialised for the caller's literal arguments and `.rodata` relocation addends; the subtest that runs the call passes | `colorspace-cie-to-rgb-private.h`'s `ConvertLuvToRGB` (campaign A, W51 round 38, lane a): `tests/validate.c`'s `ValidateLuvToRGB` passes literal Luv inputs; with them in a struct, two constants clang -O2 folds differ by 1 and 2 ulp and the objects are identical with `-ffp-contract=off`; the header goes 9.68 to 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | Step 1, upstream shared form: on a header this recipe produced and one header includes, the run may be the trailing one (after a top-level item, up to the closing `extern "C"` lines), moved verbatim into a new header with its own pair that the including header names on the line directly below the carved one; same proof and bar | `colorspace-jzazbz-oklab-private.h` (campaign A, W51 round 38, lane a): its trailing `ConvertRGBToOklab` and `ConvertRGBToOklch` sit in `colorspace-convert.c`'s `RGBToGenericMethods` table beside `MagickExport` entries, so their six arguments stay; with them carved out, Recipe B on the leading `ConvertOklabToRGB` and `ConvertOklchToRGB` takes the header 9.68 to 10.0 (stub probe; the new header 9.68) | mandate (2026-11-19) |

@@ -291,13 +291,19 @@ MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
         M,
         S;
 
+      const CAT02LMSXYZTarget
+        target = { X, Y, Z };
+
       ConvertRGBToCAT02LMS(R,G,B,&L,&M,&S);
-      ConvertCAT02LMSToXYZ(L,M,S,X,Y,Z);
+      ConvertCAT02LMSToXYZ(L,M,S,&target);
       break;
     }
     case JzazbzColorspace:
     {
-      ConvertRGBToJzazbz(R,G,B,white_luminance,X,Y,Z);
+      const RGBToJzazbzInput
+        rgb = { R, G, B, white_luminance };
+
+      ConvertRGBToJzazbz(&rgb,X,Y,Z);
       break;
     }
     default:
