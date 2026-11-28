@@ -330,8 +330,14 @@ typedef struct _OpenCLBenchmarkTokens
 } OpenCLBenchmarkTokens;
 
 static const char *SkipOpenCLBenchmarkComment(const char *q,
-  const size_t extent,char *token)
+  const OpenCLBenchmarkTokens *tokens)
 {
+  const size_t
+    extent = tokens->extent;
+
+  char
+    *const token = tokens->token;
+
   while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
     (void) GetNextToken(q,&q,extent,token);
   return(q);
@@ -520,12 +526,6 @@ static MagickBooleanType SkipOpenCLBenchmarkMarkup(
   const char
     *const keyword = tokens->keyword;
 
-  const size_t
-    extent = tokens->extent;
-
-  char
-    *const token = tokens->token;
-
   if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
     {
       (*q)=SkipOpenCLBenchmarkDoctype((*q));
@@ -536,7 +536,7 @@ static MagickBooleanType SkipOpenCLBenchmarkMarkup(
       /*
         Comment element.
       */
-      (*q)=SkipOpenCLBenchmarkComment((*q),extent,token);
+      (*q)=SkipOpenCLBenchmarkComment((*q),tokens);
       return(MagickTrue);
     }
   return(MagickFalse);
