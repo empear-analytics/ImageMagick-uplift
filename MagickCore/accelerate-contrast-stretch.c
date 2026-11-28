@@ -382,6 +382,17 @@ static void ReleaseStretchResources(StretchResources *r)
   ReleaseAccelerateQueue(r->device,r->queue);
 }
 
+static MagickBooleanType AcquireStretchQueue(StretchResources *r)
+{
+  r->device=RequestOpenCLDevice(r->clEnv);
+  if (r->device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  r->queue=AcquireOpenCLCommandQueue(r->device);
+  if (r->queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -436,11 +447,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /*
     Initialize opencl environment.
   */
-  r.device=RequestOpenCLDevice(clEnv);
-  if (r.device == (MagickCLDevice) NULL)
-    goto cleanup;
-  r.queue=AcquireOpenCLCommandQueue(r.device);
-  if (r.queue == (cl_command_queue) NULL)
+  if (AcquireStretchQueue(&r) == MagickFalse)
     goto cleanup;
 
   /*
