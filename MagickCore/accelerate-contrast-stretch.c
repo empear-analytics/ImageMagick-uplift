@@ -393,6 +393,19 @@ static MagickBooleanType AcquireStretchQueue(StretchResources *r)
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireStretchHistogram(StretchResources *r)
+{
+  r->histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL,
+    sizeof(*r->histogram));
+
+  if (r->histogram == (cl_uint4 *) NULL)
+    return(MagickFalse);
+
+  /* reset histogram */
+  (void) memset(r->histogram,0,(MaxMap+1)*sizeof(*r->histogram));
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -453,13 +466,8 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /*
     Allocate and initialize histogram arrays.
   */
-  r.histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*r.histogram));
-
-  if (r.histogram == (cl_uint4 *) NULL)
+  if (AcquireStretchHistogram(&r) == MagickFalse)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed", image->filename);
-
-  /* reset histogram */
-  (void) memset(r.histogram,0,(MaxMap+1)*sizeof(*r.histogram));
 
   /*
   if (IsGrayImage(image,exception) != MagickFalse)
