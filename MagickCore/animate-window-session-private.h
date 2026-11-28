@@ -364,6 +364,19 @@ const int
       windows->image.id);
 }
 
+static void XSetPopupWindowHints(XWindows *windows,XWMHints *manager_hints)
+{
+  windows->popup.border_width=0;
+  windows->popup.flags|=PPosition;
+  windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+}
+
 static void XCreatePanelWindows(const AnimateWindowSetup *setup)
 {
   char
@@ -426,15 +439,7 @@ const int
   */
   XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
     setup->font_info,resource_info,&windows->popup);
-  windows->popup.border_width=0;
-  windows->popup.flags|=PPosition;
-  windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
+  XSetPopupWindowHints(windows,manager_hints);
   XMakeWindow(display,root_window,&hints,&windows->popup);
   windows->popup.highlight_stipple=XCreateBitmapFromData(display,
     windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
