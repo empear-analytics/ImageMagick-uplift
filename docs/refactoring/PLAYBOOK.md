@@ -284,7 +284,10 @@ in place of item 3:
 
 A block whose exit throws through `GetMagickModule()` moves at this level only in step
 8's form, the throwing exit left in the caller unchanged, so the function name it
-reports does not change; a throw inside the moved text stops the step (item 1). The type
+reports does not change; a throw inside the moved text stops the step (item 1).
+Exception (owner 2026-11-28, answering PR #135 Q4): a guard-level Recipe E or I step may
+move an `OpenCLThrowMagickException(...,GetMagickModule(),...)` statement into its
+`static` helper, unchanged; the warning's reported location then names the helper. The type
 of each member against its variable's declaration (step 3) and the precedence of `*v`
 against `->`, `.` and `[]` are checked by reading; the members Recipe I carries are
 pointers to pointers or to structs, so a wrong precedence does not compile.
@@ -1103,6 +1106,25 @@ this shape (2026-11-20, `tools/test_reuse_check.py`'s `ReturnedMemberOutput`) an
 refuses a member through `->`, another member assigned, and another member passed. The
 member is an lvalue of the same type as a variable, read once at the call and assigned
 once at the return, so the caller's object ends with the value the block left in it.
+
+**A helper in an included private header** (mandate (2026-11-19), added 2026-11-28 for
+`accelerate-unsharp.c`'s `ComputeUnsharpMaskImageSingle`, please confirm; the tool under the
+owner's ruling of 2026-11-20 that `tools/reuse_check.py` may cover helpers in included
+private headers). In form (b), *Unreached functions* and *Object code that differs only in
+the caller*, the existing helper may be a `static inline` function of a private header
+(not installed) that the file includes directly, the header unchanged by the step: the
+block is its body under the renaming above (`DestroyUnfinishedImage` of
+`accelerate-core-private.h`, whose body is the cleanup's `if ((outputReady == MagickFalse)
+&& (filteredImage != (Image *) NULL)) filteredImage=DestroyImage(filteredImage);` and
+`return(filteredImage);`). `tools/reuse_check.py` reads the helper from that header when
+the file defines no `static` function of its name, refuses a header that differs from
+`HEAD`, and names it (`tools/test_reuse_check.py`'s `HelperInIncludedHeader`).
+`obj_modulo.sh` names the header's helper as `<Helper>`; when the caller is itself inlined
+into its own caller as built, `NOINLINE=<Caller>` keeps it out of line on both sides, and
+the run without it is quoted too. The helper is one definition included by every file
+that names it, so the call runs the text the block held, on the objects the call binds,
+as for a helper of the file; a `static inline` function of a header has internal linkage
+in each including unit, exactly as a `static` function of the file has.
 
 **A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
 *Unreached functions* and *Object code that differs only in the caller* may call a
@@ -2119,7 +2141,11 @@ merges code, not parameters.
    holds the step: report it. The owner may release a reported function; its callers in
    the other campaign's files then change in the same commit (owner 2026-11-24, "If you
    can do these changes without breaking any test cases, sure", for `LeastSquaresAddTerms`
-   and campaign A's `distort-private.h` and `distort-linear-private.h`). A caller in the
+   and campaign A's `distort-private.h` and `distort-linear-private.h`). A released
+   function whose only call is commented out keeps that comment's text verbatim: the call
+   is not compiled, so it does not change, and the message quotes it (owner 2026-11-28,
+   answering PR #135 Q3, for `AccelerateUnsharpMaskImage`, whose only call stands in
+   `effect-sharpen.c` inside `/* This kernel appears to be broken. ... */`). A caller in the
    oracle driver (`tools/oracle/driver/imdriver.c`) declares the function by hand and is
    linked against the baseline library too, so it keeps both calls: `driver/build.sh`
    defines `IMDRIVER_<FUNCTION>` when the build's private header declares the typedef
@@ -28315,3 +28341,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | LM | Step 8, *gather form*: locals a function's cleanup releases (or that later steps hand together to helpers) may be gathered into a new struct local `r` of a new typedef, one member per local of its exact type (plus at most one member copying a never-assigned parameter, set by `r.p=p;` before the first of the moved `v=c;` statements), every use written `r.m`; no copy into an existing struct needed; a local an unbuilt fragment names stays unchosen except under *Unreached functions: the worker of a wrapper no code calls* | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s fourteen cleanup and stage locals; the probed chain (E, D, V, W, JN, D) ends at 10.0 from 8.24, the gather itself flat | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 3, *new input struct, two bases*: the input struct may be a new `typedef` (one `const`-pointee pointer member per pointer the copies read through), its `const` local initialised by `{ ... }` in a compound statement holding only the calls; a `const` binding of `p->n` is read as `s->m->n` and leaves the caller; role (c)'s two lvalues may be `e1.m` and `e2.m` of two distinct struct locals, the member differing between copies (`T *value1,T *value2`) | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s four black/white level blocks (`FindStretchLevels`), seven parameters without the struct; 7.61 -> 7.69, first step of a chain ending at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 8, *precomputed levels form*: copies in one loop body that are `if`-`else` chains whose every test opens with the same side-effect-free conjunct `C` (reading nothing the loop writes) may get a new levels struct (a flag for `C`, the role (d) operands) filled before the loop by a new `static` function, one `const` local per copy; the new function takes the struct, binds the operands to `const` locals, returns first when the flag is `MagickFalse` and runs the chain with `C` dropped | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `BuildStretchMap`'s four channel chains (`SetStretchMapValue`, `GetStretchChannelLevels`); 7.67 -> 8.24, a step of a chain ending at 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | B, I, E | Recipe B step 1 (b): a function the owner released although its only call is commented out keeps that comment verbatim; *Unreached functions: Recipe I*: a guard-level E or I step may move an `OpenCLThrowMagickException(...,GetMagickModule(),...)` statement into its helper, the reported location then naming the helper | `accelerate-unsharp.c` (campaign A, W51 round 38): `AccelerateUnsharpMaskImage`'s only call is commented out in `effect-sharpen.c`, and its kernel acquisitions throw through `OpenCLThrowMagickException` | owner |
+| 2026-11-28 | AMEND | D | *A helper in an included private header*: in form (b), *Unreached functions* and *Object code that differs only in the caller*, the existing helper may be a `static inline` function of a non-installed private header the file includes directly, unchanged by the step; `tools/reuse_check.py` reads it there (babde966f) and `obj_modulo.sh` takes `NOINLINE=<Caller>` when the caller is inlined into its own caller | `accelerate-unsharp.c`'s `ComputeUnsharpMaskImageSingle` (campaign A, W51 round 38, lane d): its cleanup block is the body of `accelerate-core-private.h`'s `DestroyUnfinishedImage`, which `ComputeUnsharpMaskImage` already calls; the function is reached by no case. 8.83 to 8.84, the function's Complex Method (cc 9) no longer reported | mandate (2026-11-19) |

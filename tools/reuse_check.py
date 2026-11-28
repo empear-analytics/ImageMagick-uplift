@@ -73,6 +73,13 @@ selection*):
     compared, and the added `default:` and the `break;` after the call are allowed
     (Recipe SD with an existing function as its new one).
 
+A form added 2026-11-28 (Recipe D, *A helper in an included private header*; the owner's
+ruling of 2026-11-20 that this script may cover such helpers): when FILE defines no
+`static` HELPER, HELPER may be a `static inline` function of a private header that FILE
+includes directly (`#include "<dir>/<name>-private.h"`, the path read from the repository
+root), unchanged against HEAD; its parameters and body are read from there, and the script
+names the header.
+
 It prints OK or FAIL with the line that broke the rule. Argument types against
 parameter types, and the OpenMP condition of the step, are checked by reading.
 """
@@ -150,6 +157,28 @@ def helper_def(text, helper):
         name = re.findall(r"\w+", p)[-1]
         params.append((name, "*" in p, p))
     return params, m.group(2)
+
+
+def helper_in_file_or_header(text, helper):
+    """HELPER's parameters and body, and the header that defines it (None for FILE itself):
+    FILE's own `static` HELPER, or else a `static inline` HELPER of a private header that
+    FILE includes directly and that the working tree leaves as HEAD has it."""
+    if re.search(r"^static [^;{]*\b" + re.escape(helper) + r"\(", text, re.M):
+        params, body = helper_def(text, helper)
+        return params, body, None
+    for inc in re.findall(r'^#include "([\w/.-]+-private\.h)"', text, re.M):
+        if not os.path.isfile(inc):
+            continue
+        htext = open(inc).read()
+        if not re.search(r"^static inline [^;{]*\b" + re.escape(helper) + r"\(", htext,
+                         re.M):
+            continue
+        changed = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", inc])
+        if changed.returncode != 0:
+            raise SystemExit(f"FAIL: {inc}, which defines {helper}, differs from HEAD")
+        params, body = helper_def(htext, helper)
+        return params, body, inc
+    raise SystemExit(f"FAIL: helper {helper} not found")
 
 
 def prototype_types(params):
@@ -269,7 +298,9 @@ def main(argv):
         raise SystemExit(__doc__)
     path, helper = argv[1], argv[2]
     text = open(path).read()
-    params, body = helper_def(text, helper)
+    params, body, header = helper_in_file_or_header(text, helper)
+    if header:
+        print(f"{helper} is defined in {header}, included by {path}, unchanged")
     removed, added = diff_lines(path)
     removed = [strip_identity_casts(r) for r in removed]
     proto_lines = set()

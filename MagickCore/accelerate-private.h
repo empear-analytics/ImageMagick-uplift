@@ -78,6 +78,15 @@ typedef struct _AccelerateResizeRequest
     *resizeFilter;
 } AccelerateResizeRequest;
 
+typedef struct _AccelerateUnsharpRequest
+{
+  const double
+    radius,
+    sigma,
+    gain,
+    threshold;
+} AccelerateUnsharpRequest;
+
 extern MagickPrivate Image
   *AccelerateBlurImage(const Image *,const double,const double,ExceptionInfo *),
   *AccelerateDespeckleImage(const Image *,ExceptionInfo *),
@@ -88,8 +97,8 @@ extern MagickPrivate Image
   *AccelerateResizeImage(const Image *,const AccelerateResizeRequest *,
     ExceptionInfo *),
   *AccelerateRotationalBlurImage(const Image *,const double,ExceptionInfo *),
-  *AccelerateUnsharpMaskImage(const Image *,const double,const double,
-    const double,const double,ExceptionInfo *),
+  *AccelerateUnsharpMaskImage(const Image *,const AccelerateUnsharpRequest *,
+    ExceptionInfo *),
   *AccelerateWaveletDenoiseImage(const Image *,const double,ExceptionInfo *);
 
 extern MagickPrivate MagickBooleanType

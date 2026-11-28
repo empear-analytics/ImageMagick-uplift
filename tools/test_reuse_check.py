@@ -208,5 +208,77 @@ class ReturnedMemberThroughPointer(unittest.TestCase):
         self.assertEqual(rc, 0, out)
 
 
+
+def run_with_header(new, header, new_header=None):
+    """reuse_check on fixture.c, which includes lib/fixture-private.h holding HEADER: both
+    committed with fixture.c as OLD (the work function alone), NEW in the tree, and the
+    header as NEW_HEADER in the tree when given."""
+    here = os.getcwd()
+    with tempfile.TemporaryDirectory() as d:
+        os.chdir(d)
+        try:
+            env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t",
+                       GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+            subprocess.run(["git", "init", "-q"], check=True, env=env)
+            os.mkdir("lib")
+            with open("lib/fixture-private.h", "w") as f:
+                f.write(header)
+            with open("fixture.c", "w") as f:
+                f.write(INCLUDE + WORK)
+            subprocess.run(["git", "add", "fixture.c", "lib/fixture-private.h"], check=True,
+                           env=env)
+            subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m",
+                            "old"], check=True, env=env)
+            with open("fixture.c", "w") as f:
+                f.write(new)
+            if new_header is not None:
+                with open("lib/fixture-private.h", "w") as f:
+                    f.write(new_header)
+            out = io.StringIO()
+            rc = 0
+            with contextlib.redirect_stdout(out):
+                try:
+                    rc = R.main(["reuse_check.py", "fixture.c", "DestroyUnfinished"])
+                except SystemExit as e:
+                    print(e)
+                    rc = 1
+            return rc, out.getvalue()
+        finally:
+            os.chdir(here)
+
+
+INCLUDE = '#include "lib/fixture-private.h"\n\n'
+HEADER = HELPER.replace("static Image *", "static inline Image *")
+
+
+class HelperInIncludedHeader(unittest.TestCase):
+    """2026-11-28: the helper is a `static inline` function of a private header that the
+    file includes directly (accelerate-unsharp.c and accelerate-core-private.h's
+    DestroyUnfinishedImage)."""
+
+    def test_ok(self):
+        rc, out = run_with_header(INCLUDE + WORK.replace(BLOCK, GOOD), HEADER)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("defined in lib/fixture-private.h", out)
+
+    def test_header_not_included(self):
+        rc, out = run_with_header(WORK.replace(BLOCK, GOOD), HEADER)
+        self.assertNotEqual(rc, 0, out)
+
+    def test_header_changed(self):
+        rc, out = run_with_header(INCLUDE + WORK.replace(BLOCK, GOOD), HEADER,
+                                  HEADER.replace("image=DestroyImage(image);",
+                                                 "image=(Image *) NULL;"))
+        self.assertNotEqual(rc, 0, out)
+
+    def test_block_edited(self):
+        rc, out = run_with_header(INCLUDE + WORK.replace(BLOCK, GOOD).replace(
+            "ok=Run(image,other);", "ok=Run(other,image);"), HEADER)
+        self.assertNotEqual(rc, 0, out)
+
+    def test_not_inline_in_header(self):
+        rc, out = run_with_header(INCLUDE + WORK.replace(BLOCK, GOOD), HELPER)
+        self.assertNotEqual(rc, 0, out)
+
 if __name__ == "__main__":
     unittest.main()
