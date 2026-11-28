@@ -93,6 +93,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-kernels-localcontrast-private.h \
   MagickCore/accelerate-kernels-noise-private.h \
   MagickCore/accelerate-kernels-pixel-private.h \
+  MagickCore/accelerate-kernels-resizefilter-private.h \
   MagickCore/accelerate-kernels-resizehorizontal-private.h \
   MagickCore/accelerate-kernels-resizevertical-private.h \
   MagickCore/accelerate-kernels-unsharpmask-private.h \
@@ -827,6 +828,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-kernels-localcontrast-private.h \
   MagickCore/accelerate-kernels-noise-private.h \
   MagickCore/accelerate-kernels-pixel-private.h \
+  MagickCore/accelerate-kernels-resizefilter-private.h \
   MagickCore/accelerate-kernels-resizehorizontal-private.h \
   MagickCore/accelerate-kernels-resizevertical-private.h \
   MagickCore/accelerate-kernels-unsharpmask-private.h \
