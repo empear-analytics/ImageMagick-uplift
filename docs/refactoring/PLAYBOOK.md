@@ -187,7 +187,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
 checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, SD with
-*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*, and WP's step 8 for a wrapper no code calls, and W with *Unreached functions: Recipe W*). The proof is the build
+*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*, and WP's step 8 for a wrapper no code calls, and W with *Unreached functions: Recipe W*, and the recipes of
+*Unreached functions: the worker of a wrapper no code calls* in such a worker). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -406,6 +407,55 @@ exits BC step 3 rewrites, and that the call passes the parameters by name in the
 statement was edited, added or dropped and no argument transposed. What it leaves to reading is BC step
 1 (every path of the block ends the iteration through a `break;` or `continue;` of that loop) and the
 types. Planted errors on a synthetic fixture (`tools/test_loop_tail_check.py`) were each caught.
+
+
+**Unreached functions: the worker of a wrapper no code calls** (mandate (2026-11-19), added
+2026-11-28 by Claude Code, Claude Opus 5.5, campaign A W51 round 38 lane b; please confirm).
+A `static` function `F` whose only caller is a `MagickPrivate` wrapper that no code calls (WP
+step 8's test: `git grep -n <Wrapper>` finds its definition, its declaration in a header listed
+under `MAGICKCORE_NOINST_HDRS`, and nothing else that is code; `casemap.py` 0 for both), and the
+`static` helpers that steps of `F` add (each called only from `F` or from such a helper), may
+take steps of Recipes H, E, V, W, MA, LM, JN and D at guard level, `Verified: guard`, when all
+of these hold, each run before the commit and quoted in its message:
+
+1. The step is the recipe's own step, every condition of its *How* checked by reading as at
+   the oracle level and quoted (exits, written variables, parameter count, the argument order
+   of every call it adds). A block that throws or logs through `GetMagickModule()` (directly
+   or as an argument of `OpenCLThrowMagickException`) may move: the location then names the
+   helper, as the owner allowed for error calls and trace logs moved into helpers (2026-11-12
+   and 2026-11-13); the message says so. A throw macro that returns (`ThrowBinaryException`)
+   stays in `F` where it stood.
+2. `refactor_guard.py` prints `OK` (no literal moved), or `WARN` only for literals that a
+   reused helper already holds, each named; `--calls` moves nothing but `+2` for each new
+   function and, for a reused helper, its count up and the replaced callees' down, each named.
+3. `WIDE=1 NOINLINE=F sh tools/obj_modulo.sh <file> F <Helper>` prints `IDENTICAL` or
+   `MODULO-IDENTICAL` (`WIDE=1` where only the wide build compiles the file), so every other
+   function of the file compiles to the same instructions. When that run prints `DIFFERENT`
+   only because a function `NOINLINE` cannot keep out of line (a `static inline` function of
+   an included header, which the script looks for only in the file) is now inlined into the
+   shortened `F`, or compares fewer functions because functions of the file are now inlined
+   into `F`, the same run with `EXTRA_CFLAGS=-fno-inline` (every function out of line on both
+   sides, as in the split checks) prints `MODULO-IDENTICAL` instead; the message quotes both
+   runs and names each function whose inlining changed. And the file compiles with no new
+   diagnostic in `ci_linux_warnings.sh`'s configurations and with `-DNDEBUG -Wall -Wextra
+   -Wunused-parameter -Wshadow -Wunreachable-code` (gcc and clang) in a configuration that
+   compiles it.
+4. Code no Linux build compiles (`#ifdef RECREATEBUFFER`, a Recipe UB fragment) stays where it
+   stood, unedited, even when names it uses leave `F`, as `ComputeEqualizeImage`'s `mem_flags`,
+   `length` and `clStatus` did (the fragments already name an undeclared `context`).
+
+Why this proves the step: as WP step 8's *Careful* argues, no execution of the library or of a
+program linked against it runs the wrapper (no caller in the tree, hidden visibility) or its
+`static` worker, so no output can change through them; item 3 shows that the edit reached no
+other function. Item 1 is each recipe's own argument, read rather than run, so the worker still
+does what it did should a caller be added later; items 2 and 3 catch a changed literal, a lost
+or added call and a stray edit. Motivation: `accelerate-contrast-stretch.c`'s
+`ComputeContrastStretchImage`, whose wrapper `AccelerateContrastStretchImage` nothing calls (the
+upstream call is commented out): a stub probe of the decomposition that
+`accelerate-histogram.c`'s `ComputeEqualizeImage` already has (oracle-verified there) scores
+10.0, against 7.61 (*Complex Method*, *Large Method*, *Overall Code Complexity*); but V, W, MA,
+LM and JN have no guard-level form, and the GPU stages throw through `GetMagickModule()`, which
+no guard-level form lets move.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -28012,3 +28062,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | IC | *Evidence level*, oracle form: when `obj_identical.sh` prints `DIFFERENT` and oracle cases execute every function whose locals the step inlines, the oracle `--function` on each (0 diverged, counts quoted) proves the step, `Verified: oracle`; the message names the functions whose code differs; steps 1 to 3 and 5 by reading, step 4's warning checks `OK` | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): inlining the bindings of the five edit commands leaves Draw, Color and Matte identical one by one, but Annotate and Composite change `XApplyFXCommands`'s stack frame (+16 bytes). Kept out of line, `XApplyCompositeCommand` differs only in the order of two member loads. The commands are reached by 22, 15, 23, 9 and 3 wide cases; the chain needs those two inlined (a probe keeping either binding: 9.09 or 9.38) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | W | Step 7, twin form with a buffer per copy: two `void` functions whose leading blocks are one text may share the new function in one commit when each block holds, in a compound statement of its own, a `static char` array that only the block names (moved unchanged to its function's opening declarations and passed by name as `char *`, so each function keeps its own buffer) and both bind the block's other inputs from one `const Name *name` parameter (the new function takes `name` and binds them, Recipe SM step 4); bindings only the block read go with it | `display-image-annotate-private.h` (campaign A, W51 round 38, lane b): `XSelectColorBorder` and `XSelectPenColor` share `XSelectEditPen`; Recipe F refuses the buffers (the colour dialog writes them) and one shared buffer would change each command's remembered reply. Probed chain 9.38, 9.38, 9.38, 9.38, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, nested placement: when the `.c` file's `#include` of the new header would lower the `.c` file, the carved header names the new header on the line after its guard's `#define` and blank line, where the run stood (an include block of its own; a later carve names its header last in that block); the `.c` file is unchanged; proof as for the carved-again form (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) | `display-image-tile-private.h` (campaign A, W51 round 38, lane b): its seventh carve (the translate command) probes the header at 10.0, but a seventh mid-file `#include` in `display-image.c` is counted into `XDisplayBackgroundImage` (70 lines, *Large Method*, 9.68 -> 9.31); nested in the tile header, `display-image.c` stays 9.68 and the tile header measures 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | rule | *Two levels of evidence*, new paragraph *Unreached functions: the worker of a wrapper no code calls*: in a `static` worker whose only caller is a `MagickPrivate` wrapper no code calls (WP step 8's `git grep` test, `casemap.py` 0), and in the helpers its steps add, Recipes H, E, V, W, MA, LM, JN and D may be taken at guard level, `Verified: guard`, with the recipe's steps checked by reading and quoted, `refactor_guard.py` (and `--calls`, only new or reused helpers moving), `WIDE=1 NOINLINE=F obj_modulo.sh` `IDENTICAL` or `MODULO-IDENTICAL`, and the CI and NDEBUG warning checks; a block throwing or logging through `GetMagickModule()` may move (the location names the helper, as the 2026-11-12/13 rulings allow); throw macros that return stay in the worker; unbuilt UB fragments stay unedited | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`, 7.61, no caller of its wrapper; a stub probe of `ComputeEqualizeImage`'s decomposition scores 10.0, but V, W, MA, LM and JN have no guard-level form and the GPU stages throw through `GetMagickModule()` | mandate (2026-11-19) |
