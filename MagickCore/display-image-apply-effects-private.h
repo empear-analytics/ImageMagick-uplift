@@ -108,10 +108,24 @@ static void XApplyCompositeCommand(const XMagickCommandContext *context)
   XNoticeEditFailure(context,status,"Unable to composite X image");
 }
 
-static void XReplaceBorderedImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception,Image *border_image)
+static void XReplaceBorderedImage(const XMagickCommandContext *context,
+  Image *border_image)
 {
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   const XImageColormapTarget
     cmap_target = { display, resource_info, windows };
 
@@ -186,8 +200,7 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
     exception);
   border_image=BorderImage(*image,&page_geometry,(*image)->compose,
     exception);
-  XReplaceBorderedImage(display,resource_info,windows,image,exception,
-    border_image);
+  XReplaceBorderedImage(context,border_image);
 }
 
 static void XApplyAddFrameCommand(const XMagickCommandContext *context,
