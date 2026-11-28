@@ -23259,6 +23259,38 @@ constants; Recipe KD, whose run is a `LocaleCompare` ladder.
    of the file, and the oracle for the function with line coverage showing a case runs
    every group's call.
 
+*N-signature form* (mandate (2026-11-19), added 2026-11-28; please confirm). The chain's
+table groups may call functions of more than two signatures, and a group's statement may
+assign the call's result to an object the chain passes on by pointer
+(`(*nexus)=F(context,(*nexus));`, or `nexus=F(&context);` in the function itself), when
+every group of one signature has one call text, free of side effects but the call and its
+assignment, reading only the function's parameters and locals and the helpers' parameters
+or their bindings of members of one `const` context parameter. Then the struct of step 3
+holds the key and one pointer member per signature, and each element sets exactly one of
+them; below the lookup, a `static void` runner takes the element and the objects the call
+texts name, tests the members in their declaration order in an `if` ... `else if` chain,
+and makes the first non-`NULL` member's call with its group's text (the assignment
+included; a helper's binding `T *const v = p->v;` is read as `p->v`, a pointer parameter
+`&(*x)` as `x`). The groups that are not table groups (step 2), wherever they stand along
+the chain, gather unchanged and in chain order into the `switch` of the innermost helper,
+which stays a `static` function and keeps its `default:` group as the fallback; a group
+that is `break;` alone joins its label to another such group. When every group of the
+function's own `switch` is a table group, the `switch` becomes `m=Get<Name>(e); if (m !=
+NULL) <Runner>(m,...); else <Helper>(...);`, the innermost helper called as the chain
+called it. The other helpers are removed. A parameter of the innermost helper that no kept
+group reads any more is dropped with its argument (a `static` function, one call). Step
+6's reading is scripted: each label of the parent's chain has exactly one place (an
+element, a kept group, or none: the fallback), the parent's labels in chain order are the
+table's order, each element names the function its group called, exactly one member of
+each element is non-`NULL`, and that member is the one the group's call text selects. The
+compiler checks each member's type. Step 8's line coverage may be read per callee when
+each callee has one call, the group's (`casemap.py` per callee, `WIDE=1` for a wide-build
+file): the oracle on the cases that reach the function, every reached callee and runner
+branch named, and the elements and runner branches that no case runs listed in the
+message as checked only by the scripted reading (X11 dispatch in `display-image.c`: the
+oracle's scripted X sessions choose the commands). No timing when the function is not on a
+per-pixel or hot path (step 7).
+
 **Before:**
 
 ```c
@@ -24122,6 +24154,23 @@ against the headers of `HEAD` and of the working tree (the carved and the new he
 ahead of every `-I` path), wide candidate's flags, `__LINE__` and `__FILE__` pinned:
 preprocessed unit and object both identical. Step 1's bar is the carved header's score
 before the step; both products must reach it and one must rise above it.
+Trailing run of a carved-again mid-file header (mandate (2026-11-19), added 2026-11-28;
+please confirm). A header of the mid-file form may instead give up its last run: from
+directly after a top-level item to the line before the blank line that precedes its
+include guard's `#endif`, with every `#if`/`#endif` pair it holds inside it. The run moves
+verbatim into a new header of the same kind (licence, include guard, the run), and the
+`.c` file names the new header on the line directly below its `#include` of the carved
+one, so the translation unit has the same tokens in the same order. The blank line before
+the run stays in the carved header, above its `#endif`. Use it when the items that must
+leave trail the header (`display-image-apply-private.h`'s magnify family after
+`XMagickCommand`): the leading-run form would move the rest instead and leave the carved
+header holding only the trailing items under a name that no longer says what it holds. A
+`%` banner in the run that documents a function left in the carved header moves to
+directly above that function. Step 4's proof and step 1's bar are the carved-again form's:
+the `.c` file compiled against the headers of `HEAD` and of the working tree, wide
+candidate's flags, `__LINE__` and `__FILE__` pinned, preprocessed unit and object both
+identical; both products reach the carved header's score before the step and one rises
+above it; the `.c` file keeps its score.
 Nested placement (mandate (2026-11-19), please confirm). When the `.c` file's `#include` of
 the new header would lower the `.c` file's score, the carved header names the new header
 instead, on the line directly after its include guard's `#define` and the blank line after
@@ -28343,3 +28392,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | MA | Step 8, *precomputed levels form*: copies in one loop body that are `if`-`else` chains whose every test opens with the same side-effect-free conjunct `C` (reading nothing the loop writes) may get a new levels struct (a flag for `C`, the role (d) operands) filled before the loop by a new `static` function, one `const` local per copy; the new function takes the struct, binds the operands to `const` locals, returns first when the flag is `MagickFalse` and runs the chain with `C` dropped | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `BuildStretchMap`'s four channel chains (`SetStretchMapValue`, `GetStretchChannelLevels`); 7.67 -> 8.24, a step of a chain ending at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | B, I, E | Recipe B step 1 (b): a function the owner released although its only call is commented out keeps that comment verbatim; *Unreached functions: Recipe I*: a guard-level E or I step may move an `OpenCLThrowMagickException(...,GetMagickModule(),...)` statement into its helper, the reported location then naming the helper | `accelerate-unsharp.c` (campaign A, W51 round 38): `AccelerateUnsharpMaskImage`'s only call is commented out in `effect-sharpen.c`, and its kernel acquisitions throw through `OpenCLThrowMagickException` | owner |
 | 2026-11-28 | AMEND | D | *A helper in an included private header*: in form (b), *Unreached functions* and *Object code that differs only in the caller*, the existing helper may be a `static inline` function of a non-installed private header the file includes directly, unchanged by the step; `tools/reuse_check.py` reads it there (babde966f) and `obj_modulo.sh` takes `NOINLINE=<Caller>` when the caller is inlined into its own caller | `accelerate-unsharp.c`'s `ComputeUnsharpMaskImageSingle` (campaign A, W51 round 38, lane d): its cleanup block is the body of `accelerate-core-private.h`'s `DestroyUnfinishedImage`, which `ComputeUnsharpMaskImage` already calls; the function is reached by no case. 8.83 to 8.84, the function's Complex Method (cc 9) no longer reported | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | KV | *N-signature form*: the table groups may call functions of more than two signatures, and a group may assign the call's result to an object the chain passes on by pointer; one pointer member per signature, exactly one set per element, a `static void` runner tests them in order and makes the group's call text; kept groups gather unchanged into the innermost helper's `switch`, which stays as the fallback (a parameter no kept group reads is dropped); step 6's pairing is scripted; step 8's coverage may be read per callee, and elements and runner branches no case runs are listed as checked by the reading | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): `XMagickCommand` and its 16 SD helpers dispatch 86 labels, 82 of them to one command each of six signatures (`run`, `run_color`, `run_flags`, `run_quantize`, `next_image`, `new_image`); CodeScene counts the look-alike helpers as *Code Duplication* (14 functions). A probe of the table: 7.55 -> 9.38, only *Overall Code Complexity* left, which a carve of the magnify family clears (both products 10.0) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, trailing run: a header of that form may give up its last run (after a top-level item, to the blank line before its guard's `#endif`) into a new header of the same kind, which the `.c` file names on the line directly below the carved header's `#include`; same proof (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) and bar (both products at least the carved header's score before, one above it; the `.c` file keeps its score) | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): after the Recipe KV table it is 9.38 (*Overall Code Complexity*), and its magnify family (`XUpdateMagnifyInfo` to `XMoveMagnifyRightDown`) trails `XMagickCommand`; a probe of the trailing carve: both products 10.0, `display-image.c` 9.68 unchanged. The leading-run form would leave the apply header holding only the magnify family | mandate (2026-11-19) |

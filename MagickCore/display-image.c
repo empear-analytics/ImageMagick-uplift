@@ -120,6 +120,7 @@
 #include "MagickCore/display-image-apply-filters-private.h"
 #include "MagickCore/display-image-apply-effects-private.h"
 #include "MagickCore/display-image-apply-private.h"
+#include "MagickCore/display-image-magnify-private.h"
 
 #include "MagickCore/display-image-matte-roi-private.h"
 #include "MagickCore/display-image-matte-private.h"
