@@ -565,8 +565,11 @@ static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
   }
 }
 
-static inline void ConvertRigidAffineCoefficients(double *coeff)
+static inline void ConvertRigidAffineCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
   double
     inverse[6];
 
@@ -651,7 +654,7 @@ static inline double *RigidAffineCoefficients(const CoefficientCall *call)
         CommandOptionToMnemonic(MagickDistortOptions,*method));
       return((double *) NULL);
     }
-  ConvertRigidAffineCoefficients(coeff);
+  ConvertRigidAffineCoefficients(call);
   *method=AffineDistortion;
   return(coeff);
 }
