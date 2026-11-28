@@ -23,9 +23,22 @@
 extern "C" {
 #endif
 
-static inline void ConvertXYZToProPhoto(const double X,const double Y,
-  const double Z,double *red,double *green,double *blue)
+typedef struct _ConvertXYZInput
 {
+  double
+    X,
+    Y,
+    Z;
+} ConvertXYZInput;
+
+static inline void ConvertXYZToProPhoto(const ConvertXYZInput *xyz,
+  double *red,double *green,double *blue)
+{
+  const double
+    X = xyz->X,
+    Y = xyz->Y,
+    Z = xyz->Z;
+
   double
     b,
     g,
@@ -48,7 +61,12 @@ static inline void ConvertRGBToProPhoto(const double red,const double green,
     Z;
 
   ConvertRGBToXYZ(red,green,blue,&X,&Y,&Z);
-  ConvertXYZToProPhoto(X,Y,Z,r,g,b);
+  {
+    const ConvertXYZInput
+      xyz = { X, Y, Z };
+
+    ConvertXYZToProPhoto(&xyz,r,g,b);
+  }
 }
 
 static inline void ConvertXYZToLMS(const double x,const double y,
