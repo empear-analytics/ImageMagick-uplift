@@ -585,6 +585,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/string-si.c \
   MagickCore/string_.h \
   MagickCore/string-private.h \
+  MagickCore/string-interpret-private.h \
   MagickCore/studio.h \
   MagickCore/thread.c \
   MagickCore/thread_.h \
@@ -1041,6 +1042,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/stream-map-private.h \
   MagickCore/stream-pixels-private.h \
   MagickCore/string-private.h \
+  MagickCore/string-interpret-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
   MagickCore/threshold-private.h \
