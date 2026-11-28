@@ -17164,6 +17164,21 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+Oracle form (mandate (2026-11-19), added 2026-11-28, please confirm): when
+`obj_identical.sh` prints `DIFFERENT`, the step may still be made if oracle cases
+execute every function whose locals it inlines (`casemap.py`, the wide catalogue for
+X11 code). The oracle runs with `--function` on each of them, 0 diverged, and the
+message quotes each count and carries `Verified: oracle`. The message also names the
+functions whose code differs (`obj_modulo.sh`, or a comparison with the changed
+functions kept out of line on both sides). Steps 1 to 3 and 5 hold unchanged, checked
+by reading, and the warning checks of step 4 still print `OK`. Why the objects may
+differ: a binding loads its member at the top of the body, and the inlined read loads
+it where the argument stands. Nothing is called or written in between, so the value is
+the same, but the compiler may schedule the loads in another order and so pick other
+registers and stack slots (`XApplyCompositeCommand`, kept out of line: the loads of
+`windows` and `exception` swap, nothing else changes). At the oracle level this is no
+weaker than Recipe B's existing input struct form, which moves such bindings from one
+function to another on the oracle alone.
 
 **Provenance:** 2026-11-13, from `splay-tree.c`'s `CompareSplayTreeString` and
 `CompareSplayTreeStringInfo` (campaign B, M127 lane b round 5): after Recipe BF the
@@ -27949,3 +27964,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | CF | Step 7, event form: when no copy runs per pixel or per channel, only once per user command or pointer event of the X11 programs, a new indirect call (`call *`) is allowed; the message gives the count in the gcc `-O2 -fopenmp` object before and after and names the function holding the new call. *Careful* gives the argument (the same callee with the same arguments; one indirect call per event) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XPreviewRectangle`, `XPreviewEllipse` and their `Erase` twins differ only in `XHighlightRectangle` against `XHighlightEllipse`; gcc keeps `XPreviewBox` out of line as `XPreviewBox.isra.0`, `call *` 11 to 12 in `display-image.c`'s object, the clang object identical. The owner accepted the same cost for Recipe DC's X11 dialog commands (2026-11-18 evening). Probed chain 8.28, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 2 (d), read-operand form: the copies may also differ in a read-only operand at any position, either a parameter or local the block does not assign, or a member chain through one shared pointer (no call, no subscript) naming an object the block does not write, all of one type `U`. It is passed by value as `const U` and named in the body wherever the copy read it. Step 7 adds two checks by reading: the chain's pointer designates an object at the call, and no role (c) lvalue lies in the object it names; *Use when*: also *Overall Code Complexity* (the copies' decisions counted once, in the new function) | `display-image-crop-private.h` (campaign A, W51 round 38, lane b): `XFitSelectionRectangle`'s x and y halves (`windows->image.width` against `height`, the parameters `x` against `y`) and `XClampLineEnd`'s x2 and y2 clamps (`width` against `height`). After Recipe CF the file's only finding is Overall Code Complexity. Probed chain 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | IC | Step 5, dereferenced read: the one read of a member binding `v` may be the whole operand of a unary `*` whose `*v` is a whole argument or a whole member initialiser; it becomes `*p->m` (`*context->image`), which parses as `*(p->m)`; every other condition of step 5 holds | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): after Recipe D and B share the five edit commands' failure notice, `XApplyAnnotateCommand` and `XApplyCompositeCommand` pass `*image`; a probe keeping those bindings stays at 9.09 with Code Duplication, the chain (D, B, IC, and E, D, B, IC on two more groups) ends at 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | IC | *Evidence level*, oracle form: when `obj_identical.sh` prints `DIFFERENT` and oracle cases execute every function whose locals the step inlines, the oracle `--function` on each (0 diverged, counts quoted) proves the step, `Verified: oracle`; the message names the functions whose code differs; steps 1 to 3 and 5 by reading, step 4's warning checks `OK` | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): inlining the bindings of the five edit commands leaves Draw, Color and Matte identical one by one, but Annotate and Composite change `XApplyFXCommands`'s stack frame (+16 bytes). Kept out of line, `XApplyCompositeCommand` differs only in the order of two member loads. The commands are reached by 22, 15, 23, 9 and 3 wide cases; the chain needs those two inlined (a probe keeping either binding: 9.09 or 9.38) | mandate (2026-11-19) |
