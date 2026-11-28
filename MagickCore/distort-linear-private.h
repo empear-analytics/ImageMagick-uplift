@@ -338,9 +338,29 @@ static inline void SetPolarSpecialRadius(const CoefficientCall *call)
   SetPolarFurthestRadius(call);
 }
 
-static inline void SetArcOuterRadius(double *coeff,const size_t number_arguments,
-  const double *arguments)
+typedef struct _ArcOuterRadius
 {
+  double
+    *coeff;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+} ArcOuterRadius;
+
+static inline void SetArcOuterRadius(const ArcOuterRadius *radius)
+{
+  double
+    *const coeff = radius->coeff;
+
+  const size_t
+    number_arguments = radius->number_arguments;
+
+  const double
+    *const arguments = radius->arguments;
+
   if ( number_arguments >= 4 )
     coeff[3] = arguments[2] - arguments[3];
   else

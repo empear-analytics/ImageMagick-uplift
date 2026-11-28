@@ -190,7 +190,12 @@ static inline void SetArcCoefficients(double *coeff,const Image *image,
   coeff[3] = (double)image->rows-1;
   coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
   if ( number_arguments >= 3 )
-    SetArcOuterRadius(coeff,number_arguments,arguments);
+    {
+      const ArcOuterRadius
+        radius = { coeff, number_arguments, arguments };
+
+      SetArcOuterRadius(&radius);
+    }
   coeff[4] = ((double)image->columns-1.0)/2.0;
 }
 
