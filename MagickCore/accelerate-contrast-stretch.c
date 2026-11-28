@@ -554,6 +554,43 @@ static MagickBooleanType RunStretchHistogramPass(Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType CreateStretchMapBuffer(StretchResources *r,
+  ExceptionInfo *exception)
+{
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* Create and initialize OpenCL buffers. */
+  if (ALIGNED(r->stretch_map, PixelPacket))
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+    hostPtr = r->stretch_map;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+    hostPtr = r->stretch_map;
+  }
+  /* create a CL buffer for stretch_map  */
+  length = (MaxMap+1);
+  r->stretchMapBuffer = r->clEnv->library->clCreateBuffer(r->device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -565,9 +602,6 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     channel_mask=get32BitChannelValue(image->channel_mask),
     clStatus;
 
-  cl_mem_flags
-    mem_flags;
-
   cl_event
     event;
 
@@ -577,9 +611,6 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   size_t
     global_work_size[2],
     length;
-
-  void
-    *hostPtr;
 
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
@@ -668,25 +699,8 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
 #include "MagickCore/accelerate-recreate-buffer-private.h"
 
-  /* Create and initialize OpenCL buffers. */
-  if (ALIGNED(r.stretch_map, PixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-    hostPtr = r.stretch_map;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = r.stretch_map;
-  }
-  /* create a CL buffer for stretch_map  */
-  length = (MaxMap+1);
-  r.stretchMapBuffer = clEnv->library->clCreateBuffer(r.device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+  if (CreateStretchMapBuffer(&r,exception) == MagickFalse)
     goto cleanup;
-  }
 
   /* get the OpenCL kernel */
   r.stretchKernel = AcquireOpenCLKernel(r.device,"ContrastStretch");
