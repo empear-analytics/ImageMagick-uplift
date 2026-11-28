@@ -951,9 +951,13 @@ static inline double *ScaleRotateTranslateCoefficients(const CoefficientCall *ca
   return(coeff);
 }
 
-static inline void AddPerspectiveTerms(double **matrix,double *vectors[1],
+static inline void AddPerspectiveTerms(const LeastSquaresArrays *arrays,
   const CoefficientContext *context)
 {
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
+
   const double
     *const arguments = context->arguments;
 
@@ -1100,7 +1104,12 @@ static inline double *PerspectiveCoefficients(const CoefficientCall *call)
               "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  AddPerspectiveTerms(matrix,vectors,context);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    AddPerspectiveTerms(&arrays,context);
+  }
   /* Solve for LeastSquares Coefficients */
   status=GaussJordanElimination(matrix,vectors,8UL,1UL);
   matrix = RelinquishMagickMatrix(matrix, 8UL);
