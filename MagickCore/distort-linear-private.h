@@ -236,9 +236,21 @@ static inline MagickBooleanType IsInvalidBarrelArgumentCount(
     MagickTrue : MagickFalse);
 }
 
-static inline void SetAffineSingleCoefficients(double *coeff,const double *arguments,
-  const size_t cp_values,const size_t number_values)
+static inline void SetAffineSingleCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    cp_values = context->cp_values,
+    number_values = context->number_values;
+
   size_t
     i;
 
@@ -451,17 +463,13 @@ static inline double *AffineCoefficients(const CoefficientCall *call)
   const CoefficientContext
     *const context = call->context;
 
-  const double
-    *const arguments = context->arguments;
-
   ExceptionInfo
     *const exception = context->exception;
 
   const size_t
     number_arguments = context->number_arguments,
     number_values = context->number_values,
-    cp_size = context->cp_size,
-    cp_values = context->cp_values;
+    cp_size = context->cp_size;
 
   /* Affine Distortion
        v =  c0*x + c1*y + c2
@@ -489,7 +497,7 @@ static inline double *AffineCoefficients(const CoefficientCall *call)
   /* handle special cases of not enough arguments */
   if ( number_arguments == cp_size ) {
     /* Only 1 CP Set Given */
-    SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
+    SetAffineSingleCoefficients(call);
     return(coeff);
   }
   /* 2 or more points (usually 3) given.
