@@ -1469,6 +1469,16 @@ static void XCompositeKeyPress(const CompositeCommandInput *input,
   }
 }
 
+static MagickBooleanType IsCompositeButton1(const XWindows *windows,
+  const XEvent *event)
+{
+  if ((*event).xbutton.button != Button1)
+    return(MagickFalse);
+  if ((*event).xbutton.window != windows->image.id)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void XCompositePress(const CompositeCommandInput *input,
   const XEvent *event,const Cursor cursor,const CompositeEventTargets *targets)
 {
@@ -1491,9 +1501,7 @@ static void XCompositePress(const CompositeCommandInput *input,
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
       (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
-  if ((*event).xbutton.button != Button1)
-    return;
-  if ((*event).xbutton.window != windows->image.id)
+  if (IsCompositeButton1(windows,event) == MagickFalse)
     return;
   /*
     Change cursor.
