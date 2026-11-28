@@ -271,8 +271,17 @@ static inline void SetAffineSingleCoefficients(const CoefficientCall *call)
   }
 }
 
-static inline void SetPolarFurthestRadius(const Image *image,double *coeff)
+static inline void SetPolarFurthestRadius(const CoefficientCall *call)
 {
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  double
+    *const coeff = call->coeff;
+
   /* furthest diagonal if radius == -1 */
   if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
     double rx,ry;
@@ -309,7 +318,7 @@ static inline void SetPolarSpecialRadius(const CoefficientCall *call)
     coeff[0]=MagickMin(coeff[0],
                  fabs(coeff[3]-image->page.y-image->rows));
   }
-  SetPolarFurthestRadius(image,coeff);
+  SetPolarFurthestRadius(call);
 }
 
 static inline void SetArcOuterRadius(double *coeff,const size_t number_arguments,
