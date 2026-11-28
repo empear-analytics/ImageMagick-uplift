@@ -437,11 +437,22 @@ static inline void SetAffineVectors(double **vectors,double *coeff,
     vectors[i] = &(coeff[i*3]);
 }
 
-static inline void AddAffineTerms(const CoefficientCall *call,double **matrix,
-  double **vectors)
+typedef struct _LeastSquaresArrays
+{
+  double
+    **matrix,
+    **vectors;
+} LeastSquaresArrays;
+
+static inline void AddAffineTerms(const CoefficientCall *call,
+  const LeastSquaresArrays *arrays)
 {
   double
     *const coeff = call->coeff;
+
+  double
+    **const matrix = arrays->matrix,
+    **const vectors = arrays->vectors;
 
   const CoefficientContext
     *const context = call->context;
@@ -555,7 +566,12 @@ static inline double *AffineCoefficients(const CoefficientCall *call)
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  AddAffineTerms(call,matrix,vectors);
+  {
+    const LeastSquaresArrays
+      arrays = { matrix, vectors };
+
+    AddAffineTerms(call,&arrays);
+  }
   /* Solve for LeastSquares Coefficients */
   status=GaussJordanElimination(matrix,vectors,3UL,number_values);
   matrix = RelinquishMagickMatrix(matrix, 3UL);
