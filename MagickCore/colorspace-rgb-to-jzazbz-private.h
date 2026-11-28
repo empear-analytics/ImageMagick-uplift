@@ -41,7 +41,12 @@ static inline void ConvertRGBToJzazbz(const RGBToJzazbzInput *rgb,double *Jz,
     Z;
 
   ConvertRGBToXYZ(rgb->red,rgb->blue,rgb->green,&X,&Y,&Z);
-  ConvertXYZToJzazbz(X,Y,Z,rgb->white_luminance,Jz,az,bz);
+  {
+    const XYZToJzazbzInput
+      xyz = { X, Y, Z, rgb->white_luminance };
+
+    ConvertXYZToJzazbz(&xyz,Jz,az,bz);
+  }
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

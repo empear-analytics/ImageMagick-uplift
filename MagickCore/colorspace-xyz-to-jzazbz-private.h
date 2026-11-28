@@ -48,9 +48,24 @@ extern "C" {
 #define Jzazbz_bM  (1.096799)
 #define Jzazbz_bS  (-1.295875)
 
-static inline void ConvertXYZToJzazbz(const double X,const double Y,
-  const double Z,const double white_luminance,double *Jz,double *az,double *bz)
+typedef struct _XYZToJzazbzInput
 {
+  const double
+    X,
+    Y,
+    Z,
+    white_luminance;
+} XYZToJzazbzInput;
+
+static inline void ConvertXYZToJzazbz(const XYZToJzazbzInput *xyz,double *Jz,
+  double *az,double *bz)
+{
+  const double
+    X = xyz->X,
+    Y = xyz->Y,
+    Z = xyz->Z,
+    white_luminance = xyz->white_luminance;
+
   double
     a,
     b,
