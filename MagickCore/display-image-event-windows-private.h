@@ -61,10 +61,12 @@ static void XMakeWidgetWindow(const DisplayEventContext *context)
   char
     resource_name[MagickPathExtent];
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->widget);
+  XGetWindowInfo(display,&source,resource_info,&windows->widget);
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
     resource_info->client_name);
   windows->widget.geometry=XGetResourceClass(resource_info->resource_database,
@@ -128,10 +130,12 @@ static void XMakePopupWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->popup);
+  XGetWindowInfo(display,&source,resource_info,&windows->popup);
   windows->popup.border_width=0;
   windows->popup.flags|=PPosition;
   windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
@@ -211,10 +215,12 @@ static void XMakeMagnifyWindow(const DisplayEventContext *context,
   char
     resource_name[MagickPathExtent];
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->magnify);
+  XGetWindowInfo(display,&source,resource_info,&windows->magnify);
   if (resource_info->use_shared_memory == MagickFalse)
     windows->magnify.shared_memory=MagickFalse;
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.magnify",
@@ -288,10 +294,12 @@ static void XMakePanWindow(const DisplayEventContext *context)
   char
     resource_name[MagickPathExtent];
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->pan);
+  XGetWindowInfo(display,&source,resource_info,&windows->pan);
   (void) CloneString(&windows->pan.name,"Pan Icon");
   windows->pan.width=windows->icon.width;
   windows->pan.height=windows->icon.height;

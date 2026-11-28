@@ -692,8 +692,12 @@ static void XMakeIconWindow(const DisplayEventContext *context,
 
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
-    icon_resources,&windows->icon);
+  {
+    const XWindowInfoSource
+      source = { icon_visual, icon_map, icon_pixel, (XFontStruct *) NULL };
+
+    XGetWindowInfo(display,&source,icon_resources,&windows->icon);
+  }
   windows->icon.geometry=resource_info->icon_geometry;
   XBestIconSize(display,&windows->icon,display_image);
   windows->icon.attributes.colormap=XDefaultColormap(display,
@@ -750,11 +754,13 @@ static void XMakeContextWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
   windows->context.id=(Window) NULL;
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->context);
+  XGetWindowInfo(display,&source,resource_info,&windows->context);
   (void) CloneString(&class_hints->res_name,resource_info->client_name);
   (void) CloneString(&class_hints->res_class,resource_info->client_name);
   class_hints->res_class[0]=(char) LocaleToUppercase((int)

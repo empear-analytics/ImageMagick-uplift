@@ -186,8 +186,12 @@ static void XCreateImageWindowInfo(const AnimateWindowSetup *setup,
   RectangleInfo
     geometry_info;
 
-  XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
-    setup->font_info,resource_info,&windows->image);
+  {
+    const XWindowInfoSource
+      source = { visual_info, setup->map_info, setup->pixel, setup->font_info };
+
+    XGetWindowInfo(display,&source,resource_info,&windows->image);
+  }
   windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
   if (resource_info->use_shared_memory == MagickFalse)
     windows->image.shared_memory=MagickFalse;
@@ -271,8 +275,12 @@ const int
   const XMakeWindowHints
     hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
-    setup->font_info,resource_info,&windows->backdrop);
+  {
+    const XWindowInfoSource
+      source = { visual_info, setup->map_info, setup->pixel, setup->font_info };
+
+    XGetWindowInfo(display,&source,resource_info,&windows->backdrop);
+  }
   if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
     {
       /*
@@ -409,8 +417,13 @@ const int
   const XMakeWindowHints
     hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
-    setup->font_info,resource_info,&windows->widget);
+  {
+    const XWindowInfoSource
+      source = { setup->visual_info, setup->map_info, setup->pixel,
+        setup->font_info };
+
+    XGetWindowInfo(display,&source,resource_info,&windows->widget);
+  }
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
     resource_info->client_name);
   windows->widget.geometry=XGetResourceClass(resource_info->resource_database,
@@ -437,8 +450,13 @@ const int
   /*
     Initialize popup window.
   */
-  XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
-    setup->font_info,resource_info,&windows->popup);
+  {
+    const XWindowInfoSource
+      source = { setup->visual_info, setup->map_info, setup->pixel,
+        setup->font_info };
+
+    XGetWindowInfo(display,&source,resource_info,&windows->popup);
+  }
   XSetPopupWindowHints(windows,manager_hints);
   XMakeWindow(display,root_window,&hints,&windows->popup);
   windows->popup.highlight_stipple=XCreateBitmapFromData(display,

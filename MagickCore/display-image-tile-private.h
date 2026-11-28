@@ -760,8 +760,12 @@ static void XInitializeBackgroundAttributes(Display *display,
 
   (*window_info).name=AcquireString("\0");
   (*window_info).icon_name=AcquireString("\0");
-  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
-    resources,window_info);
+  {
+    const XWindowInfoSource
+      source = { (*visual_info), (*map_info), pixel, (XFontStruct *) NULL };
+
+    XGetWindowInfo(display,&source,resources,window_info);
+  }
 }
 
 static void XCreateBackgroundWindowInfo(Display *display,Image *image,

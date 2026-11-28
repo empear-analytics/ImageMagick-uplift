@@ -593,8 +593,13 @@ static void XInitializeBackgroundWindow(const AnimateBackgroundSetup *setup,
   /*
     Initialize Image window attributes.
   */
-  XGetWindowInfo(display,setup->visual_info,setup->map_info,pixel,
-    (XFontStruct *) NULL,resources,window_info);
+  {
+    const XWindowInfoSource
+      source = { setup->visual_info, setup->map_info, pixel,
+        (XFontStruct *) NULL };
+
+    XGetWindowInfo(display,&source,resources,window_info);
+  }
 }
 
 static void XCreateBackgroundScenes(const AnimateBackgroundSetup *setup,

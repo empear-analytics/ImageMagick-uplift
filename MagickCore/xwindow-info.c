@@ -358,10 +358,22 @@ static void XInitializeWindowAttributes(const XPixelInfo *pixel,
   window->orphan=MagickFalse;
 }
 
-MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
-  XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
-  XResourceInfo *resource_info,XWindowInfo *window)
+MagickPrivate void XGetWindowInfo(Display *display,
+  const XWindowInfoSource *source,XResourceInfo *resource_info,
+  XWindowInfo *window)
 {
+  XVisualInfo
+    *const visual_info = source->visual_info;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  XPixelInfo
+    *const pixel = source->pixel;
+
+  XFontStruct
+    *const font_info = source->font_info;
+
   /*
     Initialize window info.
   */

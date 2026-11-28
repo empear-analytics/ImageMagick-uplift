@@ -651,10 +651,12 @@ static void XMakeInfoWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,resource_info,
-    &windows->info);
+  XGetWindowInfo(display,&source,resource_info,&windows->info);
   (void) CloneString(&windows->info.name,"Info");
   (void) CloneString(&windows->info.icon_name,"Info");
   windows->info.border_width=1;
@@ -722,10 +724,12 @@ static void XMakeCommandWindow(const DisplayEventContext *context)
   char
     resource_name[MagickPathExtent];
 
+  const XWindowInfoSource
+    source = { visual_info, map_info, pixel, font_info };
+
   const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
 
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->command);
+  XGetWindowInfo(display,&source,resource_info,&windows->command);
   windows->command.data=MagickMenus;
   (void) XCommandWidget(display,windows,CommandMenu,(XEvent *) NULL);
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.command",
