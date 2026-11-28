@@ -2206,10 +2206,18 @@ typedef struct _BackgroundInput
     *window_attributes;
 } BackgroundInput;
 
-static void XCenterBackdropImage(XResourceInfo *resources,
-  XWindowInfo *window_info,const XWindowAttributes *window_attributes,
-  int *width,int *height)
+static void XCenterBackdropImage(const BackgroundInput *input,
+  const BackgroundTargets *targets,int *width,int *height)
 {
+  const XWindowAttributes
+    *const window_attributes = input->window_attributes;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
   if ((*resources).backdrop != MagickFalse)
     {
       /*
@@ -2247,7 +2255,7 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
 
   (*width)=(int) (*window_info).width;
   (*height)=(int) (*window_info).height;
-  XCenterBackdropImage(resources,window_info,window_attributes,width,height);
+  XCenterBackdropImage(input,targets,width,height);
   if (((*resources).image_geometry != (char *) NULL) &&
       (*(*resources).image_geometry != '\0'))
     {
