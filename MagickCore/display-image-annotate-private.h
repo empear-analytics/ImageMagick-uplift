@@ -1532,9 +1532,7 @@ static void XCompositeRelease(const CompositeCommandInput *input,
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
       (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
-  if ((*event).xbutton.button != Button1)
-    return;
-  if ((*event).xbutton.window != windows->image.id)
+  if (IsCompositeButton1(windows,event) == MagickFalse)
     return;
   if (((*composite_info).width != 0) && ((*composite_info).height != 0))
     {
