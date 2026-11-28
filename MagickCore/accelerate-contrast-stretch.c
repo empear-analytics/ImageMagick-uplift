@@ -480,6 +480,43 @@ static MagickBooleanType CreateStretchHistogramBuffer(StretchResources *r,
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadStretchHistogram(StretchResources *r,
+  ExceptionInfo *exception)
+{
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  /* read from the kernel output */
+  if (ALIGNED(r->histogram,cl_uint4))
+  {
+    length = (MaxMap+1);
+    r->clEnv->library->clEnqueueMapBuffer(r->queue, r->histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = (MaxMap+1);
+    clStatus = r->clEnv->library->clEnqueueReadBuffer(r->queue, r->histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), r->histogram, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* unmap, don't block gpu to use this buffer again.  */
+  if (ALIGNED(r->histogram,cl_uint4))
+    clStatus = r->clEnv->library->clEnqueueUnmapMemObject(r->queue, r->histogramBuffer, r->histogram, 0, NULL, NULL);
+  if ((ALIGNED(r->histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
+  {
+    (void) OpenCLThrowMagickException(r->device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -573,31 +610,8 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   if (status == MagickFalse)
     goto cleanup;
 
-  /* read from the kernel output */
-  if (ALIGNED(r.histogram,cl_uint4))
-  {
-    length = (MaxMap+1);
-    clEnv->library->clEnqueueMapBuffer(r.queue, r.histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = (MaxMap+1);
-    clStatus = clEnv->library->clEnqueueReadBuffer(r.queue, r.histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), r.histogram, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+  if (ReadStretchHistogram(&r,exception) == MagickFalse)
     goto cleanup;
-  }
-
-  /* unmap, don't block gpu to use this buffer again.  */
-  if (ALIGNED(r.histogram,cl_uint4))
-    clStatus = clEnv->library->clEnqueueUnmapMemObject(r.queue, r.histogramBuffer, r.histogram, 0, NULL, NULL);
-  if ((ALIGNED(r.histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
-  {
-    (void) OpenCLThrowMagickException(r.device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-    goto cleanup;
-  }
 
   /* recreate input buffer later, in case image updated */
 #include "MagickCore/accelerate-recreate-release-private.h"
