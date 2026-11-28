@@ -2110,18 +2110,8 @@ static void XInitializeBackgroundContext(XPixelInfo *pixel,Display *display,
       image->filename);
 }
 
-static void XInitializeBackgroundAttributes(XWindowInfo *window_info,
-  Display *display,XVisualInfo **visual_info,XStandardColormap **map_info,
-  XPixelInfo *pixel,XResourceInfo *resources)
-{
-  (*window_info).name=AcquireString("\0");
-  (*window_info).icon_name=AcquireString("\0");
-  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
-    resources,window_info);
-}
-
-static void XCreateBackgroundWindowInfo(Display *display,Image *image,
-  ExceptionInfo *exception,const BackgroundTargets *targets)
+static void XInitializeBackgroundAttributes(Display *display,
+  const BackgroundTargets *targets)
 {
   XStandardColormap
     **const map_info = targets->map_info;
@@ -2138,6 +2128,21 @@ static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   XWindowInfo
     *const window_info = targets->window_info;
 
+  (*window_info).name=AcquireString("\0");
+  (*window_info).icon_name=AcquireString("\0");
+  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
+    resources,window_info);
+}
+
+static void XCreateBackgroundWindowInfo(Display *display,Image *image,
+  ExceptionInfo *exception,const BackgroundTargets *targets)
+{
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
   /*
     Initialize Standard Colormap.
   */
@@ -2149,8 +2154,7 @@ static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   /*
     Initialize Image window attributes.
   */
-  XInitializeBackgroundAttributes(window_info,display,visual_info,map_info,
-    pixel,resources);
+  XInitializeBackgroundAttributes(display,targets);
 }
 
 static void XSizeBackgroundWindow(const Image *image,XWindowInfo *window_info)
