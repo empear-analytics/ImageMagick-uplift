@@ -23,8 +23,16 @@
 extern "C" {
 #endif
 
+typedef struct _OklabRGBTarget
+{
+  double
+    *red,
+    *green,
+    *blue;
+} OklabRGBTarget;
+
 static inline void ConvertOklabToRGB(const double L,const double a,
-  const double b,double *red,double *green,double *blue)
+  const double b,const OklabRGBTarget *target)
 {
 #define Oklab_la  (0.3963377774)
 #define Oklab_lb  (0.2158037573)
@@ -41,6 +49,11 @@ static inline void ConvertOklabToRGB(const double L,const double a,
 #define Oklab_Bl  (-0.0041960863)
 #define Oklab_Bm  (-0.7034186147)
 #define Oklab_Bs  (1.7076147010)
+
+  double
+    *const red = target->red,
+    *const green = target->green,
+    *const blue = target->blue;
 
   double
     aa,
@@ -87,8 +100,13 @@ static inline void ConvertOklabToRGB(const double L,const double a,
 }
 
 static inline void ConvertOklchToRGB(const double L,const double C,
-  const double H,double *red,double *green,double *blue)
+  const double H,const OklabRGBTarget *target)
 {
+  double
+    *const red = target->red,
+    *const green = target->green,
+    *const blue = target->blue;
+
   /* OKLCH → OKLab */
   const double a = C*cos(H);
   const double b_ = C*sin(H);

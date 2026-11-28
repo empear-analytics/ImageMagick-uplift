@@ -206,12 +206,18 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
   {
     case OklabColorspace:
     {
-      ConvertOklabToRGB(X,Y,Z,R,G,B);
+      const OklabRGBTarget
+        rgb = { R, G, B };
+
+      ConvertOklabToRGB(X,Y,Z,&rgb);
       break;
     }
     case OklchColorspace:
     {
-      ConvertOklchToRGB(X,Y,Z,R,G,B);
+      const OklabRGBTarget
+        rgb = { R, G, B };
+
+      ConvertOklchToRGB(X,Y,Z,&rgb);
       break;
     }
     case ProPhotoColorspace:
