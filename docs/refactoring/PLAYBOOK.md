@@ -23192,6 +23192,38 @@ constants; Recipe KD, whose run is a `LocaleCompare` ladder.
    of the file, and the oracle for the function with line coverage showing a case runs
    every group's call.
 
+*N-signature form* (mandate (2026-11-19), added 2026-11-28; please confirm). The chain's
+table groups may call functions of more than two signatures, and a group's statement may
+assign the call's result to an object the chain passes on by pointer
+(`(*nexus)=F(context,(*nexus));`, or `nexus=F(&context);` in the function itself), when
+every group of one signature has one call text, free of side effects but the call and its
+assignment, reading only the function's parameters and locals and the helpers' parameters
+or their bindings of members of one `const` context parameter. Then the struct of step 3
+holds the key and one pointer member per signature, and each element sets exactly one of
+them; below the lookup, a `static void` runner takes the element and the objects the call
+texts name, tests the members in their declaration order in an `if` ... `else if` chain,
+and makes the first non-`NULL` member's call with its group's text (the assignment
+included; a helper's binding `T *const v = p->v;` is read as `p->v`, a pointer parameter
+`&(*x)` as `x`). The groups that are not table groups (step 2), wherever they stand along
+the chain, gather unchanged and in chain order into the `switch` of the innermost helper,
+which stays a `static` function and keeps its `default:` group as the fallback; a group
+that is `break;` alone joins its label to another such group. When every group of the
+function's own `switch` is a table group, the `switch` becomes `m=Get<Name>(e); if (m !=
+NULL) <Runner>(m,...); else <Helper>(...);`, the innermost helper called as the chain
+called it. The other helpers are removed. A parameter of the innermost helper that no kept
+group reads any more is dropped with its argument (a `static` function, one call). Step
+6's reading is scripted: each label of the parent's chain has exactly one place (an
+element, a kept group, or none: the fallback), the parent's labels in chain order are the
+table's order, each element names the function its group called, exactly one member of
+each element is non-`NULL`, and that member is the one the group's call text selects. The
+compiler checks each member's type. Step 8's line coverage may be read per callee when
+each callee has one call, the group's (`casemap.py` per callee, `WIDE=1` for a wide-build
+file): the oracle on the cases that reach the function, every reached callee and runner
+branch named, and the elements and runner branches that no case runs listed in the
+message as checked only by the scripted reading (X11 dispatch in `display-image.c`: the
+oracle's scripted X sessions choose the commands). No timing when the function is not on a
+per-pixel or hot path (step 7).
+
 **Before:**
 
 ```c
@@ -28154,3 +28186,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | LM | Step 8, *gather form*: locals a function's cleanup releases (or that later steps hand together to helpers) may be gathered into a new struct local `r` of a new typedef, one member per local of its exact type (plus at most one member copying a never-assigned parameter, set by `r.p=p;` before the first of the moved `v=c;` statements), every use written `r.m`; no copy into an existing struct needed; a local an unbuilt fragment names stays unchosen except under *Unreached functions: the worker of a wrapper no code calls* | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s fourteen cleanup and stage locals; the probed chain (E, D, V, W, JN, D) ends at 10.0 from 8.24, the gather itself flat | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 3, *new input struct, two bases*: the input struct may be a new `typedef` (one `const`-pointee pointer member per pointer the copies read through), its `const` local initialised by `{ ... }` in a compound statement holding only the calls; a `const` binding of `p->n` is read as `s->m->n` and leaves the caller; role (c)'s two lvalues may be `e1.m` and `e2.m` of two distinct struct locals, the member differing between copies (`T *value1,T *value2`) | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `ComputeContrastStretchImage`'s four black/white level blocks (`FindStretchLevels`), seven parameters without the struct; 7.61 -> 7.69, first step of a chain ending at 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | MA | Step 8, *precomputed levels form*: copies in one loop body that are `if`-`else` chains whose every test opens with the same side-effect-free conjunct `C` (reading nothing the loop writes) may get a new levels struct (a flag for `C`, the role (d) operands) filled before the loop by a new `static` function, one `const` local per copy; the new function takes the struct, binds the operands to `const` locals, returns first when the flag is `MagickFalse` and runs the chain with `C` dropped | `accelerate-contrast-stretch.c` (campaign A, W51 round 38, lane b): `BuildStretchMap`'s four channel chains (`SetStretchMapValue`, `GetStretchChannelLevels`); 7.67 -> 8.24, a step of a chain ending at 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | KV | *N-signature form*: the table groups may call functions of more than two signatures, and a group may assign the call's result to an object the chain passes on by pointer; one pointer member per signature, exactly one set per element, a `static void` runner tests them in order and makes the group's call text; kept groups gather unchanged into the innermost helper's `switch`, which stays as the fallback (a parameter no kept group reads is dropped); step 6's pairing is scripted; step 8's coverage may be read per callee, and elements and runner branches no case runs are listed as checked by the reading | `display-image-apply-private.h` (campaign A, W51 round 38, lane b): `XMagickCommand` and its 16 SD helpers dispatch 86 labels, 82 of them to one command each of six signatures (`run`, `run_color`, `run_flags`, `run_quantize`, `next_image`, `new_image`); CodeScene counts the look-alike helpers as *Code Duplication* (14 functions). A probe of the table: 7.55 -> 9.38, only *Overall Code Complexity* left, which a carve of the magnify family clears (both products 10.0) | mandate (2026-11-19) |
