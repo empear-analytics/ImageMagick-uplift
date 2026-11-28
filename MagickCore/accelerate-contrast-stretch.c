@@ -224,13 +224,13 @@ static void StretchImageClass(Image *image,PixelPacket *stretch_map,
   }
 }
 
+#define ContrastStretchImageTag  "ContrastStretch/Image"
+#define MaxRange(color)  ((cl_float) ScaleQuantumToMap((Quantum) (color)))
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
 {
-#define ContrastStretchImageTag  "ContrastStretch/Image"
-#define MaxRange(color)  ((cl_float) ScaleQuantumToMap((Quantum) (color)))
-
   const double
     black_point = points->black_point,
     white_point = points->white_point;
