@@ -222,8 +222,11 @@ typedef struct _CoefficientCall
     *context;
 } CoefficientCall;
 
-static inline MagickBooleanType IsInvalidPolarRadius(const double *coeff)
+static inline MagickBooleanType IsInvalidPolarRadius(const CoefficientCall *call)
 {
+  const double
+    *const coeff = call->coeff;
+
   return(( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
            || (coeff[0]-coeff[1]) < MagickEpsilon ) ? MagickTrue : MagickFalse);
 }
