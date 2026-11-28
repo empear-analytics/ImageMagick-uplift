@@ -190,6 +190,38 @@ static inline MagickBooleanType IsInvalidPolarArgumentCount(
           || number_arguments > 8 ) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _CoefficientContext
+{
+  const Image
+    *image;
+
+  const double
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    number_arguments,
+    number_values,
+    cp_size,
+    cp_x,
+    cp_y,
+    cp_values;
+} CoefficientContext;
+
+typedef struct _CoefficientCall
+{
+  double
+    *coeff;
+
+  DistortMethod
+    *method;
+
+  const CoefficientContext
+    *context;
+} CoefficientCall;
+
 static inline MagickBooleanType IsInvalidPolarRadius(const double *coeff)
 {
   return(( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
@@ -360,38 +392,6 @@ static inline void SetAffineVectors(double **vectors,double *coeff,
   for (i=0; i < number_values; i++)
     vectors[i] = &(coeff[i*3]);
 }
-
-typedef struct _CoefficientContext
-{
-  const Image
-    *image;
-
-  const double
-    *arguments;
-
-  ExceptionInfo
-    *exception;
-
-  size_t
-    number_arguments,
-    number_values,
-    cp_size,
-    cp_x,
-    cp_y,
-    cp_values;
-} CoefficientContext;
-
-typedef struct _CoefficientCall
-{
-  double
-    *coeff;
-
-  DistortMethod
-    *method;
-
-  const CoefficientContext
-    *context;
-} CoefficientCall;
 
 static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   const CoefficientContext *context)
