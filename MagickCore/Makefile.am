@@ -275,6 +275,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image-window-setup-private.h \
   MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -928,6 +929,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-image-window-setup-private.h \
   MagickCore/display-image-event-handle-private.h \
   MagickCore/display-image-event-private.h \
+  MagickCore/display-image-event-windows-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \

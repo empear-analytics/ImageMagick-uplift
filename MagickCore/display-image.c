@@ -422,6 +422,7 @@ static DisplayCommand
   };
 
 #include "MagickCore/display-image-event-handle-private.h"
+#include "MagickCore/display-image-event-windows-private.h"
 #include "MagickCore/display-image-event-private.h"
 
 
