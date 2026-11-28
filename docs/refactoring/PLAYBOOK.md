@@ -2092,6 +2092,23 @@ merges code, not parameters.
    by hand before and after. A `static` function that the bundled one calls with exactly
    the bound locals of its step 3 may then take the same `const Name *` under step 8's
    *Existing input struct* form, the bindings standing for Recipe N's.
+   *Test-program caller* (mandate (2026-11-19), added 2026-11-28 for
+   `colorspace-cie-to-rgb-private.h`'s `ConvertLuvToRGB`, please confirm). A changed call in
+   a file under `tests/` that only a test program compiles (`tests/validate.c`: no oracle
+   case runs it, no library object holds it) may miss (d) in two ways only, each measured
+   and quoted in the message. (i) At the build's own flags, with `__LINE__` pinned as
+   `obj_identical.sh` compiles, its `.text` and relocations are identical and the only
+   other bytes that differ are constants in `.rodata.cst*` that clang folded from a
+   contractable expression (`354.0*u-134.0`, `llvm.fmuladd`): with `-ffp-contract=off`
+   added to both sides the objects are identical. (ii) With `-fno-inline`, the functions
+   that differ besides the bundled one and the caller are callees of the bundled function
+   that clang had specialised for the caller's literal arguments (interprocedural constant
+   propagation, which the struct stops) and functions whose only difference is a `.rodata`
+   relocation addend; none is new or gone. The test program is rebuilt and the subtest
+   that runs the call passes (`tests/validate -validate <type>`). The defining file, every
+   library caller and every other includer keep (d) as written. The test program may then
+   compute a floating-point value that differs in its last bits, inside the subtest's
+   tolerance; the library's code does not change.
 2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
    top of the file, one member per parameter in the group, with the parameter's type and
    name.
@@ -27913,3 +27930,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-25 | AMEND | RT | Step 1, compared constants: the copies' constant may be a numeric literal compared with an expression common to all copies (the table typed by the usual arithmetic conversions), and the step serves *Overall Code Complexity*, lowering the file's total by `n-3` | `property-exif-private.h`'s `ReadEXIFMarker` (campaign B, M143): six `if (ReadPropertyByte(exif,length) != 0x..) return(MagickFalse);` tests for the "Exif\0\0" marker; the header's mean cc was 4.6 with the threshold near 3.86 | mandate (2026-10-24) |
 | 2026-11-26 | AMEND | OH | Step 1, Form A: a run may hold an `#include` inside a conditional branch this build does not compile, moved verbatim with its pair; an `#include` this build compiles stays out | `blob.c` (campaign B, M143): its define block (`MagickMaxBlobExtent`, which the image-conversion and custom-stream families use, and the platform macros) holds `#include <io.h>` under `#if defined(__OS2__)`; the block and the private types must move to one header before Recipe S can split the families out (probe: blob.c 2.71 -> 2.89 with four families out, products 4.96 to 8.81) | owner |
 | 2026-11-28 | AMEND | HN | Step 8: (a) an exit `{ S return(R); }` whose `S` only releases objects the block does not touch, when the caller's next test has the same body; (b) `v` also written by the block's first statement, the clone its last call transforms, kept in a helper local, the helper ending `return(Last(...));` (and `return(Call(...));` with no release after the last call); (c) `NULL` or `(T *) NULL` in a guard; (d) two copies in one caller in one commit | `compare-similarity-frequency-images-private.h`'s `SIMCrossCorrelationImage` and `SIMPhaseCorrelationImage` (campaign A, W51 round 38, lane a): their FFT heads as helpers, with two Recipe E steps, clear the header's Overall Code Complexity, 9.38 flat to 10.0 in a probe | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | B | Step 1, test-program caller: a changed call in a file under `tests/` that only a test program compiles may miss (d) only by constants clang folds from a contractable expression (`.text` and relocations identical with `__LINE__` pinned, the object identical with `-ffp-contract=off`) and, under `-fno-inline`, by callees no longer specialised for the caller's literal arguments and `.rodata` relocation addends; the subtest that runs the call passes | `colorspace-cie-to-rgb-private.h`'s `ConvertLuvToRGB` (campaign A, W51 round 38, lane a): `tests/validate.c`'s `ValidateLuvToRGB` passes literal Luv inputs; with them in a struct, two constants clang -O2 folds differ by 1 and 2 ulp and the objects are identical with `-ffp-contract=off`; the header goes 9.68 to 10.0 | mandate (2026-11-19) |
