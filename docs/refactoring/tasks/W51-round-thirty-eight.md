@@ -7,10 +7,14 @@ Campaign A, lanes `campaign/W51-a` (colorspace and compare headers), `campaign/W
 1. **Inventory** (106 agents): every campaign A `.c` file and every private header it includes was scored with cs-mcp on `4178bbf3e`. **104 were below 10.0** (44 `.c`, 60 headers). One agent per file worked out and stub-probed a route to 10.0. **66 had a legal route**; the other 38 are held by MagickExport argument counts or by the per-pixel Ir rule.
 2. **Lanes**: three lanes took the 25 planned packages, then a queue of the remaining reachable files. Every package went to an independent reviewer that rescored, reran the oracle (`--base 46b61ab8d`) and checked the rules; up to two fix rounds; a package that failed three reviews was reset away.
 
-## Result: 35 files to 10.0
+## Result: 39 files to 10.0
 
 | File | Before | After | How |
 | --- | --- | --- | --- |
+| `display-image-apply-private.h` | 7.55 | **10.0** | with the new `display-image-magnify-private.h` (10.0) (third merge) |
+| `colorspace-lab-compatible-private.h` | 9.38 | **10.0** | Recipe EL under the owner's 2026-11-28 txt and histogram ruling; txt/sparse `WriteTXTImage` -0.0104 % to +0.0341 %, histogram `GetNumberColors` +0.0141 % and +0.0256 %, every other path at most +0.0042 % (lane e, third merge) |
+| `colorspace-rgb-to-xyz-cmy-private.h` | 9.68 | **10.0** | two OH carves (`colorspace-rgb-xyz-cat02-private.h`, `colorspace-rgb-to-cmy-private.h`), B (third merge) |
+| `resample.c` | 9.68 | **10.0** | S: the EWA resampler to `resample-ewa.c`, `struct _ResampleFilter` to `resample-filter-private.h` (third merge) |
 | `accelerate-contrast-stretch.c` | 7.61 | **10.0** | guard-level chain for the worker of a wrapper no code calls (new rule paragraph), LM gather, MA, D (second merge) |
 | `enhance-level.c` | 9.68 | **10.0** | S: `LevelImage` and `LevelizeImage` to `enhance-level-image.c` and `enhance-levelize.c` (9.68, MagickExport), shared helpers in `enhance-level-private.h` (second merge) |
 | `colorspace-rgb-to-cie-private.h` | 9.68 | **10.0** | B, with the table entries in `colorspace-rgb-to-cie-entries-private.h` (second merge) |
@@ -57,6 +61,7 @@ New files: 40 (35 headers, 5 `.c` split products). The split products that stay 
 - Sweep (cs-mcp, `sweep25.sh`) on `df7b939db`: campaign A **164** `.c` files (159 plus 5 split products), mean 9.88, **121 at 10.0** (115 before; the five split products are at 9.68). MagickCore 9.67. Most of the round's gains are in private headers, which this `.c` sweep does not list.
 
 - Gates on the second merge, `0317f3b56`: `ci_linux_warnings --campaign-a` OK (166 files); narrow 16,004 cases, 1 diverged: `infra/0fd402f13a`, the case recorded as load-sensitive (load average about 24 during the run); rerun alone 3 times, 0 diverged each. Wide 14,249 cases, **0 diverged** (8 settled as load-sensitive). `check_trailers` 154 refactor commits valid; `playbook_lint` 195 recipes, 610 change rows, 0 problems. Sweep: campaign A 166 `.c` files, mean **9.90**, **123 at 10.0**; MagickCore 9.68.
+- Gates on the third merge, `91d3a05d1`: `ci_linux_warnings --campaign-a` OK (167 files); narrow 16,004 cases, 1 diverged: `infra/0fd402f13a` again (load average about 26), rerun alone 3 times while the lanes kept the load average near 25: 0 diverged twice (17 s and 233 s), 1 diverged once (247 s; its report was not kept); the case is recorded as load-sensitive in the 2026-11-20 rulings, and no commit of this round touches the code it runs; wide 14,249 cases, **0 diverged** (7 settled as load-sensitive). `check_trailers` 162 refactor commits valid; `playbook_lint` 195 recipes, 613 change rows, 0 problems. Sweep: campaign A 167 `.c` files, mean 9.90, **124 at 10.0**; MagickCore 9.68.
 - **Merge correction:** the first try at the second merge resolved `PLAYBOOK.md` with the old section-level resolver, which dropped 47 lines of lane b and 4 of lane d (lines outside the conflict). It was reset before any push and redone keeping both sides' change-log rows, the only real conflict. Checked after: every line any lane added is present, and every line of main's playbook is present unless a lane removed it.
 - Every package reviewed by a separate agent: oracle `--function` (narrow, and `WIDE=1` for X11/OpenCL code), object comparisons where no case reaches the code, per-pixel Ir where objects changed, release flags, trailers.
 - No `--no-verify`.
