@@ -44,8 +44,13 @@ static inline void ConvertJzazbzToRGB(const JzazbzToRGBInput *jzazbz)
     Y,
     Z;
 
-  ConvertJzazbzToXYZ(jzazbz->Jz,jzazbz->az,jzazbz->bz,jzazbz->white_luminance,
-    &X,&Y,&Z);
+  {
+    const JzazbzToXYZInput
+      xyz = { jzazbz->Jz, jzazbz->az, jzazbz->bz, jzazbz->white_luminance,
+        (&X), (&Y), (&Z) };
+
+    ConvertJzazbzToXYZ(&xyz);
+  }
   ConvertXYZToRGB(X,Y,Z,jzazbz->red,jzazbz->blue,jzazbz->green);
 }
 

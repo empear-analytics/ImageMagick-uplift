@@ -38,8 +38,21 @@ extern "C" {
 #define Jzazbz_ZS  (1.52276656130526)
 #define mJzazbz_c3  (-2392.0/128.0)
 
-static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
-  const double bz,const double white_luminance,double *X,double *Y,double *Z)
+typedef struct _JzazbzToXYZInput
+{
+  const double
+    Jz,
+    az,
+    bz,
+    white_luminance;
+
+  double
+    *X,
+    *Y,
+    *Z;
+} JzazbzToXYZInput;
+
+static inline void ConvertJzazbzToXYZ(const JzazbzToXYZInput *jzazbz)
 {
   double
     azz,
@@ -67,9 +80,9 @@ static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
     Zp,
     Yp;
 
-  g=Jz+Jzazbz_d0;
-  azz=az-0.5;
-  bzz=bz-0.5;
+  g=jzazbz->Jz+Jzazbz_d0;
+  azz=jzazbz->az-0.5;
+  bzz=jzazbz->bz-0.5;
   C=Jzazbz_Ca*azz+Jzazbz_Cb*bzz;
   Sp=g/(1.0+Jzazbz_d*(1.0-g));
   Lp=Sp+C;
@@ -90,9 +103,9 @@ static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
   L=pow(nL/dL,Jnr);
   M=pow(nM/dM,Jnr);
   S=pow(nS/dS,Jnr);
-  L*=white_luminance;
-  M*=white_luminance;
-  S*=white_luminance;
+  L*=jzazbz->white_luminance;
+  M*=jzazbz->white_luminance;
+  S*=jzazbz->white_luminance;
   Zp=Jzazbz_ZL*L;
   Xp=Jzazbz_XL*L;
   Yp=Jzazbz_YL*L;
@@ -107,9 +120,9 @@ static inline void ConvertJzazbzToXYZ(const double Jz,const double az,
   Xp=IsNaN(Xp) != 0 ? 0.0 : Xp;  /* as rJzazbz_b = 1.0/Jzazbz_b; */
   Yp=Xp+(Yp-Xp)/Jzazbz_g;  /* Xp=rJzazbz_b*Xp+(1.0-rJzazbz_b)*Zp; etc. */
   Yp=IsNaN(Yp) != 0 ? 0.0 : Yp;
-  *Z=Zp;
-  *X=Xp;
-  *Y=Yp;
+  *jzazbz->Z=Zp;
+  *jzazbz->X=Xp;
+  *jzazbz->Y=Yp;
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
