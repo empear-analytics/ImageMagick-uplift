@@ -409,6 +409,23 @@ static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
   return(square_image);
 }
 
+static Image *SIMRootImage(Image *magnitude_image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if (status == MagickFalse)
+    {
+      magnitude_image=DestroyImage(magnitude_image);
+      return((Image *) NULL);
+    }
+  status=EvaluateImage(magnitude_image,PowEvaluateOperator,0.5,exception);
+  if (status == MagickFalse)
+    {
+      magnitude_image=DestroyImage(magnitude_image);
+      return (Image *) NULL;
+    }
+  return(magnitude_image);
+}
+
 static Image *SIMMagnitudeImage(Image *alpha_image,Image *beta_image,
   ExceptionInfo *exception)
 {
@@ -435,18 +452,7 @@ static Image *SIMMagnitudeImage(Image *alpha_image,Image *beta_image,
     exception);
   magnitude_image=xsq_image;
   ysq_image=DestroyImage(ysq_image);
-  if (status == MagickFalse)
-    {
-      magnitude_image=DestroyImage(magnitude_image);
-      return((Image *) NULL);
-    }
-  status=EvaluateImage(magnitude_image,PowEvaluateOperator,0.5,exception);
-  if (status == MagickFalse)
-    {
-      magnitude_image=DestroyImage(magnitude_image);
-      return (Image *) NULL;
-    }
-  return(magnitude_image);
+  return(SIMRootImage(magnitude_image,status,exception));
 }
 
 typedef struct
