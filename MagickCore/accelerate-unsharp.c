@@ -547,8 +547,8 @@ static cl_int SetUnsharpMaskArgs(const UnsharpMaskArgs *args)
 }
 
 static Image *ComputeUnsharpMaskImageSingle(const Image *image,
-  MagickCLEnv clEnv,const double radius,const double sigma,const double gain,
-  const double threshold,ExceptionInfo *exception)
+  MagickCLEnv clEnv,const AccelerateUnsharpRequest *request,
+  ExceptionInfo *exception)
 {
   cl_command_queue
     queue;
@@ -592,7 +592,7 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
     targets = { &device, &queue, &filteredImage, &imageBuffer,
       &filteredImageBuffer };
 
-  const BlurKernelGeometry geometry = { radius, sigma };
+  const BlurKernelGeometry geometry = { request->radius, request->sigma };
 
   queue=NULL;
   filteredImage=NULL;
@@ -615,8 +615,8 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   imageColumns=(cl_uint) image->columns;
   imageRows=(cl_uint) image->rows;
   number_channels=(cl_uint) image->number_channels;
-  fGain=(float) gain;
-  fThreshold=(float) threshold;
+  fGain=(float) request->gain;
+  fThreshold=(float) request->threshold;
 
   {
     const UnsharpMaskArgs args = { unsharpMaskKernel, imageBuffer,
@@ -660,10 +660,7 @@ MagickPrivate Image *AccelerateUnsharpMaskImage(const Image *image,
   const AccelerateUnsharpRequest *request,ExceptionInfo *exception)
 {
   const double
-    radius = request->radius,
-    sigma = request->sigma,
-    gain = request->gain,
-    threshold = request->threshold;
+    radius = request->radius;
 
   Image
     *filteredImage;
@@ -682,8 +679,8 @@ MagickPrivate Image *AccelerateUnsharpMaskImage(const Image *image,
     return((Image *) NULL);
 
   if (radius < 12.1)
-    filteredImage=ComputeUnsharpMaskImageSingle(image,clEnv,radius,sigma,gain,
-      threshold,exception);
+    filteredImage=ComputeUnsharpMaskImageSingle(image,clEnv,request,
+      exception);
   else
     filteredImage=ComputeUnsharpMaskImage(image,clEnv,request,exception);
   return(filteredImage);
