@@ -678,10 +678,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
   
   r.clEnv=clEnv;
   r.queue=NULL;
