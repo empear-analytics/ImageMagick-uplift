@@ -642,6 +642,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
+  MagickCore/visual-effects-stereo.c \
   MagickCore/visual-effects.h \
   MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/vision.c \
