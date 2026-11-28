@@ -517,6 +517,43 @@ static MagickBooleanType ReadStretchHistogram(StretchResources *r,
   return(MagickTrue);
 }
 
+static MagickBooleanType RunStretchHistogramPass(Image *image,
+  StretchResources *r,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+
+
+  /*
+    Form histogram.
+  */
+  /* Create and initialize OpenCL buffers. */
+  /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
+  /* assume this  will get a writable image */
+  if (AcquireStretchInput(image,r,exception) == MagickFalse)
+    return(MagickFalse);
+
+  if (CreateStretchHistogramBuffer(r,exception) == MagickFalse)
+    return(MagickFalse);
+
+  {
+    const HistogramKernelLaunch
+      launch = { r->clEnv, r->device, r->queue, r->imageBuffer,
+        r->histogramBuffer };
+
+    status = LaunchHistogramKernel(&launch, image, image->channel_mask,
+      exception);
+  }
+  if (status == MagickFalse)
+    return(MagickFalse);
+
+  if (ReadStretchHistogram(r,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
@@ -536,9 +573,6 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
   cl_uint
     i;
-
-  MagickBooleanType
-    status;
 
   size_t
     global_work_size[2],
@@ -585,32 +619,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     (void) SetImageColorspace(image,GRAYColorspace);
   */
 
-  status=MagickTrue;
-
-
-  /*
-    Form histogram.
-  */
-  /* Create and initialize OpenCL buffers. */
-  /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
-  /* assume this  will get a writable image */
-  if (AcquireStretchInput(image,&r,exception) == MagickFalse)
-    goto cleanup;
-
-  if (CreateStretchHistogramBuffer(&r,exception) == MagickFalse)
-    goto cleanup;
-
-  {
-    const HistogramKernelLaunch
-      launch = { clEnv, r.device, r.queue, r.imageBuffer, r.histogramBuffer };
-
-    status = LaunchHistogramKernel(&launch, image, image->channel_mask,
-      exception);
-  }
-  if (status == MagickFalse)
-    goto cleanup;
-
-  if (ReadStretchHistogram(&r,exception) == MagickFalse)
+  if (RunStretchHistogramPass(image,&r,exception) == MagickFalse)
     goto cleanup;
 
   /* recreate input buffer later, in case image updated */
