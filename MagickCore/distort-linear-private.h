@@ -1031,9 +1031,18 @@ static inline double *PerspectiveCoefficients(const CoefficientCall *call)
   return(coeff);
 }
 
-static inline double *PerspectiveProjectionCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *PerspectiveProjectionCoefficients(
+  const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 

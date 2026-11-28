@@ -907,14 +907,8 @@ static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
 static inline double *GenerateAffineFamilyCoefficients(
   const CoefficientCall *call)
 {
-  double
-    *const coeff = call->coeff;
-
   DistortMethod
     *const method = call->method;
-
-  const CoefficientContext
-    *const context = call->context;
 
   switch (*method)
   {
@@ -929,7 +923,7 @@ static inline double *GenerateAffineFamilyCoefficients(
     case PerspectiveDistortion:
       return(PerspectiveCoefficients(call));
     case PerspectiveProjectionDistortion:
-      return(PerspectiveProjectionCoefficients(coeff,method,context));
+      return(PerspectiveProjectionCoefficients(call));
     default:
       break;
   }
