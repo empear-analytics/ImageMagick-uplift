@@ -97,6 +97,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-kernels-resizefilter-private.h \
   MagickCore/accelerate-kernels-resizehorizontal-private.h \
   MagickCore/accelerate-kernels-resizevertical-private.h \
+  MagickCore/accelerate-kernels-rotationalblur-private.h \
   MagickCore/accelerate-kernels-unsharpmask-private.h \
   MagickCore/accelerate-kernels-wavelet-private.h \
   MagickCore/accelerate-blur-private.h \
@@ -833,6 +834,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-kernels-resizefilter-private.h \
   MagickCore/accelerate-kernels-resizehorizontal-private.h \
   MagickCore/accelerate-kernels-resizevertical-private.h \
+  MagickCore/accelerate-kernels-rotationalblur-private.h \
   MagickCore/accelerate-kernels-unsharpmask-private.h \
   MagickCore/accelerate-kernels-wavelet-private.h \
   MagickCore/accelerate-blur-private.h \
