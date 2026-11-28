@@ -227,14 +227,40 @@ static void StretchImageClass(Image *image,PixelPacket *stretch_map,
 #define ContrastStretchImageTag  "ContrastStretch/Image"
 #define MaxRange(color)  ((cl_float) ScaleQuantumToMap((Quantum) (color)))
 
+typedef struct _StretchLevelSearch
+{
+  const Image
+    *image;
+
+  const cl_uint4
+    *histogram;
+
+  const ContrastStretchPoints
+    *points;
+} StretchLevelSearch;
+
+static void FindStretchLevels(const StretchLevelSearch *search,
+  const ChannelType channel,cl_float *black,cl_float *white)
+{
+  cl_uint
+    i;
+
+  *black=0.0;
+  *white=MaxRange(QuantumRange);
+  if ((search->image->channel_mask & channel) != 0)
+  {
+    i=FindStretchBlackBin(search->histogram,search->points->black_point);
+    *black=(cl_float) i;
+    i=FindStretchWhiteBin(search->image,search->histogram,
+      search->points->white_point);
+    *white=(cl_float) i;
+  }
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
 {
-  const double
-    black_point = points->black_point,
-    white_point = points->white_point;
-
   CacheView
     *image_view;
 
@@ -429,41 +455,14 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /*
      Find the histogram boundaries by locating the black/white levels.
   */
-  black.x=0.0;
-  white.x=MaxRange(QuantumRange);
-  if ((image->channel_mask & RedChannel) != 0)
   {
-    i=FindStretchBlackBin(histogram,black_point);
-    black.x=(cl_float) i;
-    i=FindStretchWhiteBin(image,histogram,white_point);
-    white.x=(cl_float) i;
-  }
-  black.y=0.0;
-  white.y=MaxRange(QuantumRange);
-  if ((image->channel_mask & GreenChannel) != 0)
-  {
-    i=FindStretchBlackBin(histogram,black_point);
-    black.y=(cl_float) i;
-    i=FindStretchWhiteBin(image,histogram,white_point);
-    white.y=(cl_float) i;
-  }
-  black.z=0.0;
-  white.z=MaxRange(QuantumRange);
-  if ((image->channel_mask & BlueChannel) != 0)
-  {
-    i=FindStretchBlackBin(histogram,black_point);
-    black.z=(cl_float) i;
-    i=FindStretchWhiteBin(image,histogram,white_point);
-    white.z=(cl_float) i;
-  }
-  black.w=0.0;
-  white.w=MaxRange(QuantumRange);
-  if ((image->channel_mask & AlphaChannel) != 0)
-  {
-    i=FindStretchBlackBin(histogram,black_point);
-    black.w=(cl_float) i;
-    i=FindStretchWhiteBin(image,histogram,white_point);
-    white.w=(cl_float) i;
+    const StretchLevelSearch
+      search = { image, histogram, points };
+
+    FindStretchLevels(&search,RedChannel,&black.x,&white.x);
+    FindStretchLevels(&search,GreenChannel,&black.y,&white.y);
+    FindStretchLevels(&search,BlueChannel,&black.z,&white.z);
+    FindStretchLevels(&search,AlphaChannel,&black.w,&white.w);
   }
 
   stretch_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,
