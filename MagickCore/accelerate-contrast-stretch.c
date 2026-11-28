@@ -762,8 +762,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
 #include "MagickCore/accelerate-recreate-buffer-private.h"
 
-  if (RunStretchPass(image,&r,channel_mask,exception) == MagickFalse)
-    goto cleanup;
+  (void) RunStretchPass(image,&r,channel_mask,exception);
 
 cleanup:
 
