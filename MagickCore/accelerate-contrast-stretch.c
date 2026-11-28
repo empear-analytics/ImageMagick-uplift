@@ -377,14 +377,9 @@ static void ReleaseStretchResources(StretchResources *r)
     r->clEnv->library->clReleaseMemObject(r->histogramBuffer);
   if (r->histogram!=NULL)
     r->histogram=(cl_uint4 *) RelinquishMagickMemory(r->histogram);
-  if (r->histogramKernel!=NULL)
-    ReleaseOpenCLKernel(r->histogramKernel);
-  if (r->stretchKernel!=NULL)
-    ReleaseOpenCLKernel(r->stretchKernel);
-  if (r->queue != NULL)
-    ReleaseOpenCLCommandQueue(r->device,r->queue);
-  if (r->device != NULL)
-    ReleaseOpenCLDevice(r->device);
+  ReleaseKernel(r->histogramKernel);
+  ReleaseKernel(r->stretchKernel);
+  ReleaseAccelerateQueue(r->device,r->queue);
 }
 
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
