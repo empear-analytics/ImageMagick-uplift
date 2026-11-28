@@ -421,6 +421,7 @@ static DisplayCommand
     HelpCommands
   };
 
+#include "MagickCore/display-image-event-handle-private.h"
 #include "MagickCore/display-image-event-private.h"
 
 
