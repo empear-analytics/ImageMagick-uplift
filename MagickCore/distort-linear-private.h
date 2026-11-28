@@ -718,10 +718,18 @@ typedef struct _ScaleRotateTranslateTargets
     *ny;
 } ScaleRotateTranslateTargets;
 
-static inline MagickBooleanType ParseScaleRotateTranslateArguments(double *coeff,
-  const DistortMethod *method,const CoefficientContext *context,
-  const ScaleRotateTranslateTargets *targets)
+static inline MagickBooleanType ParseScaleRotateTranslateArguments(
+  const CoefficientCall *call,const ScaleRotateTranslateTargets *targets)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const double
     *const arguments = context->arguments;
 
@@ -847,7 +855,7 @@ static inline double *ScaleRotateTranslateCoefficients(const CoefficientCall *ca
   default:
     x = nx = arguments[0];
     y = ny = arguments[1];
-    if (ParseScaleRotateTranslateArguments(coeff,method,context,&targets) ==
+    if (ParseScaleRotateTranslateArguments(call,&targets) ==
         MagickFalse)
       return((double *) NULL);
     break;
