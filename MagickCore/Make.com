@@ -137,6 +137,7 @@ $call Make geometry-meta.c
 $call Make geometry-parse.c
 $call Make hashmap.c
 $call Make histogram.c
+$call Make histogram-stretch.c
 $call Make identify.c
 $call Make image.c
 $call Make image-mask.c
@@ -209,6 +210,7 @@ $call Make registry.c
 $call Make resample.c
 $call Make resize.c
 $call Make resize-rescale.c
+$call Make resize-liquid.c
 $call Make resize-sample.c
 $call Make resize-scale.c
 $call Make resize-image.c
@@ -249,6 +251,7 @@ $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-image.c
 $call Make threshold-level.c
+$call Make threshold-range.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c

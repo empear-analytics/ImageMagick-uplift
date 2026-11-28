@@ -119,6 +119,21 @@ typedef struct _HCubeInfo
   HNodes
     *node_queue;
 } HCubeInfo;
+
+typedef struct _HUniqueTraversal
+{
+  Image
+    *unique_image;
+
+  CacheView
+    *unique_view;
+
+  HCubeInfo
+    *cube_info;
+
+  ExceptionInfo
+    *exception;
+} HUniqueTraversal;
 
 /*
   Forward declarations.
@@ -1289,146 +1304,6 @@ MagickExport MagickBooleanType IsPaletteImage(const Image *image)
   return((image->colors <= MaxColormapSize) ? MagickTrue : MagickFalse);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%     M i n M a x S t r e t c h I m a g e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  MinMaxStretchImage() uses the exact minimum and maximum values found in
-%  each of the channels given, as the BlackPoint and WhitePoint to linearly
-%  stretch the colors (and histogram) of the image.  The stretch points are
-%  also moved further inward by the adjustment values given.
-%
-%  If the adjustment values are both zero this function is equivalent to a
-%  perfect normalization (or autolevel) of the image.
-%
-%  Each channel is stretched independently of each other (producing color
-%  distortion) unless the special 'SyncChannels' flag is also provided in the
-%  channels setting. If this flag is present the minimum and maximum point
-%  will be extracted from all the given channels, and those channels will be
-%  stretched by exactly the same amount (preventing color distortion).
-%
-%  In the special case that only ONE value is found in a channel of the image
-%  that value is not stretched, that value is left as is.
-%
-%  The 'SyncChannels' is turned on in the 'DefaultChannels' setting by
-%  default.
-%
-%  The format of the MinMaxStretchImage method is:
-%
-%      MagickBooleanType MinMaxStretchImage(Image *image,const double black,
-%        const double white,const double gamma,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: The image to auto-level
-%
-%    o black, white:  move the black / white point inward from the minimum and
-%      maximum points by this color value.
-%
-%    o gamma: the gamma.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-typedef struct _MinMaxStretch
-{
-  Image
-    *image;
-
-  double
-    black,
-    white,
-    gamma;
-
-  ExceptionInfo
-    *exception;
-} MinMaxStretch;
-
-static MagickBooleanType StretchAllChannels(const MinMaxStretch *stretch,
-  MagickStatusType status)
-{
-  Image
-    *const image = stretch->image;
-
-  const double
-    black = stretch->black,
-    white = stretch->white,
-    gamma = stretch->gamma;
-
-  ExceptionInfo
-    *const exception = stretch->exception;
-
-  double
-    min,
-    max;
-
-  /*
-    Auto-level all channels equally.
-  */
-  (void) GetImageRange(image,&min,&max,exception);
-  min+=black;
-  max-=white;
-  if (fabs(min-max) >= MagickEpsilon)
-    status&=(MagickStatusType) LevelImage(image,min,max,gamma,exception);
-  return(status != 0 ? MagickTrue : MagickFalse);
-}
-
-MagickExport MagickBooleanType MinMaxStretchImage(Image *image,
-  const double black,const double white,const double gamma,
-  ExceptionInfo *exception)
-{
-  double
-    min,
-    max;
-
-  ssize_t
-    i;
-
-  MagickStatusType
-    status;
-
-  status=MagickTrue;
-  if (image->channel_mask == AllChannels)
-    {
-      MinMaxStretch
-        stretch;
-
-      stretch.image=image;
-      stretch.black=black;
-      stretch.white=white;
-      stretch.gamma=gamma;
-      stretch.exception=exception;
-      return(StretchAllChannels(&stretch,status));
-    }
-  /*
-    Auto-level each channel.
-  */
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    ChannelType
-      channel_mask;
-
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    if ((traits & UpdatePixelTrait) == 0)
-      continue;
-    channel_mask=SetImageChannelMask(image,(ChannelType) (1UL << i));
-    status&=(MagickStatusType) GetImageRange(image,&min,&max,exception);
-    min+=black;
-    max-=white;
-    if (fabs(min-max) >= MagickEpsilon)
-      status&=(MagickStatusType) LevelImage(image,min,max,gamma,exception);
-    (void) SetImageChannelMask(image,channel_mask);
-  }
-  return(status != 0 ? MagickTrue : MagickFalse);
-}
 
 static void FormatColorTuple(const PixelInfo pixel,char *tuple)
 {
@@ -1704,8 +1579,8 @@ static void UpdateUniqueColorsProgress(Image *unique_image,
     return;
 }
 
-static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
-  HCubeInfo *cube_info,const HNodeInfo *node_info,ExceptionInfo *exception)
+static void UniqueColorsToImage(const HUniqueTraversal *traversal,
+  const HNodeInfo *node_info)
 {
   MagickBooleanType
     status;
@@ -1719,24 +1594,25 @@ static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
   /*
     Traverse any children.
   */
-  number_children=unique_image->alpha_trait == UndefinedPixelTrait ? 8UL : 16UL;
+  number_children=traversal->unique_image->alpha_trait ==
+    UndefinedPixelTrait ? 8UL : 16UL;
   for (i=0; i < (ssize_t) number_children; i++)
     if (node_info->child[i] != (HNodeInfo *) NULL)
-      UniqueColorsToImage(unique_image,unique_view,cube_info,
-        node_info->child[i],exception);
+      UniqueColorsToImage(traversal,node_info->child[i]);
   if (node_info->level == (MaxTreeDepth-1))
     {
       HUniqueColors
         unique;
 
       status=MagickTrue;
-      unique.unique_image=unique_image;
-      unique.unique_view=unique_view;
-      unique.cube_info=cube_info;
+      unique.unique_image=traversal->unique_image;
+      unique.unique_view=traversal->unique_view;
+      unique.cube_info=traversal->cube_info;
       unique.node_info=node_info;
-      unique.exception=exception;
+      unique.exception=traversal->exception;
       SetUniqueColorPixels(&unique);
-      UpdateUniqueColorsProgress(unique_image,cube_info,status);
+      UpdateUniqueColorsProgress(traversal->unique_image,traversal->cube_info,
+        status);
     }
 }
 
@@ -1764,8 +1640,12 @@ MagickExport Image *UniqueImageColors(const Image *image,
       return((Image *) NULL);
     }
   unique_view=AcquireAuthenticCacheView(unique_image,exception);
-  UniqueColorsToImage(unique_image,unique_view,cube_info,cube_info->root,
-    exception);
+  {
+    const HUniqueTraversal
+      traversal = { unique_image, unique_view, cube_info, exception };
+
+    UniqueColorsToImage(&traversal,cube_info->root);
+  }
   unique_view=DestroyCacheView(unique_view);
   cube_info=DestroyHCubeInfo(image,cube_info);
   return(unique_image);

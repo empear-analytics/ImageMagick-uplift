@@ -92,6 +92,7 @@
 #include "MagickCore/utility-private.h"
 #include "MagickCore/morphology-apply-private.h"
 #include "MagickCore/morphology-primitive-walk-private.h"
+#include "MagickCore/morphology-primitive-direct-row-private.h"
 #include "MagickCore/morphology-primitive-direct-private.h"
 
 typedef struct _MorphologyStage

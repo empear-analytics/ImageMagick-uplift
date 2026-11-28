@@ -23902,6 +23902,27 @@ placed as at `HEAD` and as in the working tree, `__LINE__`/`__FILE__` pinned; ev
 including object of an OpenMP -O2 tree identical to the parent's, debug sections stripped.
 Step 1's bar holds: the new header scores at least the carved header's score before, and
 the carved header rises or, flat, stands in a stub-probed chain whose last step raises it.
+Declarations in the run (mandate, 2026-11-19; campaign A round 38): in the upstream shared
+form the run may also hold `extern MagickPrivate` declarations that stand among its items
+(declarations only: no definition with external linkage moves, each function stays defined
+in its `.c` file), moved verbatim in their order with the rest of the run
+(`utility-private.h`'s `GetPathComponents` to `ExpandFilename` after `MagickPathTemplate`).
+Every includer still sees each declaration once, at the same place among its unit's tokens,
+so the proof of the upstream shared form covers them unchanged.
+Upstream shared mid-file form (mandate, 2026-11-19; campaign A round 38; the owner's
+2026-11-20 ruling that mid-file includes are allowed in any file): in an upstream shared
+header with no include block of its own (`token-private.h`, 31 including sources), the run
+may begin directly after a kept item, as in the mid-file form below (a non-`const`
+file-scope object such as `utf_info`, a `typedef` other items name, or a declaration with
+external linkage), and end directly before the next item that stays; the carved header
+names the new header on the run's first line, where the run stood, inside its own `extern
+"C"` pair, so the new header adds no pair of its own and the translation unit has the same
+tokens in the same order in C and in C++. The new header holds the items verbatim and in
+order inside its include guard and is included only by the carved header. Proof as for the
+upstream shared form: every including source's preprocessed unit and object identical with
+`HEAD`'s and the working tree's headers (`HDRS=1` `tools/obj_identical.sh` in every
+`ci_linux_warnings` configuration that compiles it), and the C++ check on the MagickCore
+includers. Step 1's probe applies.
 X11 conditional form (mandate, 2026-11-19; campaign A round 35): Form A also applies to a
 `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)`,
 whose matching `#endif` is the file's last directive (the `widget-*.c` split products). The
@@ -23996,6 +24017,28 @@ configuration that compiles it, such as `ci-gcc-x` and `ci-clang-x`), `IDENTICAL
 `pp_identical` differing only in indentation, identical under `diff -b`), and `NOTHING
 COMPILED` in the narrow build before and after. Unbuilt branches inside the run (`#ifdef
 _WIN32` in the accelerate timer) move verbatim under the owner's 2026-11-20 ruling.
+A header of the mid-file conditional form may be carved in its middle (mandate, 2026-11-19;
+campaign A round 38): in such a header, which one `.c` file includes
+(`opencl-initialize-benchmark-private.h`), a run that begins directly after a kept top-level
+item and ends directly before the next item that stays, inside the same `#if` branches as
+both (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`) and with every `#if`/`#endif` pair it
+holds inside it, moves verbatim and in order into a new header of the same kind (licence,
+include guard, the run; no wrapping conditional and no `extern "C"` pair of its own), and
+the carved header names the new header on the run's own first line, where the run stood,
+inside the same `#if` branches (a mid-file `#include` in the header). The new header is
+included only by the carved header. The run holds no `#include`, no definition with
+external linkage and no non-`const` file-scope object; an item of the run may name an item
+that stays above it (`SkipOpenCLBenchmarkDoctype` calls `CloseDoctypeBracket`), which is
+still declared before its use. Blank lines at the run's edges stay in the carved header.
+On such a header the recipe also takes the file-level ratio findings *Primitive Obsession*
+and *String Heavy Function Arguments*, as it takes *Overall Code Complexity* above: when a
+probe of the carve leaves the carved header and the new header each at 10.0, or at least
+at the carved header's score before with a stub-probed chain ending at 10.0 for both.
+Step 4's proof: the `.c` file compiled against `HEAD`'s and the working tree's headers
+(both headers placed ahead of every `-I` path), `__LINE__` and `__FILE__` pinned, in every
+build that compiles it (the wide candidate, `ci-gcc-x`, and `ci-clang-x` where it compiles
+standalone): preprocessed unit and object identical (the unit under `diff -b` where
+`clang -E -P` re-indents); `NOTHING COMPILED` in the narrow build before and after.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -24942,6 +24985,24 @@ parameter the callee can read from another.
    (`kernel`, `angle`) or two or more pointers that travel together, primitive ones among
    them (`kernel_string`, `end`); every call passes, for each, the caller's own variable of
    the same name, or `&v` of a plain local `v` of the caller (Recipe B step 4).
+   *Plain identifiers of other names* (mandate (2026-11-19); campaign A round 38,
+   `distort-linear-private.h`): a call may also pass, for a member, a plain identifier of
+   another name, that is a local, a parameter or an array of the caller and no other
+   expression, so that no argument has a side effect: `InvertAffineCoefficients(coeff,inverse)`
+   is called as `(inverse,coeff)` in `ConvertRigidAffineCoefficients` and
+   `InvertPerspectiveCoefficients(coeff,inverse)` as `(arguments,coeff)` in
+   `PerspectiveProjectionCoefficients`. Step 4's initialiser then lists the call's own
+   arguments in the order the call passed them, which is the member order
+   (`inversion = { inverse, coeff };`): each member is initialised from the argument its
+   parameter received. A swapped pair of the same type compiles silently, so the
+   initialiser is checked by reading against the old call, argument by argument. An array
+   argument (`double inverse[6]`) decays to the address of its first element in the
+   initialiser exactly as it did as the argument.
+   *Mixed groups* (the same mandate and file): the group may also be two or more pointers
+   that travel together with the scalars that travel with one of them, as in
+   `SetArcOuterRadius(coeff,number_arguments,arguments)`, the coefficient array beside the
+   argument array and its count. Each member keeps its parameter's exact type, and every
+   rule above applies to each member as in the two plain forms.
 2. Declare `typedef struct _Name { ... } Name;` with one member per group parameter, the
    parameter's type without top-level `const` and its name, directly above the first
    function that will take it, outside every `#if` block (in the commit of the first step;
@@ -26336,6 +26397,39 @@ block stood. Recipe S (whole functions, a branch inside them).
 6. Checks: `tools/ci_linux_warnings.sh --campaign-a`, `refactor_guard.py --combined` over the
    file and the header (every literal's total unchanged), the scores of the file and of the
    header, and the wide oracle when a case reaches the function.
+
+Kernel-string form (mandate, 2026-11-19; campaign A round 38): `accelerate-kernels-private.h`
+holds no C function. Its two initialisers, `const char *accelerateKernels =` and `const char
+*accelerateKernels2 =`, are runs of top-level `STRINGIFY(...)` and `OPENCL_DEFINE`,
+`OPENCL_IF`, `OPENCL_ELIF`, `OPENCL_ELSE` and `OPENCL_ENDIF` calls whose arguments are OpenCL
+C: the C compiler turns them into two string literals, and the OpenCL runtime compiles the
+strings when a device is used (`CompileOpenCLKernel`, which the wide catalogue reaches through
+pocl). CodeScene scores that text as C functions (2.03). A run of whole top-level calls, with
+the blank lines and banner comments between them, moves byte for byte into a guard-less
+fragment `MagickCore/accelerate-kernels-<theme>-private.h`, named by a column-0 `#include`
+line where the run stood, inside the initialiser. The text is compiled at run time, so this
+form does not rest on step 2's condition: it rests on both strings staying byte-identical,
+which leaves every object of the library unchanged. Conditions:
+(a) a cut falls only between top-level calls, where a script finds the parenthesis depth 0
+outside comments and literals, never inside a call's argument (a directive inside a macro
+argument is undefined behaviour);
+(b) the macro definitions, the `;` lines and `const char *accelerateKernels2 =` stay in the
+file;
+(c) nothing in the run is edited, so the fragment keeps the run's findings (*Excess Number of
+Function Arguments* on `__kernel` signatures that the host binds by `clSetKernelArg`, *Brain
+Method* in `WaveletDenoise`); this form does not clear them;
+(d) one fragment per commit; step 1's probe applies with the bar of the commit gate's split
+rule: the file rises, or the step is flat inside a stub-probed chain ending at 10.0 (rule 2),
+and the fragment scores at least the file's score before the step.
+The fragment's licence comment names the initialiser that includes it. Proof, in place of
+step 5: the reassembly script against `HEAD`; a translation unit that defines
+`MAGICKCORE_OPENCL_SUPPORT`, includes the header and writes both strings, built against
+`HEAD`'s and the working tree's headers, the two outputs equal under `cmp`;
+`opencl-initialize.c`, the one includer, preprocessed (`-E -P`, blank lines dropped) and
+compiled (`HDRS=1 WIDE=1 tools/obj_identical.sh`) against each side's headers, both identical;
+`tools/ci_linux_warnings.sh MagickCore/opencl-initialize.c`; `refactor_guard.py --combined`
+over the file and the fragment, every literal's total unchanged; the wide oracle with
+`--function CompileOpenCLKernel`.
 
 **Before:** (`accelerate-histogram.c`, `ComputeEqualizeImage`)
 
@@ -28075,3 +28169,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-28 | AMEND | IC | *Evidence level*, oracle form: when `obj_identical.sh` prints `DIFFERENT` and oracle cases execute every function whose locals the step inlines, the oracle `--function` on each (0 diverged, counts quoted) proves the step, `Verified: oracle`; the message names the functions whose code differs; steps 1 to 3 and 5 by reading, step 4's warning checks `OK` | `display-image-apply-effects-private.h` (campaign A, W51 round 38, lane b): inlining the bindings of the five edit commands leaves Draw, Color and Matte identical one by one, but Annotate and Composite change `XApplyFXCommands`'s stack frame (+16 bytes). Kept out of line, `XApplyCompositeCommand` differs only in the order of two member loads. The commands are reached by 22, 15, 23, 9 and 3 wide cases; the chain needs those two inlined (a probe keeping either binding: 9.09 or 9.38) | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | W | Step 7, twin form with a buffer per copy: two `void` functions whose leading blocks are one text may share the new function in one commit when each block holds, in a compound statement of its own, a `static char` array that only the block names (moved unchanged to its function's opening declarations and passed by name as `char *`, so each function keeps its own buffer) and both bind the block's other inputs from one `const Name *name` parameter (the new function takes `name` and binds them, Recipe SM step 4); bindings only the block read go with it | `display-image-annotate-private.h` (campaign A, W51 round 38, lane b): `XSelectColorBorder` and `XSelectPenColor` share `XSelectEditPen`; Recipe F refuses the buffers (the colour dialog writes them) and one shared buffer would change each command's remembered reply. Probed chain 9.38, 9.38, 9.38, 9.38, 9.38, 9.38, 10.0 | mandate (2026-11-19) |
 | 2026-11-28 | AMEND | OH | *Mid-file form*, carved again, nested placement: when the `.c` file's `#include` of the new header would lower the `.c` file, the carved header names the new header on the line after its guard's `#define` and blank line, where the run stood (an include block of its own; a later carve names its header last in that block); the `.c` file is unchanged; proof as for the carved-again form (preprocessed unit and object identical against `HEAD`'s and the working tree's headers) | `display-image-tile-private.h` (campaign A, W51 round 38, lane b): its seventh carve (the translate command) probes the header at 10.0, but a seventh mid-file `#include` in `display-image.c` is counted into `XDisplayBackgroundImage` (70 lines, *Large Method*, 9.68 -> 9.31); nested in the tile header, `display-image.c` stays 9.68 and the tile header measures 10.0 | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Upstream shared mid-file form*: in an upstream shared header without an include block, Form A's run may begin after a kept item (a non-`const` file-scope object, a named `typedef`, an external declaration) and end before the next kept item; the header names the new header where the run stood, inside its own `extern "C"` pair (the new header adds none); proof every includer's unit and object identical (`HDRS=1`) in every `ci_linux_warnings` configuration, plus the C++ check | `token-private.h` (9.09; *Overall Code Complexity* and *Complex Method* on `ConvertMacRomanToUTF8`, cc 10): any function added in place costs *Primitive Obsession* (probes 8.28 to 9.09); a probe moving `ConvertLatin1ToUTF8`, `macroman_unicode` and `ConvertMacRomanToUTF8` out from after `utf_info` gives 10.0 and a new header at 9.68, then 10.0 after one Recipe E step (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Upstream shared form, declarations in the run*: the run may also hold `extern MagickPrivate` declarations standing among its items (declarations only, every definition stays in its `.c` file), moved verbatim in order; proof unchanged (every includer's unit and object identical with `HDRS=1` in every `ci_linux_warnings` configuration, plus the C++ check) | `utility-private.h` (8.81; *Code Duplication* on `MagickRead`/`MagickWrite`, *Primitive Obsession*, *String Heavy Function Arguments*): its leading run after the include block, `MagickPathTemplate` to `MagickWrite`, holds the `GetPathComponents` to `ExpandFilename` declarations; a probe moving that run gives 10.0 and a new header at 10.0, both without findings; the shorter cuts that leave the declarations behind (through `MagickRead`) stop at 9.68 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | UB | *Kernel-string form*: a run of whole top-level `STRINGIFY`/`OPENCL_*` calls in `accelerate-kernels-private.h`'s two kernel-source initialisers moves byte for byte into a guard-less fragment `accelerate-kernels-<theme>-private.h`, named by a column-0 `#include` where it stood; cuts only at parenthesis depth 0; nothing edited; the fragment scores at least the file's score before the step; proof both kernel strings byte-identical (`cmp`), `opencl-initialize.c`'s unit and object identical (`HDRS=1 WIDE=1`), wide oracle on `CompileOpenCLKernel` | `accelerate-kernels-private.h` (2.03; *Brain Method*, *Complex Method*, *Large Method*, *Excess Number of Function Arguments*, *Code Duplication*, all in OpenCL C): a stub probe of 17 fragments, one per kernel section, takes it to 10.0 with no findings, the fragments 6.61 to 10.0 (campaign A, W51 round 38, lane c) | mandate (2026-11-19) |
+| 2026-11-28 | AMEND | OH | *Mid-file conditional form, carved in its middle*: in a header of that form that one `.c` file includes, a run between two kept items, inside the same `#if` branches, moves verbatim into a new header named by an `#include` on the run's first line in the carved header; on such a header OH also takes *Primitive Obsession* and *String Heavy Function Arguments* when the probe leaves both headers at 10.0 (or at the bar with a stub-probed chain ending at 10.0 for both); proof: the `.c` file against `HEAD`'s and the working tree's headers, unit and object identical in every build that compiles it | `opencl-initialize-benchmark-private.h` (9.38; *Primitive Obsession* 45 %, *String Heavy Function Arguments* 40 %): after four Recipe IP steps the header stays at 9.68 (*Primitive Obsession* 36 %); moving the DOCTYPE run `EndDoctypeQuote` to `SkipOpenCLBenchmarkDoctype` into `opencl-initialize-doctype-private.h` gives 10.0 for both (stub probe, cs-mcp 1.5.16, `tools/ch.py`; campaign A, W51 round 38, lane c) | mandate (2026-11-19) |

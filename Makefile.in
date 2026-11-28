@@ -421,7 +421,7 @@ am__DEPENDENCIES_1 =
 am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURCES_DIST =  \
 	MagickCore/MagickCore.h MagickCore/accelerate.c MagickCore/accelerate-point.c MagickCore/accelerate-local-contrast.c MagickCore/accelerate-motion-blur.c MagickCore/accelerate-blur.c MagickCore/accelerate-rotational-blur.c MagickCore/accelerate-unsharp.c MagickCore/accelerate-denoise.c MagickCore/accelerate-despeckle.c MagickCore/accelerate-histogram.c MagickCore/accelerate-contrast-stretch.c MagickCore/accelerate-resize.c \
 	MagickCore/accelerate-private.h \
-	MagickCore/accelerate-kernels-private.h MagickCore/accelerate-blur-private.h MagickCore/accelerate-core-private.h MagickCore/accelerate-histogram-private.h MagickCore/accelerate-recreate-buffer-private.h MagickCore/accelerate-recreate-release-private.h MagickCore/animate.c MagickCore/animate-window.c \
+	MagickCore/accelerate-kernels-private.h MagickCore/accelerate-kernels-blur-private.h MagickCore/accelerate-kernels-contraststretch-private.h MagickCore/accelerate-kernels-despeckle-private.h MagickCore/accelerate-kernels-equalize-private.h MagickCore/accelerate-kernels-function-private.h MagickCore/accelerate-kernels-localcontrast-private.h MagickCore/accelerate-kernels-modulate-private.h MagickCore/accelerate-kernels-motionblur-private.h MagickCore/accelerate-kernels-noise-private.h MagickCore/accelerate-kernels-pixel-private.h MagickCore/accelerate-kernels-quantum-private.h MagickCore/accelerate-kernels-resizefilter-private.h MagickCore/accelerate-kernels-resizehorizontal-private.h MagickCore/accelerate-kernels-resizevertical-private.h MagickCore/accelerate-kernels-rotationalblur-private.h MagickCore/accelerate-kernels-unsharpmask-private.h MagickCore/accelerate-kernels-wavelet-private.h MagickCore/accelerate-blur-private.h MagickCore/accelerate-core-private.h MagickCore/accelerate-histogram-private.h MagickCore/accelerate-recreate-buffer-private.h MagickCore/accelerate-recreate-release-private.h MagickCore/animate.c MagickCore/animate-window.c \
 	MagickCore/animate.h MagickCore/animate-private.h MagickCore/animate-window-command-private.h MagickCore/animate-window-menu-private.h MagickCore/animate-window-scene-private.h MagickCore/animate-window-events-private.h MagickCore/animate-window-session-private.h \
 	MagickCore/annotate.c MagickCore/annotate-metrics.c MagickCore/annotate.h MagickCore/annotate-type-private.h MagickCore/annotate-raqm-private.h MagickCore/annotate-freetype-private.h MagickCore/annotate-freetype-render-private.h MagickCore/annotate-render-private.h \
 	MagickCore/artifact.c MagickCore/artifact.h \
@@ -469,7 +469,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/fx-private.h MagickCore/fx-execute-private.h MagickCore/fx-translate-rpn-private.h MagickCore/fx-translate-attributes-private.h MagickCore/fx-translate-qualifiers-private.h MagickCore/fx-translate-functions-private.h MagickCore/fx-translate-operators-private.h MagickCore/fx-translate-private.h MagickCore/gem.c MagickCore/gem.h \
 	MagickCore/gem-private.h MagickCore/geometry.c MagickCore/geometry-meta.c MagickCore/geometry-parse.c \
 	MagickCore/geometry.h MagickCore/geometry-private.h MagickCore/geometry-meta-private.h MagickCore/geometry-parse-debug-private.h MagickCore/property-set-8bim-private.h MagickCore/property-set-exif-fx-private.h MagickCore/property-set-iptc-private.h MagickCore/property-set-pixel-private.h MagickCore/property-set-xmp-private.h \
-	MagickCore/histogram.c MagickCore/histogram.h \
+	MagickCore/histogram.c MagickCore/histogram-stretch.c MagickCore/histogram.h \
 	MagickCore/identify.c MagickCore/identify.h MagickCore/image.c MagickCore/image-mask.c MagickCore/image-fill.c MagickCore/image-clone.c MagickCore/image-settings.c MagickCore/image-append.c MagickCore/image-filename.c \
 	MagickCore/image.h MagickCore/image-private.h MagickCore/image-filename-private.h \
 	MagickCore/image-view.c MagickCore/image-view.h \
@@ -487,11 +487,11 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/module.h MagickCore/monitor.c MagickCore/monitor.h \
 	MagickCore/monitor-private.h MagickCore/montage.c MagickCore/montage-info.c \
 	MagickCore/montage.h MagickCore/montage-tile-private.h MagickCore/morphology.c MagickCore/morphology-apply.c MagickCore/morphology-primitive.c MagickCore/morphology-builtin.c \
-	MagickCore/morphology.h MagickCore/morphology-private.h MagickCore/morphology-apply-private.h MagickCore/morphology-apply-kernel-private.h MagickCore/morphology-builtin-shape-private.h MagickCore/morphology-builtin-type-private.h MagickCore/morphology-builtin-base-private.h MagickCore/morphology-primitive-walk-private.h MagickCore/morphology-primitive-direct-private.h \
+	MagickCore/morphology.h MagickCore/morphology-private.h MagickCore/morphology-apply-private.h MagickCore/morphology-apply-kernel-private.h MagickCore/morphology-builtin-shape-private.h MagickCore/morphology-builtin-type-private.h MagickCore/morphology-builtin-base-private.h MagickCore/morphology-primitive-walk-private.h MagickCore/morphology-primitive-direct-private.h MagickCore/morphology-primitive-direct-row-private.h \
 	MagickCore/mutex.h MagickCore/nt-base.h \
 	MagickCore/nt-base-private.h MagickCore/nt-feature.h \
 	MagickCore/opencl.c MagickCore/opencl-environment.c MagickCore/opencl-initialize.c MagickCore/opencl-enqueue.c MagickCore/opencl-device.c MagickCore/opencl.h \
-	MagickCore/opencl-private.h MagickCore/opencl-environment-private.h MagickCore/opencl-initialize-benchmark-private.h MagickCore/option.c MagickCore/option-image.c \
+	MagickCore/opencl-private.h MagickCore/opencl-environment-private.h MagickCore/opencl-initialize-benchmark-private.h MagickCore/opencl-initialize-doctype-private.h MagickCore/option.c MagickCore/option-image.c \
 	MagickCore/option.h MagickCore/option-private.h \
 	MagickCore/paint.c MagickCore/paint-floodfill.c MagickCore/paint.h MagickCore/pixel.c MagickCore/pixel-fuzzy.c MagickCore/pixel-gamma.c MagickCore/pixel-import.c MagickCore/pixel-export.c \
 	MagickCore/pixel.h MagickCore/pixel-accessor.h \
@@ -508,7 +508,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/random-private.h MagickCore/registry.c \
 	MagickCore/registry.h MagickCore/resample.c \
 	MagickCore/resample.h MagickCore/resample-private.h \
-	MagickCore/resize.c MagickCore/resize-rescale.c MagickCore/resize-sample.c MagickCore/resize-scale.c MagickCore/resize-image.c MagickCore/magnify.c \
+	MagickCore/resize.c MagickCore/resize-rescale.c MagickCore/resize-liquid.c MagickCore/resize-sample.c MagickCore/resize-scale.c MagickCore/resize-image.c MagickCore/magnify.c \
 	MagickCore/resize.h \
 	MagickCore/resize-private.h MagickCore/resource.c \
 	MagickCore/resource_.h MagickCore/resource-private.h MagickCore/resource-unique-private.h \
@@ -522,18 +522,18 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/statistic.h MagickCore/statistic-evaluate-private.h MagickCore/statistic-private.h \
 	MagickCore/stream.c MagickCore/stream-read.c MagickCore/stream.h \
 	MagickCore/stream-private.h MagickCore/stream-read-private.h MagickCore/stream-row-private.h MagickCore/stream-quantum-private.h MagickCore/stream-map-private.h MagickCore/stream-pixels-private.h MagickCore/string.c MagickCore/string-copy.c MagickCore/string-info.c MagickCore/string-argv.c MagickCore/string-si.c \
-	MagickCore/string_.h MagickCore/string-private.h \
+	MagickCore/string_.h MagickCore/string-private.h MagickCore/string-interpret-private.h \
 	MagickCore/studio.h MagickCore/thread.c MagickCore/thread_.h \
 	MagickCore/thread-private.h MagickCore/timer.c \
 	MagickCore/timer.h MagickCore/timer-private.h \
 	MagickCore/token.c MagickCore/token-isglob.c MagickCore/token-next.c MagickCore/token-glob.c MagickCore/token.h \
-	MagickCore/token-private.h MagickCore/transform.c MagickCore/transform-region.c MagickCore/transform-crop.c MagickCore/transform-tiles.c \
-	MagickCore/transform.h MagickCore/threshold.c MagickCore/threshold-image.c MagickCore/threshold-level.c MagickCore/threshold-adaptive.c MagickCore/threshold-auto.c \
-	MagickCore/threshold.h MagickCore/threshold-private.h MagickCore/type.c MagickCore/type-list.c MagickCore/type.h \
+	MagickCore/token-private.h MagickCore/token-utf8-private.h MagickCore/transform.c MagickCore/transform-region.c MagickCore/transform-crop.c MagickCore/transform-tiles.c \
+	MagickCore/transform.h MagickCore/threshold.c MagickCore/threshold-image.c MagickCore/threshold-level.c MagickCore/threshold-range.c MagickCore/threshold-adaptive.c MagickCore/threshold-auto.c \
+	MagickCore/threshold.h MagickCore/threshold-level-private.h MagickCore/threshold-private.h MagickCore/type.c MagickCore/type-list.c MagickCore/type.h \
 	MagickCore/utility.c MagickCore/utility-unique.c MagickCore/utility.h \
-	MagickCore/utility-private.h MagickCore/utility-path-private.h MagickCore/utility-template-private.h MagickCore/utility-list-private.h MagickCore/utility-expand-private.h MagickCore/utility-base64-private.h MagickCore/version.c \
+	MagickCore/utility-private.h MagickCore/utility-file-private.h MagickCore/utility-path-private.h MagickCore/utility-template-private.h MagickCore/utility-list-private.h MagickCore/utility-expand-private.h MagickCore/utility-base64-private.h MagickCore/version.c \
 	MagickCore/version.h MagickCore/version-private.h \
-	MagickCore/visual-effects.c MagickCore/visual-effects-pixel.c MagickCore/visual-effects-pixel-methods.c MagickCore/visual-effects-polaroid.c MagickCore/visual-effects-color-matrix.c MagickCore/visual-effects-morph.c MagickCore/visual-effects-sepia.c MagickCore/visual-effects-colorize.c MagickCore/visual-effects-blueshift.c MagickCore/visual-effects-noise.c MagickCore/visual-effects-wavelet.c MagickCore/visual-effects-plasma.c MagickCore/visual-effects-stegano.c MagickCore/visual-effects.h MagickCore/visual-effects-pixel-methods-private.h \
+	MagickCore/visual-effects.c MagickCore/visual-effects-pixel.c MagickCore/visual-effects-pixel-methods.c MagickCore/visual-effects-polaroid.c MagickCore/visual-effects-color-matrix.c MagickCore/visual-effects-morph.c MagickCore/visual-effects-sepia.c MagickCore/visual-effects-colorize.c MagickCore/visual-effects-blueshift.c MagickCore/visual-effects-noise.c MagickCore/visual-effects-wavelet.c MagickCore/visual-effects-plasma.c MagickCore/visual-effects-stegano.c MagickCore/visual-effects-stereo.c MagickCore/visual-effects.h MagickCore/visual-effects-pixel-methods-private.h \
 	MagickCore/vision.c MagickCore/vision-components.c MagickCore/vision.h MagickCore/vision-components-object-private.h MagickCore/vision-components-label-private.h MagickCore/widget.c MagickCore/widget-text.c MagickCore/widget-command.c MagickCore/widget-menu.c MagickCore/widget-list.c MagickCore/widget-font.c MagickCore/widget-file.c MagickCore/widget-color.c MagickCore/widget-prefs.c MagickCore/widget-confirm.c MagickCore/widget-dialog.c \
 	MagickCore/widget.h MagickCore/widget-core-private.h MagickCore/widget-browser-private.h MagickCore/widget-color-actions-private.h MagickCore/widget-font-actions-private.h MagickCore/widget-file-actions-private.h MagickCore/widget-text-view-private.h MagickCore/widget-list-actions-private.h MagickCore/widget-list-entries-private.h MagickCore/widget-private.h \
 	MagickCore/xml-tree.c MagickCore/xml-tree-file.c MagickCore/xml-tree.h \n	MagickCore/xml-tree-private.h MagickCore/xml-tree-text-private.h MagickCore/xml-tree-declarations-private.h MagickCore/xml-tree-markup-private.h MagickCore/xwindow.c MagickCore/xwindow-image.c MagickCore/xwindow-annotate.c MagickCore/xwindow-info.c MagickCore/xwindow-free.c MagickCore/xwindow-image-private.h MagickCore/xwindow-pixel.c MagickCore/xwindow-text.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c MagickCore/xwindow-import-image.c MagickCore/xwindow-import-private.h MagickCore/xwindow-import-image-window-private.h MagickCore/xwindow-search.c \n	MagickCore/xwindow.h MagickCore/nt-feature.c \
@@ -727,6 +727,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-parse.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image-mask.lo \
@@ -799,6 +800,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resample.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-scale.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-image.lo \
@@ -839,6 +841,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-image.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-auto.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-type.lo \
@@ -859,6 +862,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision-components.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.lo \
@@ -2548,6 +2552,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-parse.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image-view.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image.Plo \
@@ -2622,6 +2627,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resample.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-scale.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-image.Plo \
@@ -2653,6 +2659,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-image.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-auto.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-timer.Plo \
@@ -2684,6 +2691,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-text.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-command.Plo \
@@ -5752,6 +5760,23 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-kernels-blur-private.h \
+  MagickCore/accelerate-kernels-contraststretch-private.h \
+  MagickCore/accelerate-kernels-despeckle-private.h \
+  MagickCore/accelerate-kernels-equalize-private.h \
+  MagickCore/accelerate-kernels-function-private.h \
+  MagickCore/accelerate-kernels-localcontrast-private.h \
+  MagickCore/accelerate-kernels-modulate-private.h \
+  MagickCore/accelerate-kernels-motionblur-private.h \
+  MagickCore/accelerate-kernels-noise-private.h \
+  MagickCore/accelerate-kernels-pixel-private.h \
+  MagickCore/accelerate-kernels-quantum-private.h \
+  MagickCore/accelerate-kernels-resizefilter-private.h \
+  MagickCore/accelerate-kernels-resizehorizontal-private.h \
+  MagickCore/accelerate-kernels-resizevertical-private.h \
+  MagickCore/accelerate-kernels-rotationalblur-private.h \
+  MagickCore/accelerate-kernels-unsharpmask-private.h \
+  MagickCore/accelerate-kernels-wavelet-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-recreate-buffer-private.h \
@@ -6044,6 +6069,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/property-set-pixel-private.h \
   MagickCore/property-set-xmp-private.h \
   MagickCore/histogram.c \
+  MagickCore/histogram-stretch.c \
   MagickCore/histogram.h \
   MagickCore/identify.c \
   MagickCore/identify.h \
@@ -6122,6 +6148,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/morphology-builtin-base-private.h \
   MagickCore/morphology-primitive-walk-private.h \
   MagickCore/morphology-primitive-direct-private.h \
+  MagickCore/morphology-primitive-direct-row-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-base-private.h \
@@ -6135,6 +6162,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
   MagickCore/opencl-initialize-benchmark-private.h \
+  MagickCore/opencl-initialize-doctype-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -6207,6 +6235,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resample-private.h \
   MagickCore/resize.c \
   MagickCore/resize-rescale.c \
+  MagickCore/resize-liquid.c \
   MagickCore/resize-sample.c \
   MagickCore/resize-scale.c \
   MagickCore/resize-image.c \
@@ -6260,6 +6289,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/string-si.c \
   MagickCore/string_.h \
   MagickCore/string-private.h \
+  MagickCore/string-interpret-private.h \
   MagickCore/studio.h \
   MagickCore/thread.c \
   MagickCore/thread_.h \
@@ -6273,6 +6303,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/token-glob.c \
   MagickCore/token.h \
   MagickCore/token-private.h \
+  MagickCore/token-utf8-private.h \
   MagickCore/transform.c \
   MagickCore/transform-region.c \
   MagickCore/transform-crop.c \
@@ -6282,9 +6313,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/threshold.c \
   MagickCore/threshold-image.c \
   MagickCore/threshold-level.c \
+  MagickCore/threshold-range.c \
   MagickCore/threshold-adaptive.c \
   MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
+  MagickCore/threshold-level-private.h \
   MagickCore/threshold-private.h \
   MagickCore/type.c \
   MagickCore/type-list.c \
@@ -6293,6 +6326,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/utility-unique.c \
   MagickCore/utility.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-file-private.h \
   MagickCore/utility-path-private.h \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
@@ -6314,6 +6348,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
+  MagickCore/visual-effects-stereo.c \
   MagickCore/visual-effects.h \
   MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/vision.c \
@@ -6478,6 +6513,23 @@ MAGICKCORE_INCLUDE_HDRS = \
 MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-kernels-blur-private.h \
+  MagickCore/accelerate-kernels-contraststretch-private.h \
+  MagickCore/accelerate-kernels-despeckle-private.h \
+  MagickCore/accelerate-kernels-equalize-private.h \
+  MagickCore/accelerate-kernels-function-private.h \
+  MagickCore/accelerate-kernels-localcontrast-private.h \
+  MagickCore/accelerate-kernels-modulate-private.h \
+  MagickCore/accelerate-kernels-motionblur-private.h \
+  MagickCore/accelerate-kernels-noise-private.h \
+  MagickCore/accelerate-kernels-pixel-private.h \
+  MagickCore/accelerate-kernels-quantum-private.h \
+  MagickCore/accelerate-kernels-resizefilter-private.h \
+  MagickCore/accelerate-kernels-resizehorizontal-private.h \
+  MagickCore/accelerate-kernels-resizevertical-private.h \
+  MagickCore/accelerate-kernels-rotationalblur-private.h \
+  MagickCore/accelerate-kernels-unsharpmask-private.h \
+  MagickCore/accelerate-kernels-wavelet-private.h \
   MagickCore/accelerate-blur-private.h \
   MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-recreate-buffer-private.h \
@@ -6678,12 +6730,14 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/morphology-builtin-base-private.h \
   MagickCore/morphology-primitive-walk-private.h \
   MagickCore/morphology-primitive-direct-private.h \
+  MagickCore/morphology-primitive-direct-row-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
   MagickCore/opencl-initialize-benchmark-private.h \
+  MagickCore/opencl-initialize-doctype-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
@@ -6721,15 +6775,19 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/stream-map-private.h \
   MagickCore/stream-pixels-private.h \
   MagickCore/string-private.h \
+  MagickCore/string-interpret-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
+  MagickCore/threshold-level-private.h \
   MagickCore/threshold-private.h \
   MagickCore/timer-private.h \
   MagickCore/token-private.h \
+  MagickCore/token-utf8-private.h \
   MagickCore/transform-private.h \
   MagickCore/transform-region-private.h \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
+  MagickCore/utility-file-private.h \
   MagickCore/utility-path-private.h \
   MagickCore/utility-template-private.h \
   MagickCore/utility-list-private.h \
@@ -6771,7 +6829,8 @@ MAGICKCORE_EXTRA_DIST = \
 
 @MAGICKCORE_ZERO_CONFIGURATION_SUPPORT_TRUE@libMagickCore_threshold_target = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold.lo \
 @MAGICKCORE_ZERO_CONFIGURATION_SUPPORT_TRUE@libMagickCore_threshold_target = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-image.lo \
-@MAGICKCORE_ZERO_CONFIGURATION_SUPPORT_TRUE@libMagickCore_threshold_target = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.lo
+@MAGICKCORE_ZERO_CONFIGURATION_SUPPORT_TRUE@libMagickCore_threshold_target = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo
 @MAGICKCORE_ZERO_CONFIGURATION_SUPPORT_TRUE@libMagickCore_threshold_target = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.lo
 @MAGICKCORE_ZERO_CONFIGURATION_SUPPORT_TRUE@libMagickCore_threshold_target = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-auto.lo
 MagickWandincdir = $(INCLUDE_PATH)/MagickWand
@@ -8069,6 +8128,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -8285,6 +8347,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize.lo
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -8405,6 +8470,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -8463,6 +8531,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-ef
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision.lo:  \
@@ -10074,6 +10145,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-parse.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image-view.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image.Plo@am__quote@ # am--include-marker
@@ -10148,6 +10220,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resample.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-scale.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-image.Plo@am__quote@ # am--include-marker
@@ -10179,6 +10252,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-image.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-auto.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-timer.Plo@am__quote@ # am--include-marker
@@ -10210,6 +10284,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-text.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-command.Plo@am__quote@ # am--include-marker
@@ -11377,6 +11452,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.lo `test -f 'MagickCore/histogram.c' || echo '$(srcdir)/'`MagickCore/histogram.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo: MagickCore/histogram-stretch.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo `test -f 'MagickCore/histogram-stretch.c' || echo '$(srcdir)/'`MagickCore/histogram-stretch.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/histogram-stretch.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.lo `test -f 'MagickCore/histogram-stretch.c' || echo '$(srcdir)/'`MagickCore/histogram-stretch.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.lo: MagickCore/identify.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.lo `test -f 'MagickCore/identify.c' || echo '$(srcdir)/'`MagickCore/identify.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Plo
@@ -11881,6 +11963,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-re
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.lo `test -f 'MagickCore/resize-rescale.c' || echo '$(srcdir)/'`MagickCore/resize-rescale.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo: MagickCore/resize-liquid.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo `test -f 'MagickCore/resize-liquid.c' || echo '$(srcdir)/'`MagickCore/resize-liquid.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/resize-liquid.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.lo `test -f 'MagickCore/resize-liquid.c' || echo '$(srcdir)/'`MagickCore/resize-liquid.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.lo: MagickCore/resize-sample.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.lo `test -f 'MagickCore/resize-sample.c' || echo '$(srcdir)/'`MagickCore/resize-sample.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Plo
@@ -12161,6 +12250,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.lo `test -f 'MagickCore/threshold-level.c' || echo '$(srcdir)/'`MagickCore/threshold-level.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo: MagickCore/threshold-range.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo `test -f 'MagickCore/threshold-range.c' || echo '$(srcdir)/'`MagickCore/threshold-range.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/threshold-range.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.lo `test -f 'MagickCore/threshold-range.c' || echo '$(srcdir)/'`MagickCore/threshold-range.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.lo: MagickCore/threshold-adaptive.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.lo `test -f 'MagickCore/threshold-adaptive.c' || echo '$(srcdir)/'`MagickCore/threshold-adaptive.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Plo
@@ -12300,6 +12396,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-ef
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/visual-effects-stegano.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.lo `test -f 'MagickCore/visual-effects-stegano.c' || echo '$(srcdir)/'`MagickCore/visual-effects-stegano.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo: MagickCore/visual-effects-stereo.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo `test -f 'MagickCore/visual-effects-stereo.c' || echo '$(srcdir)/'`MagickCore/visual-effects-stereo.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/visual-effects-stereo.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.lo `test -f 'MagickCore/visual-effects-stereo.c' || echo '$(srcdir)/'`MagickCore/visual-effects-stereo.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision.lo: MagickCore/vision.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision.lo `test -f 'MagickCore/vision.c' || echo '$(srcdir)/'`MagickCore/vision.c
@@ -16212,6 +16315,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-parse.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image-view.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image.Plo
@@ -16286,6 +16390,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resample.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-scale.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-image.Plo
@@ -16317,6 +16422,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-auto.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-timer.Plo
@@ -16348,6 +16454,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-text.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-command.Plo
@@ -16903,6 +17010,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-parse.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-histogram-stretch.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-identify.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image-view.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-image.Plo
@@ -16977,6 +17085,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resample.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-rescale.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-liquid.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-sample.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-scale.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-resize-image.Plo
@@ -17008,6 +17117,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-level.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-range.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-adaptive.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-threshold-auto.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-timer.Plo
@@ -17039,6 +17149,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stereo.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-text.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget-command.Plo
