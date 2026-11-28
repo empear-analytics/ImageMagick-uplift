@@ -340,9 +340,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance-tone.c \
   MagickCore/enhance-equalize.c \
   MagickCore/enhance-level.c \
+  MagickCore/enhance-levelize.c \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
   MagickCore/enhance-color-private.h \
+  MagickCore/enhance-level-private.h \
   MagickCore/enhance-private.h \
   MagickCore/exception.c \
   MagickCore/exception-throw.c \
@@ -979,6 +981,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
   MagickCore/effect-common-private.h \
+  MagickCore/enhance-level-private.h \
   MagickCore/enhance-private.h \
   MagickCore/enhance-color-private.h \
   MagickCore/exception-private.h \

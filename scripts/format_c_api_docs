@@ -92,6 +92,7 @@ if ( ! GetOptions(
 	 'enhance-tone.c',
 	 'enhance-equalize.c',
 	 'enhance-level.c',
+	 'enhance-levelize.c',
 	 'enhance-level-colors.c',
 	 'exception.c',
 	 'exception-throw.c',

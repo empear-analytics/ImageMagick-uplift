@@ -91,6 +91,7 @@
 #include "MagickCore/xml-tree.h"
 #include "MagickCore/xml-tree-private.h"
 #include "MagickCore/enhance-private.h"
+#include "MagickCore/enhance-level-private.h"
 
 static inline MagickBooleanType IsStretchMemoryMissing(const Quantum *black,
   const Quantum *white,const Quantum *stretch_map,const double *histogram)
@@ -481,68 +482,6 @@ typedef struct _StretchPass
     *stretch_map;
 } StretchPass;
 
-typedef void
-  (*ToneRowMethod)(const Image *,const void *,Quantum *);
-
-typedef struct _ToneRows
-{
-  const char
-    *tag;
-
-  ToneRowMethod
-    method;
-
-  const void
-    *arguments;
-} ToneRows;
-
-static MagickBooleanType ToneImageRows(Image *image,const ToneRows *rows,
-  ExceptionInfo *exception)
-{
-  CacheView
-    *image_view;
-
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  ssize_t
-    y;
-
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    const ToneLine
-      line = { image,image_view,exception };
-
-    if (GetToneRow(&line,y,&q,&status) == MagickFalse)
-      continue;
-    rows->method(image,rows->arguments,q);
-    SyncToneRow(&line,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetToneProgress(image,rows->tag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
-}
-
 static MagickBooleanType StretchImagePixels(Image *image,
   const StretchPass *pass,ExceptionInfo *exception)
 {
@@ -672,11 +611,6 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
 %    o gamma: the image gamma.
 %
 */
-
-static inline double gamma_pow(const double value,const double gamma)
-{
-  return(value < 0.0 ? value : pow(value,gamma));
-}
 
 static void GammaImageRow(const Image *image,const void *arguments,
   Quantum *q)
@@ -1144,14 +1078,6 @@ static void LevelColormap(Image *image,const double black_point,
   }
 }
 
-typedef struct _LevelPoints
-{
-  double
-    black_point,
-    white_point,
-    gamma;
-} LevelPoints;
-
 static void LevelImageRow(const Image *image,const void *arguments,
   Quantum *q)
 {
@@ -1215,123 +1141,3 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
   return(status);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%     L e v e l i z e I m a g e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  LevelizeImage() applies the reversed LevelImage() operation to just
-%  the specific channels specified.  It compresses the full range of color
-%  values, so that they lie between the given black and white points. Gamma is
-%  applied before the values are mapped.
-%
-%  LevelizeImage() can be called with by using a +level command line
-%  API option, or using a '!' on a -level or LevelImage() geometry string.
-%
-%  It can be used to de-contrast a greyscale image to the exact levels
-%  specified.  Or by using specific levels for each channel of an image you
-%  can convert a gray-scale image to any linear color gradient, according to
-%  those levels.
-%
-%  The format of the LevelizeImage method is:
-%
-%      MagickBooleanType LevelizeImage(Image *image,const double black_point,
-%        const double white_point,const double gamma,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o black_point: The level to map zero (black) to.
-%
-%    o white_point: The level to map QuantumRange (white) to.
-%
-%    o gamma: adjust gamma by this factor before mapping values.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-#define LevelizeValue(x) ClampToQuantum(((MagickRealType) gamma_pow((double) \
-  (QuantumScale*((double) x)),gamma))*(white_point-black_point)+black_point)
-
-static void LevelizeImageRow(const Image *image,const void *arguments,
-  Quantum *q)
-{
-  const LevelPoints
-    *level = (const LevelPoints *) arguments;
-
-  const double
-    black_point = level->black_point,
-    white_point = level->white_point,
-    gamma = level->gamma;
-
-  ssize_t
-    x;
-
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    ssize_t
-      j;
-
-    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,j);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) == 0)
-        continue;
-      q[j]=LevelizeValue(q[j]);
-    }
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
-}
-
-MagickExport MagickBooleanType LevelizeImage(Image *image,
-  const double black_point,const double white_point,const double gamma,
-  ExceptionInfo *exception)
-{
-#define LevelizeImageTag  "Levelize/Image"
-
-  const LevelPoints
-    level = { black_point, white_point, gamma };
-
-  ssize_t
-    i;
-
-  const ToneRows
-    rows = { LevelizeImageTag,LevelizeImageRow,&level };
-
-  /*
-    Allocate and initialize levels map.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->storage_class == PseudoClass)
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      /*
-        Level colormap.
-      */
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(double) LevelizeValue(image->colormap[i].red);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(double) LevelizeValue(
-          image->colormap[i].green);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(double) LevelizeValue(image->colormap[i].blue);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(double) LevelizeValue(
-          image->colormap[i].alpha);
-    }
-  /*
-    Level image.
-  */
-  return(ToneImageRows(image,&rows,exception));
-}
