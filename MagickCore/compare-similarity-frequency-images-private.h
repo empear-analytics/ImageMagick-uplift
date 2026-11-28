@@ -771,6 +771,19 @@ static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
   return(SIMImageRows(image,&rows,exception));
 }
 
+static Image *SIMCloneForwardFourier(const Image *image,
+  ExceptionInfo *exception)
+{
+  Image
+    *clone_image = (Image *) NULL;
+
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageArtifact(clone_image,"fourier:normalize","inverse");
+  return(ForwardFourierTransformImage(clone_image,MagickFalse,exception));
+}
+
 static Image *SIMPhaseCorrelationImage(const Image *target_image,
   const Image *reconstruct_image,const Image *magnitude_image,
   ExceptionInfo *exception)
@@ -784,25 +797,13 @@ static Image *SIMPhaseCorrelationImage(const Image *target_image,
   /*
     Take the FFT of the reconstruction image.
   */
-  reconstruct_fft=CloneImage(reconstruct_image,0,0,MagickTrue,exception);
-  if (reconstruct_fft == NULL)
-    return((Image *) NULL);
-  (void) SetImageArtifact(reconstruct_fft,"fourier:normalize","inverse");
-  reconstruct_fft=ForwardFourierTransformImage(reconstruct_fft,MagickFalse,
-    exception);
+  reconstruct_fft=SIMCloneForwardFourier(reconstruct_image,exception);
   if (reconstruct_fft == NULL)
     return((Image *) NULL);
   /*
     Take the FFT of the target image.
   */
-  target_fft=CloneImage(target_image,0,0,MagickTrue,exception);
-  if (target_fft == (Image *) NULL)
-    {
-      reconstruct_fft=DestroyImageList(reconstruct_fft);
-      return((Image *) NULL);
-    }
-  (void) SetImageArtifact(target_fft,"fourier:normalize","inverse");
-  target_fft=ForwardFourierTransformImage(target_fft,MagickFalse,exception);
+  target_fft=SIMCloneForwardFourier(target_image,exception);
   if (target_fft == (Image *) NULL)
     {
       reconstruct_fft=DestroyImageList(reconstruct_fft);
