@@ -88,6 +88,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-kernels-contraststretch-private.h \
   MagickCore/accelerate-kernels-despeckle-private.h \
   MagickCore/accelerate-kernels-function-private.h \
   MagickCore/accelerate-kernels-localcontrast-private.h \
@@ -823,6 +824,7 @@ MAGICKCORE_INCLUDE_HDRS = \
 MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-kernels-contraststretch-private.h \
   MagickCore/accelerate-kernels-despeckle-private.h \
   MagickCore/accelerate-kernels-function-private.h \
   MagickCore/accelerate-kernels-localcontrast-private.h \
