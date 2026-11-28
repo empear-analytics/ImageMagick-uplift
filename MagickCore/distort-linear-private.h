@@ -517,8 +517,14 @@ static inline double *AffineCoefficients(double *coeff,const DistortMethod *meth
 }
 
 static inline void AddRigidAffineTerms(double **matrix,double *vectors[1],
-  const double *arguments,const size_t number_arguments)
+  const CoefficientContext *context)
 {
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   const LeastSquaresSystem
     least_squares = { matrix, vectors, 4UL, 1UL };
 
@@ -564,9 +570,6 @@ static inline void ConvertRigidAffineCoefficients(double *coeff)
 static inline double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
   const CoefficientContext *context)
 {
-  const double
-    *const arguments = context->arguments;
-
   ExceptionInfo
     *const exception = context->exception;
 
@@ -610,7 +613,7 @@ static inline double *RigidAffineCoefficients(double *coeff,DistortMethod *metho
     Add control points for least squares solving.
   */
   vectors[0]=(&(coeff[0]));
-  AddRigidAffineTerms(matrix,vectors,arguments,number_arguments);
+  AddRigidAffineTerms(matrix,vectors,context);
   /*
     Solve for least-squares coefficients.
   */
