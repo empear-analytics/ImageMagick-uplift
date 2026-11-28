@@ -23,9 +23,22 @@
 extern "C" {
 #endif
 
-static inline void ConvertXYZToAdobe98(const double X,const double Y,
-  const double Z,double *red,double *green,double *blue)
+typedef struct _XYZToAdobe98Input
 {
+  double
+    X,
+    Y,
+    Z;
+} XYZToAdobe98Input;
+
+static inline void ConvertXYZToAdobe98(const XYZToAdobe98Input *xyz,
+  double *red,double *green,double *blue)
+{
+  const double
+    X = xyz->X,
+    Y = xyz->Y,
+    Z = xyz->Z;
+
   double
     b,
     g,
@@ -48,7 +61,12 @@ static inline void ConvertRGBToAdobe98(const double red,const double green,
     Z;
 
   ConvertRGBToXYZ(red,green,blue,&X,&Y,&Z);
-  ConvertXYZToAdobe98(X,Y,Z,r,g,b);
+  {
+    const XYZToAdobe98Input
+      xyz = { X, Y, Z };
+
+    ConvertXYZToAdobe98(&xyz,r,g,b);
+  }
 }
 
 static inline void ConvertXYZToDisplayP3(const double X,const double Y,
