@@ -77,6 +77,34 @@ static const uint16_t macroman_unicode[128] = {
   0x00AF,0x02D8,0x02D9,0x02DA,0x00B8,0x02DD,0x02DB,0x02C7
 };
 
+static inline unsigned char *WriteUTF8Code(unsigned char *magick_restrict q,
+  const int c)
+{
+  if ((c & 0x80) == 0)
+    *q++=(unsigned char) c;
+  else
+    if (c <= 0x7ff)
+      {
+        *q++=(unsigned char) (0xc0 | ((c >> 6) & 0x3f));
+        *q++=(unsigned char) (0x80 | (c & 0x3f));
+      }
+    else
+      if (c <= 0xffff)
+        {
+          *q++=(unsigned char) (0xe0 | (c >> 12));
+          *q++=(unsigned char) (0x80 | ((c >> 6) & 0x3f));
+          *q++=(unsigned char) (0x80 | (c & 0x3f));
+        }
+      else
+        {
+          *q++=(unsigned char) (0xf0 | (c >> 18));
+          *q++=(unsigned char) (0x80 | ((c >> 12) & 0x3f));
+          *q++=(unsigned char) (0x80 | ((c >> 6) & 0x3f));
+          *q++=(unsigned char) (0x80 | (c & 0x3f));
+        }
+  return(q);
+}
+
 static inline unsigned char *ConvertMacRomanToUTF8(
   const unsigned char *magick_restrict content)
 {
@@ -107,28 +135,7 @@ static inline unsigned char *ConvertMacRomanToUTF8(
     c=(*p);
     if (c > 128)
       c=(int) macroman_unicode[c-128];
-    if ((c & 0x80) == 0)
-      *q++=(unsigned char) c;
-    else
-      if (c <= 0x7ff)
-        {
-          *q++=(unsigned char) (0xc0 | ((c >> 6) & 0x3f));
-          *q++=(unsigned char) (0x80 | (c & 0x3f));
-        }
-      else
-        if (c <= 0xffff)
-          {
-            *q++=(unsigned char) (0xe0 | (c >> 12));
-            *q++=(unsigned char) (0x80 | ((c >> 6) & 0x3f));
-            *q++=(unsigned char) (0x80 | (c & 0x3f));
-          }
-        else
-          {
-            *q++=(unsigned char) (0xf0 | (c >> 18));
-            *q++=(unsigned char) (0x80 | ((c >> 12) & 0x3f));
-            *q++=(unsigned char) (0x80 | ((c >> 6) & 0x3f));
-            *q++=(unsigned char) (0x80 | (c & 0x3f));
-          }
+    q=WriteUTF8Code(q,c);
   }
   *q='\0';
   return(utf8);
