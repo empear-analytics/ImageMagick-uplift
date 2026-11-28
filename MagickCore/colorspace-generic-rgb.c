@@ -375,7 +375,10 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   {
     case Adobe98Colorspace:
     {
-      ConvertAdobe98ToRGB(X,Y,Z,R,G,B);
+      const XYZToRGBTarget
+        target = { R, G, B };
+
+      ConvertAdobe98ToRGB(X,Y,Z,&target);
       break;
     }
     case CAT02LMSColorspace:
@@ -385,13 +388,19 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
         M,
         S;
 
+      const CAT02LMSRGBTarget
+        target = { R, G, B };
+
       ConvertXYZToCAT02LMS(X,Y,Z,&L,&M,&S);
-      ConvertCAT02LMSToRGB(L,M,S,R,G,B);
+      ConvertCAT02LMSToRGB(L,M,S,&target);
       break;
     }
     case CMYColorspace:
     {
-      ConvertCMYToRGB(X,Y,Z,R,G,B);
+      const XYZToRGBTarget
+        target = { R, G, B };
+
+      ConvertCMYToRGB(X,Y,Z,&target);
       break;
     }
     case DisplayP3Colorspace:
