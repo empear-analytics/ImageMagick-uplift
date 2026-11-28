@@ -43,6 +43,7 @@
 #include "MagickCore/colorspace-jzazbz-to-xyz-private.h"
 #include "MagickCore/colorspace-jzazbz-private.h"
 #include "MagickCore/colorspace-jzazbz-oklab-private.h"
+#include "MagickCore/colorspace-rgb-to-oklab-private.h"
 #include "MagickCore/colorspace-rgb-to-ycc-private.h"
 #include "MagickCore/colorspace-rgb-to-luma-private.h"
 #include "MagickCore/colorspace-conversions-private.h"

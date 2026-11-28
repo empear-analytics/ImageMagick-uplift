@@ -193,6 +193,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-jzazbz-to-xyz-private.h \
   MagickCore/colorspace-jzazbz-private.h \
   MagickCore/colorspace-jzazbz-oklab-private.h \
+  MagickCore/colorspace-rgb-to-oklab-private.h \
   MagickCore/colorspace-rgb-to-ycc-private.h \
   MagickCore/colorspace-rgb-to-luma-private.h \
   MagickCore/colorspace-conversions-private.h \
@@ -865,6 +866,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colorspace-jzazbz-to-xyz-private.h \
   MagickCore/colorspace-jzazbz-private.h \
   MagickCore/colorspace-jzazbz-oklab-private.h \
+  MagickCore/colorspace-rgb-to-oklab-private.h \
   MagickCore/colorspace-rgb-to-ycc-private.h \
   MagickCore/colorspace-rgb-to-luma-private.h \
   MagickCore/colorspace-conversions-private.h \
